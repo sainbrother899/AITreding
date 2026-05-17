@@ -2550,3 +2550,24 @@ body[data-admin-page="true"] .card:hover,
 body[data-admin-page="true"] .table-card:hover{
   transform:none!important;
 }
+
+
+/* ===== USER MANAGED TRADE HISTORY ===== */
+.user-managed-history-card{
+  max-width:1560px;
+  margin:18px auto 0!important;
+}
+#userManagedTradesLog .pnl-plus{
+  color:var(--green);
+  font-weight:900;
+}
+#userManagedTradesLog .pnl-minus{
+  color:var(--red);
+  font-weight:900;
+}
+@media(min-width:901px){
+  #appPage .user-managed-history-card{
+    width:430px!important;
+    max-width:430px!important;
+  }
+}

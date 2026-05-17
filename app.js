@@ -622,7 +622,21 @@ async function loadRemoteData() {
     console.warn("KYC fetch failed", e);
   }
 
+  
   try {
+    const { data: managedRows } = await supabaseClient
+      .from("managed_trades")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (managedRows) {
+      state.managedTrades = managedRows.map(mapManagedTradeRow);
+    }
+  } catch (e) {
+    console.warn("Managed trades fetch failed", e);
+  }
+
+try {
     const { data: refs } = await supabaseClient.from("referrals").select("*");
     if (refs) {
       state.referrals = refs.map(r => ({
@@ -821,6 +835,7 @@ function render() {
   renderDeposits();
   renderWithdrawals();
   renderWithdrawalEligibility();
+  renderUserManagedTrades();
   renderAdminPanel();
   renderPlans();
   renderKyc();
@@ -2030,6 +2045,7 @@ function renderAdminPanel() {
   renderAdminReferrals();
   renderAdminAiEligibility();
   renderManagedTradeAdmin();
+  renderUserManagedTrades();
 }
 
 function renderAdminUsers() {
@@ -2219,6 +2235,26 @@ function openMassTradeForEligibleUsers() {
 }
 
 
+
+function mapManagedTradeRow(row) {
+  return {
+    id: String(row.id),
+    userId: row.user_id,
+    userEmail: row.user_email || "",
+    coin: row.coin,
+    side: row.side,
+    risk: row.risk || "MEDIUM",
+    amount: Number(row.amount || 0),
+    entry: Number(row.entry_price || 0),
+    close: row.close_price === null || row.close_price === undefined ? null : Number(row.close_price || 0),
+    pnl: Number(row.pnl || 0),
+    status: row.status || "OPEN",
+    source: row.source || "ADMIN_MANAGED",
+    openedAt: row.opened_at || "",
+    closedAt: row.closed_at || ""
+  };
+}
+
 function managedPnl(side, entry, close, amount) {
   entry = Number(entry || 0);
   close = Number(close || 0);
@@ -2265,6 +2301,26 @@ function renderManagedTradesLog() {
       <td>${t.status}</td>
     </tr>`;
   }).join("") || `<tr><td colspan="8" class="empty">No managed trades.</td></tr>`;
+}
+
+
+function renderUserManagedTrades() {
+  const el = $("userManagedTradesLog");
+  if (!el) return;
+  const uid = String(state.user?.id || "local");
+  const rows = (state.managedTrades || []).filter(t => String(t.userId) === uid || !t.userId && uid === "local");
+  el.innerHTML = rows.map(t => {
+    const cls = Number(t.pnl || 0) >= 0 ? "pnl-plus" : "pnl-minus";
+    return `<tr>
+      <td>${String(t.coin || "").replace("USDT","/USDT")}</td>
+      <td>${t.side || "-"}</td>
+      <td>${money(t.amount || 0)}</td>
+      <td>${money(t.entry || 0)}</td>
+      <td>${t.close ? money(t.close) : "-"}</td>
+      <td class="${cls}">${money(t.pnl || 0)}</td>
+      <td>${t.status || "OPEN"}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="7" class="empty">No AI/Admin trades yet.</td></tr>`;
 }
 
 function renderManagedTradeAdmin() {
@@ -2319,6 +2375,28 @@ async function openManagedTrade() {
       openedAt: new Date().toLocaleString()
     };
     state.managedTrades.unshift(trade);
+
+    if (supabaseClient) {
+      try {
+        await supabaseClient.from("managed_trades").insert({
+          id: trade.id,
+          user_id: trade.userId,
+          user_email: trade.userEmail,
+          coin: trade.coin,
+          side: trade.side,
+          risk: trade.risk,
+          amount: trade.amount,
+          entry_price: trade.entry,
+          close_price: null,
+          pnl: 0,
+          status: "OPEN",
+          source: "ADMIN_MANAGED",
+          opened_at: trade.openedAt
+        });
+      } catch (e) {
+        console.warn("Managed trade open save failed", e);
+      }
+    }
 
     // Local preview position for current shared demo build.
     state.accounts.REAL.trades = state.accounts.REAL.trades || [];
@@ -2385,6 +2463,13 @@ async function closeManagedTrade() {
 
   if (supabaseClient) {
     try {
+      await supabaseClient.from("managed_trades").update({
+        close_price: close,
+        pnl,
+        status: "CLOSED",
+        closed_at: t.closedAt
+      }).eq("id", id);
+
       await supabaseClient.from("wallet_ledger").insert({
         user_id: t.userId,
         type: "MANAGED_TRADE_PNL",

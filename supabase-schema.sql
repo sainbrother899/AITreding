@@ -225,3 +225,32 @@ update public.subscription_plans set ai_trade_limit = 5 where ai_trade_limit is 
 
 
 -- wallet_ledger type MANAGED_TRADE_PNL stores admin-managed trade profit/loss.
+
+
+create table if not exists public.managed_trades (
+  id text primary key,
+  created_at timestamp with time zone default now(),
+  user_id text,
+  user_email text,
+  coin text,
+  side text,
+  risk text,
+  amount numeric,
+  entry_price numeric,
+  close_price numeric,
+  pnl numeric default 0,
+  status text default 'OPEN',
+  source text default 'ADMIN_MANAGED',
+  opened_at text,
+  closed_at text
+);
+
+alter table public.managed_trades enable row level security;
+
+drop policy if exists "public read managed trades" on public.managed_trades;
+drop policy if exists "public insert managed trades" on public.managed_trades;
+drop policy if exists "public update managed trades" on public.managed_trades;
+
+create policy "public read managed trades" on public.managed_trades for select using (true);
+create policy "public insert managed trades" on public.managed_trades for insert with check (true);
+create policy "public update managed trades" on public.managed_trades for update using (true);

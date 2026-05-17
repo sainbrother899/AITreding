@@ -361,3 +361,12 @@ Admin Stable PC Fix:
 - Fixed admin grid width and content overflow.
 - Tables stay inside right panel with horizontal scroll if needed.
 - PC admin panel should no longer shake/move.
+
+
+Managed Trade User History Fix:
+- Added Supabase managed_trades table.
+- Admin open managed trade now saves to managed_trades.
+- Admin close managed trade updates managed_trades and wallet_ledger.
+- User dashboard now shows AI/Admin Managed Trade History.
+- User can see entry, close, PnL and status after refresh.
+- Latest SQL must be run once for managed_trades table.
