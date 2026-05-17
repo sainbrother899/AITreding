@@ -2571,3 +2571,8 @@ body[data-admin-page="true"] .table-card:hover{
     max-width:430px!important;
   }
 }
+
+/* Managed Trade Sync Fix */
+.user-managed-history-card .pill{
+  white-space:nowrap;
+}

@@ -370,3 +370,11 @@ Managed Trade User History Fix:
 - User dashboard now shows AI/Admin Managed Trade History.
 - User can see entry, close, PnL and status after refresh.
 - Latest SQL must be run once for managed_trades table.
+
+
+Managed Trade User Sync Fix:
+- Admin user list now loads from Supabase profiles.
+- User managed trade history matches by user_id OR user_email.
+- User dashboard auto-refreshes managed trade history every 10 seconds.
+- Closing managed trade reloads remote data and updates history.
+- Fixes issue where admin-managed trade did not show on user dashboard.

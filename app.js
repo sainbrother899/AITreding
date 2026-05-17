@@ -504,8 +504,42 @@ async function recalcRealBalanceFromLedger() {
 }
 
 
+
+async function fetchSupabaseProfilesForAdmin() {
+  if (!supabaseClient) return;
+  try {
+    const { data: profiles } = await supabaseClient
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (profiles && profiles.length) {
+      const existing = state.users || [];
+      const byKey = new Map(existing.map(u => [String(u.id || u.email), u]));
+      profiles.forEach(p => {
+        const id = String(p.id || p.user_id || p.email || "");
+        const current = byKey.get(id) || {};
+        byKey.set(id, {
+          ...current,
+          id: p.id || p.user_id || current.id || p.email,
+          name: p.name || current.name || (p.email ? String(p.email).split("@")[0] : "User"),
+          email: p.email || current.email || "",
+          mobile: p.mobile || current.mobile || "",
+          role: p.role || current.role || "user",
+          plan: p.plan || current.plan || "Free",
+          autoTradePermission: current.autoTradePermission !== false
+        });
+      });
+      state.users = Array.from(byKey.values());
+    }
+  } catch (e) {
+    console.warn("Profiles fetch failed", e);
+  }
+}
+
 async function loadRemoteData() {
   if (!supabaseClient) return;
+  await fetchSupabaseProfilesForAdmin();
 
   try {
     const { data: payments } = await supabaseClient
@@ -2268,9 +2302,13 @@ function renderManagedUserSelect() {
   const el = $("managedUserSelect");
   if (!el || state.user?.role !== "admin") return;
   const old = el.value || "ALL";
-  const users = (state.users || []).filter(u => u.role !== "admin");
-  el.innerHTML = `<option value="ALL">All Eligible Users</option>` + users.map(u => `<option value="${u.id}">${u.email || u.name || u.id}</option>`).join("");
-  el.value = old;
+  const users = (state.users || []).filter(u => u.role !== "admin" && (u.email || u.id));
+  el.innerHTML = `<option value="ALL">All Eligible Users</option>` + users.map(u => {
+    const id = u.id || u.email;
+    const label = u.email || u.name || id;
+    return `<option value="${id}">${label}</option>`;
+  }).join("");
+  if ([...el.options].some(o => o.value === old)) el.value = old;
 }
 
 function renderManagedTradeSelect() {
@@ -2307,8 +2345,16 @@ function renderManagedTradesLog() {
 function renderUserManagedTrades() {
   const el = $("userManagedTradesLog");
   if (!el) return;
+
   const uid = String(state.user?.id || "local");
-  const rows = (state.managedTrades || []).filter(t => String(t.userId) === uid || !t.userId && uid === "local");
+  const email = String(state.user?.email || "").toLowerCase();
+
+  const rows = (state.managedTrades || []).filter(t => {
+    const tid = String(t.userId || "");
+    const temail = String(t.userEmail || "").toLowerCase();
+    return tid === uid || (!!email && temail === email);
+  });
+
   el.innerHTML = rows.map(t => {
     const cls = Number(t.pnl || 0) >= 0 ? "pnl-plus" : "pnl-minus";
     return `<tr>
@@ -2485,6 +2531,9 @@ async function closeManagedTrade() {
   saveState();
   render();
   renderManagedTradeAdmin();
+  // Managed trade remote reload after close
+  try { await loadRemoteData(); } catch(e) {}
+  renderUserManagedTrades();
   toast(`Managed trade closed. PnL: ${money(pnl)}`);
 }
 
@@ -2965,3 +3014,18 @@ function syncAdminPremiumMetrics(){
   }catch(e){}
 }
 setInterval(syncAdminPremiumMetrics, 1000);
+
+
+let managedTradeUserAutoRefresh = null;
+window.addEventListener("load", function(){
+  if (managedTradeUserAutoRefresh) return;
+  managedTradeUserAutoRefresh = setInterval(async () => {
+    try {
+      if (state.user && state.user.role !== "admin" && supabaseClient) {
+        await loadRemoteData();
+        renderUserManagedTrades();
+        if (typeof render === "function") render();
+      }
+    } catch(e) {}
+  }, 10000);
+});
