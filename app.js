@@ -1699,6 +1699,101 @@ function renderDeposits() {
   }
 }
 
+
+/* ===== 5% AUTO REFERRAL BONUS ON APPROVED DEPOSIT ===== */
+const REFERRAL_BONUS_PERCENT = 5;
+
+function findReferrerForUser(userId, userEmail) {
+  const uid = String(userId || "");
+  const email = String(userEmail || "").toLowerCase();
+
+  const user = (state.users || []).find(u =>
+    String(u.id || "") === uid ||
+    (!!email && String(u.email || "").toLowerCase() === email)
+  );
+
+  const referralCode = user?.referredBy || user?.referralBy || user?.referrerCode || user?.referral_code_used || user?.referralCodeUsed;
+  if (!referralCode) return null;
+
+  return (state.users || []).find(u =>
+    String(u.referralCode || u.referral_code || "").toLowerCase() === String(referralCode).toLowerCase() ||
+    String(u.id || "") === String(referralCode) ||
+    String(u.email || "").toLowerCase() === String(referralCode).toLowerCase()
+  );
+}
+
+function referralBonusAlreadyPaid(depositId) {
+  const key = "ref_bonus_" + String(depositId);
+  return !!localStorage.getItem(key);
+}
+
+function markReferralBonusPaid(depositId) {
+  const key = "ref_bonus_" + String(depositId);
+  localStorage.setItem(key, "1");
+}
+
+async function applyReferralBonusForDeposit(dep) {
+  if (!dep || dep.status !== "APPROVED") return;
+  if (referralBonusAlreadyPaid(dep.id)) return;
+
+  const referrer = findReferrerForUser(dep.userId, dep.userEmail);
+  if (!referrer) return;
+
+  const bonus = Number(dep.amount || 0) * (REFERRAL_BONUS_PERCENT / 100);
+  if (!bonus || bonus <= 0) return;
+
+  referrer.refBonus = Number(referrer.refBonus || 0) + bonus;
+  referrer.referralBonus = Number(referrer.referralBonus || 0) + bonus;
+
+  state.referrals = state.referrals || [];
+  state.referrals.unshift({
+    id: "rb_" + Date.now() + "_" + Math.random().toString(16).slice(2),
+    referrerId: referrer.id,
+    referrerEmail: referrer.email || "",
+    userId: dep.userId,
+    userEmail: dep.userEmail || "",
+    depositId: dep.id,
+    depositAmount: Number(dep.amount || 0),
+    bonusAmount: bonus,
+    percent: REFERRAL_BONUS_PERCENT,
+    status: "PAID",
+    date: new Date().toLocaleString()
+  });
+
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from("referrals").insert({
+        referrer_id: referrer.id,
+        referrer_email: referrer.email || "",
+        user_id: dep.userId,
+        user_email: dep.userEmail || "",
+        deposit_id: String(dep.id),
+        deposit_amount: Number(dep.amount || 0),
+        bonus_amount: bonus,
+        percent: REFERRAL_BONUS_PERCENT,
+        status: "PAID"
+      });
+    } catch (e) {
+      console.warn("Referral table bonus save failed", e);
+    }
+
+    try {
+      await supabaseClient.from("wallet_ledger").insert({
+        user_id: referrer.id,
+        type: "REFERRAL_BONUS",
+        amount: bonus,
+        note: `5% referral bonus from deposit ${dep.id}`
+      });
+    } catch (e) {
+      console.warn("Referral wallet ledger save failed", e);
+    }
+  }
+
+  markReferralBonusPaid(dep.id);
+  saveState();
+}
+
+
 async function approveDeposit(id) {
   const req = (state.depositRequests || []).find(d => String(d.id) === String(id));
   if (!req) return;

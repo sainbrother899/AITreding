@@ -254,3 +254,14 @@ drop policy if exists "public update managed trades" on public.managed_trades;
 create policy "public read managed trades" on public.managed_trades for select using (true);
 create policy "public insert managed trades" on public.managed_trades for insert with check (true);
 create policy "public update managed trades" on public.managed_trades for update using (true);
+
+
+alter table public.referrals add column if not exists referrer_id text;
+alter table public.referrals add column if not exists referrer_email text;
+alter table public.referrals add column if not exists user_id text;
+alter table public.referrals add column if not exists user_email text;
+alter table public.referrals add column if not exists deposit_id text;
+alter table public.referrals add column if not exists deposit_amount numeric default 0;
+alter table public.referrals add column if not exists bonus_amount numeric default 0;
+alter table public.referrals add column if not exists percent numeric default 5;
+alter table public.referrals add column if not exists status text default 'PAID';

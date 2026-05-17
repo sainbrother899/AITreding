@@ -455,3 +455,12 @@ More Buttons Fix:
 - More page internal buttons now open KYC, Plans, Referral and Profile.
 - Added Profile page.
 - Added direct navigation handler for More page buttons.
+
+
+Referral 5% Auto Bonus Update:
+- Referral bonus = 5% of referred user's approved deposit.
+- Bonus applies automatically when admin approves deposit.
+- No separate referral approval needed.
+- Bonus saved in referrals table and wallet_ledger as REFERRAL_BONUS.
+- Bonus is paid only once per deposit.
+- If you use Supabase, run latest referral SQL columns once.
