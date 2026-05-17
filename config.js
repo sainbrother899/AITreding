@@ -1,18 +1,15 @@
 // Supabase Config
-// 1) Supabase project create करो
-// 2) Project Settings > API से URL और anon public key copy करो
-// 3) नीचे paste करो
-// Empty रहने पर app localStorage mode में चलेगा.
+// आपकी Supabase URL और publishable/anon key नीचे add कर दी गई है.
 
 window.APP_CONFIG = {
-  SUPABASE_URL: "",
-  SUPABASE_ANON_KEY: "",
+  SUPABASE_URL: "https://gijafjwjrmymtonddvfv.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_vVZFBYp-tXwKmwCCmIrgdw_-ZVQ1aFG",
 
-  // Local admin fallback login
+  // Separate admin login
   ADMIN_EMAIL: "admin@aitrade.local",
   ADMIN_PASSWORD: "admin123",
 
-  // Manual gateway details
+  // Manual gateway details - यहां अपनी real UPI/Bank details डालना
   UPI_ID: "yourupi@bank",
   ACCOUNT_NAME: "AI Trading Assistant",
   BANK_NAME: "Your Bank Name",

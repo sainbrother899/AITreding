@@ -49,3 +49,12 @@ Separate Admin Login Added:
 - User side no longer shows Admin tab.
 - Admin cannot login from index.html.
 - Normal users cannot login from admin.html.
+
+
+Configured:
+- Supabase URL added
+- Supabase publishable/anon key added
+
+Before going live:
+- Replace manual gateway details in config.js with your real UPI/Bank details.
+- Run supabase-schema.sql in Supabase SQL Editor.
