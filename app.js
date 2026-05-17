@@ -32,6 +32,7 @@ const defaultState = {
   note: "Admin + AI engine combined signal.",
   trades: [],
   paymentRequests: [],
+  depositRequests: [],
   closedTrades: [],
   recentFills: [],
   selectedPaymentPlan: "Pro",
@@ -190,6 +191,7 @@ async function login() {
     }
 
     state.user = { ...localUser, password: undefined };
+    if (typeof localUser.realBalance === "number") state.realBalance = localUser.realBalance;
     saveState();
     await loadRemoteData();
     showApp();
@@ -340,6 +342,28 @@ async function loadRemoteData() {
   }
 
   try {
+    const { data: deposits } = await supabaseClient
+      .from("deposit_requests")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (deposits) {
+      state.depositRequests = deposits.map(d => ({
+        id: String(d.id),
+        userId: d.user_id,
+        userEmail: d.user_email || "",
+        amount: Number(d.amount || 0),
+        txn: d.txn,
+        screenshot: d.screenshot_url || "Not uploaded",
+        status: d.status || "PENDING",
+        date: d.created_at ? new Date(d.created_at).toLocaleString() : ""
+      }));
+    }
+  } catch (e) {
+    console.warn("Deposit fetch failed", e);
+  }
+
+  try {
     const { data: refs } = await supabaseClient.from("referrals").select("*");
     if (refs) {
       state.referrals = refs.map(r => ({
@@ -366,9 +390,21 @@ async function loadRemoteData() {
         state.user.plan = p.plan || state.user.plan || "Free";
         state.user.referralCode = p.referral_code || state.user.referralCode;
       }
+
+      const { data: ledgerRows } = await supabaseClient
+        .from("wallet_ledger")
+        .select("amount,type")
+        .eq("user_id", state.user.id);
+
+      if (ledgerRows) {
+        const depositTotal = ledgerRows
+          .filter(x => x.type === "DEPOSIT")
+          .reduce((a, x) => a + Number(x.amount || 0), 0);
+        state.realBalance = depositTotal;
+      }
     }
   } catch (e) {
-    console.warn("Profile refresh failed", e);
+    console.warn("Profile/wallet refresh failed", e);
   }
 
   saveState();
@@ -413,6 +449,7 @@ function render() {
   if (!state.user) return;
 
   if ($("walletBalance")) $("walletBalance").textContent = money(state.mode === "DEMO" ? state.demoBalance : state.realBalance);
+  if ($("walletPageBalance")) $("walletPageBalance").textContent = money(state.realBalance);
   $("demoBtn")?.classList.toggle("active", state.mode === "DEMO");
   $("realBtn")?.classList.toggle("active", state.mode === "REAL");
 
@@ -431,6 +468,7 @@ function render() {
   renderTickers();
   renderTrades();
   renderPayments();
+  renderDeposits();
   renderAnalytics();
   renderReferral();
 }
@@ -791,6 +829,144 @@ async function submitManualPayment() {
   toast("Payment request submitted.");
 }
 
+
+function openDepositModal() {
+  if ($("depositUpiText")) $("depositUpiText").textContent = CONFIG.UPI_ID || "yourupi@bank";
+  if ($("depositAccountText")) $("depositAccountText").textContent = CONFIG.ACCOUNT_NAME || "AI Trading Assistant";
+  if ($("depositBankText")) $("depositBankText").textContent = CONFIG.BANK_NAME || "Your Bank Name";
+  if ($("depositAccountNoText")) $("depositAccountNoText").textContent = CONFIG.ACCOUNT_NO || "000000000000";
+  if ($("depositIfscText")) $("depositIfscText").textContent = CONFIG.IFSC || "ABCD0000000";
+  $("depositModal")?.classList.add("show");
+}
+
+function closeDepositModal() {
+  $("depositModal")?.classList.remove("show");
+}
+
+async function submitDepositRequest() {
+  const amount = Number($("depositAmount")?.value || 0);
+  const txn = $("depositTxn")?.value.trim();
+  const file = $("depositScreenshot")?.files[0];
+
+  if (!amount || amount <= 0 || !txn) {
+    toast("Deposit amount and UTR required.");
+    return;
+  }
+
+  let remoteId = "d_" + Date.now();
+
+  if (supabaseClient && state.user?.id) {
+    try {
+      const { data, error } = await supabaseClient
+        .from("deposit_requests")
+        .insert({
+          user_id: state.user.id,
+          user_email: state.user.email || "",
+          amount,
+          txn,
+          screenshot_url: file ? file.name : "Not uploaded",
+          status: "PENDING"
+        })
+        .select()
+        .single();
+
+      if (error) {
+        toast(error.message || "Deposit save failed.");
+        return;
+      }
+
+      remoteId = String(data.id);
+    } catch (e) {
+      toast("Deposit request save failed. Run latest SQL.");
+      return;
+    }
+  }
+
+  state.depositRequests.unshift({
+    id: remoteId,
+    userId: state.user?.id || "local",
+    userEmail: state.user?.email || "",
+    amount,
+    txn,
+    screenshot: file ? file.name : "Not uploaded",
+    status: "PENDING",
+    date: new Date().toLocaleString()
+  });
+
+  saveState();
+  render();
+  closeDepositModal();
+
+  if ($("depositAmount")) $("depositAmount").value = "";
+  if ($("depositTxn")) $("depositTxn").value = "";
+  if ($("depositScreenshot")) $("depositScreenshot").value = "";
+
+  toast("Deposit request submitted for admin approval.");
+}
+
+function renderDeposits() {
+  const adminTable = $("depositRequestsLog");
+  const userTable = $("userDepositLog");
+
+  if (adminTable && state.user?.role === "admin") {
+    adminTable.innerHTML = (state.depositRequests || []).map(d => `
+      <tr>
+        <td>${d.userEmail || d.userId || "-"}</td>
+        <td>${money(d.amount)}</td>
+        <td>${d.txn}</td>
+        <td>${d.status}</td>
+        <td>${d.status === "PENDING" ? `<button class="ghost-btn" onclick="approveDeposit('${d.id}')">Approve</button>` : "-"}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="5" class="empty">No deposit requests.</td></tr>`;
+  }
+
+  if (userTable) {
+    const myDeposits = (state.depositRequests || []).filter(d => String(d.userId) === String(state.user?.id));
+    userTable.innerHTML = myDeposits.map(d => `
+      <tr>
+        <td>${money(d.amount)}</td>
+        <td>${d.txn}</td>
+        <td>${d.status}</td>
+        <td>${d.date || "-"}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="4" class="empty">No deposit requests yet.</td></tr>`;
+  }
+}
+
+async function approveDeposit(id) {
+  const req = (state.depositRequests || []).find(d => String(d.id) === String(id));
+  if (!req) return;
+
+  req.status = "APPROVED";
+
+  if (String(state.user?.id) === String(req.userId)) {
+    state.realBalance += Number(req.amount || 0);
+  }
+
+  // Store approved amount into local user record if available
+  const user = state.users.find(u => String(u.id) === String(req.userId));
+  if (user) user.realBalance = Number(user.realBalance || 0) + Number(req.amount || 0);
+
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from("deposit_requests").update({ status: "APPROVED" }).eq("id", id);
+      await supabaseClient.from("wallet_ledger").insert({
+        user_id: req.userId,
+        type: "DEPOSIT",
+        amount: req.amount,
+        note: "Manual deposit approved"
+      });
+    } catch (e) {
+      console.warn("Deposit approve remote update failed", e);
+    }
+  }
+
+  saveState();
+  render();
+  toast("Deposit approved. User balance updated on next login/refresh.");
+}
+
+
 function renderPayments() {
   const tbody = $("paymentRequestsLog");
   if (!tbody || state.user?.role !== "admin") return;
@@ -892,11 +1068,16 @@ function bind() {
 
   if ($("saveAdminBtn")) $("saveAdminBtn").addEventListener("click", saveAdminSettings);
   if ($("clearPaymentsBtn")) $("clearPaymentsBtn").addEventListener("click", () => { state.paymentRequests = []; saveState(); render(); });
+  if ($("clearDepositsBtn")) $("clearDepositsBtn").addEventListener("click", () => { state.depositRequests = []; saveState(); render(); });
 
   document.querySelectorAll(".plan-btn").forEach(b => b.addEventListener("click", () => openPaymentModal(b.dataset.plan)));
 
   if ($("closePaymentModal")) $("closePaymentModal").addEventListener("click", closePaymentModal);
   if ($("submitManualPayment")) $("submitManualPayment").addEventListener("click", submitManualPayment);
+  if ($("openDepositBtn")) $("openDepositBtn").addEventListener("click", openDepositModal);
+  if ($("openDepositBtn2")) $("openDepositBtn2").addEventListener("click", openDepositModal);
+  if ($("closeDepositModal")) $("closeDepositModal").addEventListener("click", closeDepositModal);
+  if ($("submitDepositRequest")) $("submitDepositRequest").addEventListener("click", submitDepositRequest);
   if ($("copyReferralBtn")) $("copyReferralBtn").addEventListener("click", copyReferral);
 }
 
@@ -938,3 +1119,5 @@ window.addEventListener("load", async () => {
 });
 
 window.closeTrade = closeTrade;
+
+window.approveDeposit = approveDeposit;

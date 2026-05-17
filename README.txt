@@ -89,3 +89,12 @@ Real-Feel Simulation Update:
 - Added simulated order book panel
 - Added recent fills feed
 - Added trade open animation
+
+
+Deposit Flow Update:
+- User side Wallet page added.
+- Deposit Funds button added on dashboard and wallet page.
+- Manual deposit modal added with amount, UTR and screenshot.
+- Admin panel now has Deposit Requests approval table.
+- Admin approval adds approved amount to user's Real UI balance through wallet_ledger.
+- Latest SQL includes deposit_requests and wallet_ledger tables.
