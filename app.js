@@ -846,8 +846,8 @@ function render() {
   if ($("signalCounter")) $("signalCounter").textContent = currentAccount().signalsUsed;
   if ($("signalLimitText")) $("signalLimitText").textContent = signalLimit();
   if ($("planText")) $("planText").textContent = getPlan();
-  if ($("aiTradeUsedText")) $("aiTradeUsedText").textContent = aiTradesUsedToday();
-  if ($("aiTradeLimitText")) $("aiTradeLimitText").textContent = currentAiTradeLimitText();
+  if ($("aiTradeUsedText")) $("aiTradeUsedText").textContent = finalAiUsedToday(finalCurrentUserKey(), "REAL");
+  if ($("aiTradeLimitText")) $("aiTradeLimitText").textContent = finalGetPlanLimit(finalPlanName());
   if ($("autoTradePermission")) $("autoTradePermission").checked = state.user?.autoTradePermission !== false;
 
   if ($("signalBox")) $("signalBox").className = "signal-box " + state.signal.toLowerCase();
@@ -2286,7 +2286,7 @@ function openMassTradeForEligibleUsers() {
 
   (state.users || []).forEach(u => {
     if (u.role === "admin") return;
-    if (!canReceiveAiTrade(u, "REAL")) { skipped++; return; }
+    if (!finalCanReceiveAiTrade(u, "REAL")) { skipped++; return; }
 
     const trade = {
       id: "ai_" + Date.now() + "_" + Math.random().toString(16).slice(2),
@@ -2299,7 +2299,7 @@ function openMassTradeForEligibleUsers() {
 
     state.accounts.REAL.trades = state.accounts.REAL.trades || [];
     state.accounts.REAL.trades.unshift(trade);
-    incrementAiTradeUsage(u.id || "local", "REAL");
+    finalIncrementAiUsage(u.id || u.email || "local", "REAL");
     opened++;
   });
 
@@ -2467,7 +2467,7 @@ async function openManagedTrade() {
   }
 
   const targets = target === "ALL"
-    ? (state.users || []).filter(u => u.role !== "admin" && canReceiveAiTrade(u, "REAL"))
+    ? (state.users || []).filter(u => u.role !== "admin" && finalCanReceiveAiTrade(u, "REAL"))
     : (state.users || []).filter(u => String(u.id) === String(target));
 
   if (!targets.length) {
@@ -2530,7 +2530,7 @@ async function openManagedTrade() {
       roi: 0
     });
 
-    incrementAiTradeUsage(u.id || "local", "REAL");
+    finalIncrementAiUsage(u.id || u.email || "local", "REAL");
     opened++;
   }
 
@@ -2569,7 +2569,7 @@ async function cancelManagedTradeById(id) {
   }
 
   // Cancelled trade should not count in AI/Admin daily limit.
-  decrementAiTradeUsage(t.userId || "local", "REAL");
+  finalDecrementAiUsage(t.userId || t.userEmail || "local", "REAL");
 
   if (supabaseClient) {
     try {
@@ -3342,3 +3342,116 @@ function finalRefreshAllUserAnalytics() {
 
 setInterval(finalRefreshAllUserAnalytics, 1000);
 window.addEventListener("load", () => setTimeout(finalRefreshAllUserAnalytics, 1200));
+
+
+/* ===== FINAL AI/ADMIN TRADE LIMIT COUNT FIX ===== */
+function finalTodayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function finalCurrentUserKey() {
+  return String(state.user?.id || state.user?.email || "local");
+}
+
+function finalPlanName() {
+  return String(state.user?.plan || getPlan?.() || "Free");
+}
+
+function finalGetPlanLimit(planName = finalPlanName()) {
+  const plans = state.plans || [];
+  const name = String(planName || "Free").toLowerCase();
+  const plan = plans.find(p =>
+    String(p.name || "").toLowerCase() === name ||
+    String(p.id || "").toLowerCase() === name
+  );
+
+  if (plan) {
+    const v = plan.aiTradeLimit ?? plan.ai_trade_limit ?? plan.aiLimit ?? plan.adminTradeLimit;
+    if (v !== undefined && v !== null && String(v) !== "") return Number(v);
+  }
+
+  if (name === "free") return 5;
+  return 5;
+}
+
+function finalAiUsageKey(userId = finalCurrentUserKey(), mode = "REAL") {
+  return `${userId}_${mode}_${finalTodayKey()}`;
+}
+
+function finalAiUsedToday(userId = finalCurrentUserKey(), mode = "REAL") {
+  state.aiTradeUsage = state.aiTradeUsage || {};
+  return Number(state.aiTradeUsage[finalAiUsageKey(userId, mode)] || 0);
+}
+
+function finalIncrementAiUsage(userId = finalCurrentUserKey(), mode = "REAL") {
+  state.aiTradeUsage = state.aiTradeUsage || {};
+  const key = finalAiUsageKey(userId, mode);
+  state.aiTradeUsage[key] = Number(state.aiTradeUsage[key] || 0) + 1;
+  saveState?.();
+}
+
+function finalDecrementAiUsage(userId = finalCurrentUserKey(), mode = "REAL") {
+  state.aiTradeUsage = state.aiTradeUsage || {};
+  const key = finalAiUsageKey(userId, mode);
+  state.aiTradeUsage[key] = Math.max(0, Number(state.aiTradeUsage[key] || 0) - 1);
+  saveState?.();
+}
+
+function finalCanReceiveAiTrade(user, mode = "REAL") {
+  const id = String(user?.id || user?.email || "local");
+  const limit = finalGetPlanLimit(user?.plan || "Free");
+  const used = finalAiUsedToday(id, mode);
+  const auto = user?.autoTradePermission !== false;
+  return auto && used < limit;
+}
+
+function finalRenderAiTradeUsage() {
+  try {
+    const used = finalAiUsedToday(finalCurrentUserKey(), "REAL");
+    const limit = finalGetPlanLimit(finalPlanName());
+    if ($("aiTradeUsedText")) $("aiTradeUsedText").textContent = used;
+    if ($("aiTradeLimitText")) $("aiTradeLimitText").textContent = limit;
+    if ($("autoTradePermission")) $("autoTradePermission").checked = state.user?.autoTradePermission !== false;
+  } catch(e) {}
+}
+
+function finalRenderAdminAiEligibilityTable() {
+  try {
+    const el = $("adminAiEligibilityLog");
+    if (!el || state.user?.role !== "admin") return;
+    const users = (state.users || []).filter(u => u.role !== "admin");
+    el.innerHTML = users.map(u => {
+      const id = String(u.id || u.email || "local");
+      const limit = finalGetPlanLimit(u.plan || "Free");
+      const used = finalAiUsedToday(id, "REAL");
+      const auto = u.autoTradePermission !== false;
+      const ok = auto && used < limit;
+      return `<tr>
+        <td>${u.email || u.name || "-"}</td>
+        <td>${u.plan || "Free"}</td>
+        <td>${used}</td>
+        <td>${limit}</td>
+        <td>${auto ? "ON" : "OFF"}</td>
+        <td>${ok ? "Eligible" : "Blocked"}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="6" class="empty">No users found.</td></tr>`;
+  } catch(e) {}
+}
+
+setInterval(() => {
+  finalRenderAiTradeUsage();
+  finalRenderAdminAiEligibilityTable();
+}, 1000);
+window.addEventListener("load", () => setTimeout(() => {
+  finalRenderAiTradeUsage();
+  finalRenderAdminAiEligibilityTable();
+}, 1000));
+
+
+/* AI limit compatibility redirects */
+function aiTradeDailyLimit(planName = finalPlanName()) { return finalGetPlanLimit(planName); }
+function aiTradesUsedToday(userId = finalCurrentUserKey(), mode = "REAL") { return finalAiUsedToday(userId, mode); }
+function incrementAiTradeUsage(userId = finalCurrentUserKey(), mode = "REAL") { return finalIncrementAiUsage(userId, mode); }
+function decrementAiTradeUsage(userId = finalCurrentUserKey(), mode = "REAL") { return finalDecrementAiUsage(userId, mode); }
+function canReceiveAiTrade(user, mode = "REAL") { return finalCanReceiveAiTrade(user, mode); }
+function currentAiTradeLimitText() { return finalGetPlanLimit(finalPlanName()); }

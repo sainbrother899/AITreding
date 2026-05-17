@@ -424,3 +424,12 @@ Final PnL Analytics Fix:
 - Cancelled managed trades do not count.
 - Analytics refreshes automatically every second.
 - No SQL required.
+
+
+AI/Admin Trade Limit Count Fix:
+- AI/Admin trades used today now displays correctly on user dashboard.
+- Plan-wise AI/Admin trade daily limit now reads from aiTradeLimit/ai_trade_limit.
+- Free plan fallback remains 5/day.
+- Managed/Mass admin trades increment user AI trade usage.
+- Cancelled managed trade decrements usage.
+- No SQL required if ai_trade_limit column already exists.
