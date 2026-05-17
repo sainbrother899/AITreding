@@ -183,3 +183,11 @@ Merged Mockup + Working Build:
 - Keeps existing functional files and JS logic.
 - Adds mockup-style mobile dashboard look.
 - Keeps Supabase/config/admin/deposit/KYC/plans files from working build.
+
+
+Full User Dashboard Rebuild:
+- index.html user dashboard fully rebuilt, not just CSS patched.
+- Mockup-style home panel + trading chart panel.
+- New bottom nav with center AI Signal button.
+- Working IDs preserved for app.js logic.
+- Admin remains separate in admin.html.

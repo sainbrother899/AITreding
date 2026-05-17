@@ -3,37 +3,36 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>AI Trading Assistant Pro</title>
+  <title>AI Trading Assistant</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://s3.tradingview.com/tv.js"></script>
   <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
-  <div class="neon-bg">
-    <span></span><span></span><span></span><span></span>
-  </div>
+  <div class="neon-bg"><span></span><span></span><span></span><span></span></div>
 
   <header class="topbar">
     <div class="brand">
       <div class="logo">AI</div>
       <div>
         <h1>AI Trading Assistant</h1>
-        <p>Signals • Real prices • Referrals • PnL analytics</p>
+        <p>Next Gen AI Trading Platform</p>
       </div>
     </div>
+
     <div class="mock-feature-strip">
-        <span>▧ Real Time Signals</span>
-        <span>⚙ AI Powered Engine</span>
-        <span>▣ Secure</span>
-        <span>◌ 24/7 Support</span>
-      </div>
+      <span>▧ Real Time Signals</span>
+      <span>⚙ AI Powered Engine</span>
+      <span>▣ Secure</span>
+      <span>◌ 24/7 Support</span>
+    </div>
 
-      <div id="headerMarketTicker" class="header-market-ticker">
-        <span>BTC <b id="headerBtcPrice">$0</b></span>
-        <span id="marketStatusDot">● Market Live</span>
-      </div>
+    <div id="headerMarketTicker" class="header-market-ticker">
+      <span>BTC <b id="headerBtcPrice">$0</b></span>
+      <span id="marketStatusDot">● Market Live</span>
+    </div>
 
-      <div class="auth-actions">
+    <div class="auth-actions">
       <span id="userBadge" class="pill profile-pill"><i id="userAvatar">U</i><span id="userBadgeText">Guest</span><em id="userVipBadge">FREE</em></span>
       <button id="logoutBtn" class="ghost-btn hidden">Logout</button>
     </div>
@@ -43,14 +42,14 @@
     <section id="authPage" class="auth-page">
       <div class="auth-grid">
         <div class="hero-copy">
-          <p class="label">Mobile app style trading dashboard</p>
-          <h2>Smart crypto signal dashboard with control control</h2>
-          <p class="muted">Login/Register, Supabase-ready database, manual gateway, referral tracking, AI-style indicator engine and live market data.</p>
+          <p class="label">AI Trading Dashboard</p>
+          <h2>Premium crypto signal dashboard</h2>
+          <p class="muted">Live chart, AI signal, demo/real accounts, KYC, wallet, plans and referral system.</p>
           <div class="hero-points">
-            <p>✅ 5 free indicators/day</p>
-            <p>✅ Real BTC/ETH/SOL prices</p>
-            <p>✅ Manual payment verification</p>
-            <p>✅ -controlled signals</p>
+            <p>✅ Demo & Real separate</p>
+            <p>✅ Manual deposit approval</p>
+            <p>✅ KYC verification</p>
+            <p>✅ AI-style trade signals</p>
           </div>
         </div>
 
@@ -88,14 +87,14 @@
     </section>
 
     <section id="appPage" class="hidden">
-      <nav class="bottom-nav">
-        <button class="nav-btn active" data-page="dashboard">⌂ Home</button>
-        <button class="nav-btn real-only-nav" data-page="wallet">▣ Wallet</button>
-        <button class="nav-btn real-only-nav" data-page="kyc">✓ KYC</button>
-        <button class="nav-btn" data-page="analytics">↗ PnL</button>
-        <button class="nav-btn real-only-nav" data-page="subscription">★ Plan</button>
-        <button class="nav-btn real-only-nav" data-page="referral">⤴ Referral</button>
-        
+      <nav class="bottom-nav pro-bottom-nav">
+        <button class="nav-btn active" data-page="dashboard"><span class="nav-ico">⌂</span><small>Home</small></button>
+        <button class="nav-btn real-only-nav" data-page="wallet"><span class="nav-ico">▣</span><small>Wallet</small></button>
+        <button class="nav-btn" data-page="analytics"><span class="nav-ico">↗</span><small>PnL</small></button>
+        <button class="nav-btn center-trade-btn" data-page="dashboard"><span class="nav-ico">AI</span><small>Signal</small></button>
+        <button class="nav-btn real-only-nav" data-page="subscription"><span class="nav-ico">◇</span><small>Plans</small></button>
+        <button class="nav-btn real-only-nav" data-page="kyc"><span class="nav-ico">✓</span><small>KYC</small></button>
+        <button class="nav-btn real-only-nav" data-page="referral"><span class="nav-ico">⤴</span><small>Refer</small></button>
       </nav>
 
       <section id="dashboard" class="page active-page">
@@ -108,24 +107,14 @@
           <div class="mini-metric"><span>Active Signal</span><strong id="activeSignalMini">BUY</strong></div>
         </div>
 
-        <div class="grid hero-grid">
-          <div class="card wallet-card">
+        <div class="pro-dashboard-shell">
+          <aside class="card wallet-card pro-home-panel">
             <div class="mock-welcome-strip">
               <div>
                 <h2>Hello, <span id="mockUserName">Trader</span></h2>
                 <p>Welcome back to AI Trading Assistant</p>
               </div>
               <div class="mock-avatar">A</div>
-            </div>
-
-            <div class="account-mode-banner">
-              <p class="label">Selected Account</p>
-              <h3 id="accountModeTitle">Demo Account</h3>
-              <p id="accountModeText">Demo balance, demo signals and demo trades are separate.</p>
-            </div>
-
-            <div id="demoOnlyNotice" class="demo-only-notice">
-              Demo Account में सिर्फ Home और PnL sections available हैं. KYC, Deposit, Plans और Referral Real Account में मिलेंगे.
             </div>
 
             <div class="mock-account-cards">
@@ -139,6 +128,10 @@
               </div>
             </div>
             <div class="switch-caption">Switch Account</div>
+
+            <div id="demoOnlyNotice" class="demo-only-notice">
+              Demo Account में सिर्फ Home और PnL sections available हैं. KYC, Deposit, Plans और Referral Real Account में मिलेंगे.
+            </div>
 
             <div class="mode-switch">
               <button id="demoBtn" class="mode-btn active">Demo Account</button>
@@ -155,12 +148,17 @@
               <div><span>Plan</span><strong id="planText">Free</strong></div>
             </div>
 
-            <div id="signalBox" class="signal-box buy">
-              <p>Current AI Indicator</p>
+            <div id="signalBox" class="signal-box buy pro-signal-card">
+              <p>AI Signal Live</p>
               <h3 id="aiSignalText">BUY BTC NOW</h3>
-              <span id="signalNote"> + AI engine combined signal.</span>
+              <span id="signalNote">AI engine combined signal.</span>
+              <div class="live-signal-meta">
+                <div><small>Entry</small><b id="signalEntryMeta">Market</b></div>
+                <div><small>Target 1</small><b id="signalTarget1Meta">-</b></div>
+                <div><small>Stop Loss</small><b id="signalStopMeta">-</b></div>
+                <div><small>Expires</small><b id="signalCountdown">30m</b></div>
+              </div>
             </div>
-
 
             <div id="userSignalDetails" class="signal-details">
               <div><span>Coin</span><strong id="userSignalCoin">BTC/USDT</strong></div>
@@ -171,10 +169,7 @@
 
             <div class="ai-engine">
               <div class="section-head">
-                <div>
-                  <p class="label">AI Indicator Engine</p>
-                  <h3 id="engineSignal">Analyzing...</h3>
-                </div>
+                <div><p class="label">AI Indicator Engine</p><h3 id="engineSignal">Analyzing...</h3></div>
                 <span id="engineConfidence" class="pill">0%</span>
               </div>
               <div class="meter"><i id="confidenceMeter"></i></div>
@@ -183,10 +178,7 @@
 
             <div class="order-ticket">
               <div class="section-head">
-                <div>
-                  <p class="label">Order Ticket</p>
-                  <h3>Place Simulation Order</h3>
-                </div>
+                <div><p class="label">Order Ticket</p><h3>Place Simulation Order</h3></div>
                 <span class="pill">SIM</span>
               </div>
 
@@ -199,36 +191,16 @@
               </select>
 
               <div class="order-row">
-                <div>
-                  <label class="input-label">Order Type</label>
-                  <select id="orderType">
-                    <option value="MARKET">Market</option>
-                    <option value="LIMIT">Limit</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="input-label">Leverage</label>
-                  <select id="leverageSelect">
-                    <option value="1">1x</option>
-                    <option value="2">2x</option>
-                    <option value="5">5x</option>
-                    <option value="10">10x</option>
-                  </select>
-                </div>
+                <div><label class="input-label">Order Type</label><select id="orderType"><option value="MARKET">Market</option><option value="LIMIT">Limit</option></select></div>
+                <div><label class="input-label">Leverage</label><select id="leverageSelect"><option value="1">1x</option><option value="2">2x</option><option value="5">5x</option><option value="10">10x</option></select></div>
               </div>
 
               <label class="input-label">Margin Amount</label>
               <input id="tradeAmountInput" type="number" value="100" min="1"/>
 
               <div class="order-row">
-                <div>
-                  <label class="input-label">Take Profit Optional</label>
-                  <input id="takeProfitInput" type="number" placeholder="TP price"/>
-                </div>
-                <div>
-                  <label class="input-label">Stop Loss Optional</label>
-                  <input id="stopLossInput" type="number" placeholder="SL price"/>
-                </div>
+                <div><label class="input-label">Take Profit Optional</label><input id="takeProfitInput" type="number" placeholder="TP price"/></div>
+                <div><label class="input-label">Stop Loss Optional</label><input id="stopLossInput" type="number" placeholder="SL price"/></div>
               </div>
 
               <div class="trade-actions">
@@ -237,37 +209,51 @@
               </div>
               <p class="tiny-warning">Simulation only. Real exchange order/API is not connected.</p>
             </div>
-          </div>
+          </aside>
 
-          <div class="card chart-card">
+          <section class="card chart-card pro-trading-panel">
             <div class="section-head">
               <div><p class="label mock-trade-screen-title">REAL ACCOUNT - TRADING</p><h2>BTC/USDT</h2></div>
               <div class="chart-tools"><span class="live-pill">LIVE</span><span class="chart-hint">5m candles</span></div>
             </div>
+
+            <div class="pro-pair-line">
+              <button class="pair-pill">🟠 BTC/USDT⌄</button>
+              <div><strong id="proPairPrice">$0.00</strong><small id="proPairChange"> +0.00%</small></div>
+            </div>
+
+            <div class="time-tabs pro-time-tabs"><span>1m</span><b>5m</b><span>15m</span><span>1H</span><span>4H</span><span>D</span><span>⌁</span><span>⛶</span></div>
+
             <div id="crypto_live_chart"></div>
 
-          <div class="chart-bottom-feed">
-            <div class="mini-feed-card">
-              <div class="section-head compact-head">
-                <div><p class="label">Order Book</p><h3>BTC/USDT Depth</h3></div>
-                <span class="pill">LIVE</span>
-              </div>
-              <div id="orderBook" class="order-book compact-order-book"></div>
+            <div class="chart-stats-row">
+              <div><small>Volume</small><b>125.34</b></div>
+              <div><small>24H High</small><b>$78,900.00</b></div>
+              <div><small>24H Low</small><b>$77,800.00</b></div>
+              <div><small>24H Vol</small><b>1.24B</b></div>
             </div>
 
-            <div class="mini-feed-card">
-              <div class="section-head compact-head">
-                <div><p class="label">Recent Fills</p><h3>Trade Feed</h3></div>
-                <span class="pill">SIM</span>
+            <div class="chart-bottom-feed">
+              <div class="mini-feed-card">
+                <div class="section-head compact-head">
+                  <div><p class="label">Order Book</p><h3>BTC/USDT Depth</h3></div>
+                  <span class="pill">LIVE</span>
+                </div>
+                <div id="orderBook" class="order-book compact-order-book"></div>
               </div>
-              <div id="recentFills" class="recent-fills compact-recent-fills"></div>
-            </div>
-          </div>
 
-          </div>
+              <div class="mini-feed-card">
+                <div class="section-head compact-head">
+                  <div><p class="label">Recent Fills</p><h3>Trade Feed</h3></div>
+                  <span class="pill">SIM</span>
+                </div>
+                <div id="recentFills" class="recent-fills compact-recent-fills"></div>
+              </div>
+            </div>
+          </section>
         </div>
 
-        <div class="card table-card">
+        <div class="card table-card pro-positions-card">
           <div class="section-head">
             <div><p class="label">Open Positions</p><h2>Live Positions</h2></div>
             <button id="clearTradesBtn" class="ghost-btn">Clear</button>
@@ -281,39 +267,29 @@
         </div>
       </section>
 
-
-      <section id="wallet" class="page mock-mobile-page real-only-page">
+      <section id="wallet" class="page real-only-page mock-mobile-page">
         <div class="wallet-grid">
           <div class="card">
             <p class="label">Wallet</p>
             <h2>Deposit Balance</h2>
-            <div class="wallet-big" id="walletPageBalance">$10,000.00</div>
+            <div class="wallet-big" id="walletPageBalance">$0.00</div>
             <button id="openDepositBtn2" class="primary-btn">Deposit Now</button>
-            <p class="tiny-warning">Deposit request control approval के बाद आपके Real Account balance में add होगी.</p>
+            <p class="tiny-warning">Deposit approval के बाद amount आपके Real Account balance में add होगा.</p>
           </div>
 
           <div class="card table-card">
-            <div class="section-head">
-              <div>
-                <p class="label">Deposit Requests</p>
-                <h2>Your Deposit History</h2>
-              </div>
-            </div>
+            <div class="section-head"><div><p class="label">Deposit Requests</p><h2>Your Deposit History</h2></div></div>
             <div class="table-wrap">
               <table>
-                <thead>
-                  <tr><th>Amount</th><th>UTR / TXN</th><th>Status</th><th>Date</th></tr>
-                </thead>
-                <tbody id="userDepositLog">
-                  <tr><td colspan="4" class="empty">No deposit requests yet.</td></tr>
-                </tbody>
+                <thead><tr><th>Amount</th><th>UTR / TXN</th><th>Status</th><th>Date</th></tr></thead>
+                <tbody id="userDepositLog"><tr><td colspan="4" class="empty">No deposit requests yet.</td></tr></tbody>
               </table>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="analytics" class="page mock-mobile-page">
+      <section id="analytics" class="page">
         <div class="analytics-grid">
           <div class="card metric-card"><p>Total Trades</p><h2 id="totalTradesMetric">0</h2></div>
           <div class="card metric-card"><p>Total PnL</p><h2 id="totalPnlMetric">$0.00</h2></div>
@@ -327,42 +303,23 @@
         </div>
       </section>
 
-      <section id="subscription" class="page mock-mobile-page real-only-page">
+      <section id="subscription" class="page real-only-page mock-mobile-page">
         <div class="section-title"><p class="label">Manual Gateway</p><h2>Subscription Plans</h2><p>Payment UPI/Bank से करें, फिर UTR और screenshot submit करें।</p></div>
         <div class="plans-grid" id="dynamicPlansGrid"></div>
       </section>
 
-
-      <section id="kyc" class="page mock-mobile-page real-only-page">
+      <section id="kyc" class="page real-only-page mock-mobile-page">
         <div class="wallet-grid">
           <div class="card">
             <p class="label">KYC Verification</p>
             <h2>Submit KYC</h2>
-            <p class="muted small"> approval के बाद आपका account verified दिखेगा.</p>
-
-            <label class="input-label">Full Name</label>
-            <input id="kycName" placeholder="As per document"/>
-
-            <label class="input-label">Mobile Number</label>
-            <input id="kycMobile" placeholder="Mobile number"/>
-
-            <label class="input-label">Document Type</label>
-            <select id="kycDocType">
-              <option value="AADHAAR">Aadhaar</option>
-              <option value="PAN">PAN</option>
-              <option value="PASSPORT">Passport</option>
-              <option value="OTHER">Other</option>
-            </select>
-
-            <label class="input-label">Document Number</label>
-            <input id="kycDocNumber" placeholder="Document number"/>
-
-            <label class="input-label">Document Front Image</label>
-            <input id="kycFrontFile" type="file" accept="image/*"/>
-
-            <label class="input-label">Selfie Image</label>
-            <input id="kycSelfieFile" type="file" accept="image/*"/>
-
+            <p class="muted small">Approval के बाद आपका account verified दिखेगा.</p>
+            <label class="input-label">Full Name</label><input id="kycName" placeholder="As per document"/>
+            <label class="input-label">Mobile Number</label><input id="kycMobile" placeholder="Mobile number"/>
+            <label class="input-label">Document Type</label><select id="kycDocType"><option value="AADHAAR">Aadhaar</option><option value="PAN">PAN</option><option value="PASSPORT">Passport</option><option value="OTHER">Other</option></select>
+            <label class="input-label">Document Number</label><input id="kycDocNumber" placeholder="Document number"/>
+            <label class="input-label">Document Front Image</label><input id="kycFrontFile" type="file" accept="image/*"/>
+            <label class="input-label">Selfie Image</label><input id="kycSelfieFile" type="file" accept="image/*"/>
             <button id="submitKycBtn" class="primary-btn">Submit KYC</button>
             <p class="tiny-warning">Static version में image filename store होगा. Production में Supabase Storage चाहिए.</p>
           </div>
@@ -370,14 +327,12 @@
           <div class="card">
             <p class="label">KYC Status</p>
             <h2 id="kycStatusTitle">Not Submitted</h2>
-            <div id="kycStatusBox" class="kyc-status-box">
-              <p>No KYC submitted yet.</p>
-            </div>
+            <div id="kycStatusBox" class="kyc-status-box"><p>No KYC submitted yet.</p></div>
           </div>
         </div>
       </section>
 
-      <section id="referral" class="page mock-mobile-page real-only-page">
+      <section id="referral" class="page real-only-page mock-mobile-page">
         <div class="card referral-card">
           <p class="label">Referral System</p>
           <h2>Your Referral Code</h2>
@@ -389,18 +344,14 @@
           </div>
         </div>
       </section>
-
-      
     </section>
   </main>
-
 
   <div id="depositModal" class="modal-backdrop">
     <div class="modal-card">
       <button id="closeDepositModal" class="modal-close">×</button>
       <p class="label">Manual Deposit Gateway</p>
       <h2>Deposit Funds</h2>
-
       <div class="payment-box">
         <p><strong>UPI ID:</strong> <span id="depositUpiText">yourupi@bank</span></p>
         <p><strong>Account Name:</strong> <span id="depositAccountText">AI Trading Assistant</span></p>
@@ -408,21 +359,13 @@
         <p><strong>Account No:</strong> <span id="depositAccountNoText">000000000000</span></p>
         <p><strong>IFSC:</strong> <span id="depositIfscText">ABCD0000000</span></p>
       </div>
-
-      <label class="input-label">Deposit Amount</label>
-      <input id="depositAmount" type="number" min="1" placeholder="Enter amount"/>
-
-      <label class="input-label">Transaction / UTR Number</label>
-      <input id="depositTxn" placeholder="Example: 4158XXXXXX"/>
-
-      <label class="input-label">Upload Payment Screenshot</label>
-      <input id="depositScreenshot" type="file" accept="image/*"/>
-
+      <label class="input-label">Deposit Amount</label><input id="depositAmount" type="number" min="1" placeholder="Enter amount"/>
+      <label class="input-label">Transaction / UTR Number</label><input id="depositTxn" placeholder="Example: 4158XXXXXX"/>
+      <label class="input-label">Upload Payment Screenshot</label><input id="depositScreenshot" type="file" accept="image/*"/>
       <button id="submitDepositRequest" class="primary-btn">Submit Deposit Request</button>
-      <p class="tiny-warning"> approve करने के बाद amount आपके Real balance में add होगा.</p>
+      <p class="tiny-warning">Approval के बाद amount आपके Real balance में add होगा.</p>
     </div>
   </div>
-
 
   <div id="paymentModal" class="modal-backdrop">
     <div class="modal-card">
@@ -441,7 +384,7 @@
       <label class="input-label">Transaction / UTR Number</label><input id="transactionId"/>
       <label class="input-label">Upload Payment Screenshot</label><input id="paymentScreenshot" type="file" accept="image/*"/>
       <button id="submitManualPayment" class="primary-btn">Submit Payment Request</button>
-      <p class="tiny-warning"> verify करने के बाद plan activate होगा।</p>
+      <p class="tiny-warning">Verify होने के बाद plan activate होगा।</p>
     </div>
   </div>
 

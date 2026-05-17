@@ -1812,3 +1812,19 @@ window.togglePlan = togglePlan;
 window.deletePlan = deletePlan;
 window.approveKyc = approveKyc;
 window.rejectKyc = rejectKyc;
+
+
+function updateFullRedesignUI(){
+  try{
+    if (typeof currentAccount === "function") {
+      const acc = currentAccount();
+      if (document.getElementById("mockDemoBalance")) document.getElementById("mockDemoBalance").textContent = money(state.accounts?.DEMO?.balance || state.demoBalance || 10000);
+      if (document.getElementById("mockRealBalance")) document.getElementById("mockRealBalance").textContent = money(state.accounts?.REAL?.balance || state.realBalance || 0);
+    }
+    if (document.getElementById("mockUserName")) document.getElementById("mockUserName").textContent = state.user?.name || "Trader";
+    const btc = state.prices?.BTCUSDT || {price:0,change:0};
+    if (document.getElementById("proPairPrice")) document.getElementById("proPairPrice").textContent = money(btc.price || 0);
+    if (document.getElementById("proPairChange")) document.getElementById("proPairChange").textContent = `${btc.change >= 0 ? "+" : ""}${Number(btc.change || 0).toFixed(2)}%`;
+  }catch(e){}
+}
+setInterval(updateFullRedesignUI, 1000);
