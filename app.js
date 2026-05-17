@@ -3435,30 +3435,6 @@ window.cancelManagedTradeById = cancelManagedTradeById;
 window.cancelSelectedManagedTrade = cancelSelectedManagedTrade;
 
 
-/* Top More / data-page direct navigation fix */
-function safeOpenPageFromButton(btn) {
-  const page = btn?.dataset?.page;
-  if (!page) return;
-  if (typeof showPage === "function") {
-    showPage(page);
-    return;
-  }
-  document.querySelectorAll(".page").forEach(p => p.classList.remove("active-page"));
-  document.getElementById(page)?.classList.add("active-page");
-}
-
-document.addEventListener("click", function(e){
-  const btn = e.target.closest("[data-page]");
-  if (!btn) return;
-
-  // Allow all non-nav shortcut buttons like top 3-dot and More page cards.
-  if (btn.id === "topMoreMenuBtn" || btn.classList.contains("more-open-btn") || btn.classList.contains("history-open-btn")) {
-    e.preventDefault();
-    safeOpenPageFromButton(btn);
-  }
-});
-
-
 function syncManagedPnLIntoMetrics() {
   try {
     if (!state.user || state.user.role === "admin") return;
@@ -3762,17 +3738,23 @@ window.closeSelectedMassTrade = closeSelectedMassTrade;
 window.closeAllMassTrades = closeAllMassTrades;
 
 
-/* More page internal buttons navigation fix */
-function openUserPageDirect(pageId) {
-  if (!pageId) return;
+
+
+/* Final More Page Button Fix */
+function openMoreTargetPage(pageId) {
+  if (!pageId) return false;
 
   const target = document.getElementById(pageId);
   if (!target) {
-    console.warn("Page not found:", pageId);
-    return;
+    console.warn("More target page not found:", pageId);
+    return false;
   }
 
-  document.querySelectorAll(".page").forEach(p => p.classList.remove("active-page"));
+  document.querySelectorAll(".page").forEach(p => {
+    p.classList.remove("active-page");
+    p.classList.remove("active");
+  });
+
   target.classList.add("active-page");
 
   document.querySelectorAll(".nav-btn").forEach(btn => {
@@ -3786,16 +3768,23 @@ function openUserPageDirect(pageId) {
       if ($("profilePlanText")) $("profilePlanText").textContent = state.user?.plan || getPlan?.() || "Free";
       if ($("profileModeText")) $("profileModeText").textContent = state.mode || "DEMO";
     }
-    if (typeof render === "function") setTimeout(() => { try { render(); } catch(e){} }, 50);
+    if (typeof render === "function") setTimeout(render, 30);
   } catch(e) {}
+
+  return false;
 }
 
-document.addEventListener("click", function(e){
-  const moreBtn = e.target.closest(".more-open-btn, #topMoreMenuBtn, .ghost-btn[data-page]");
-  if (!moreBtn) return;
-  const pageId = moreBtn.dataset.page;
-  if (!pageId) return;
+window.openMoreTargetPage = openMoreTargetPage;
+
+document.addEventListener("click", function(e) {
+  const btn = e.target.closest(".more-open-btn, #topMoreMenuBtn");
+  if (!btn) return;
+
+  const inlineMatch = btn.getAttribute("onclick");
+  if (inlineMatch) return; // inline onclick handles it
+
+  const pageId = btn.dataset.page || "morepage";
   e.preventDefault();
   e.stopPropagation();
-  openUserPageDirect(pageId);
+  openMoreTargetPage(pageId);
 }, true);

@@ -464,3 +464,11 @@ Referral 5% Auto Bonus Update:
 - Bonus saved in referrals table and wallet_ledger as REFERRAL_BONUS.
 - Bonus is paid only once per deposit.
 - If you use Supabase, run latest referral SQL columns once.
+
+
+Final More Page Button Fix:
+- Top 3-dot opens More page via direct onclick.
+- KYC, Plans, Referral and Profile buttons use direct navigation.
+- Added/ensured Profile page exists.
+- Removed older conflicting More navigation handlers.
+- No SQL required.
