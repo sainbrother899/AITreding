@@ -352,3 +352,12 @@ Admin Users View Removed:
 - Removed Users/User Management tab from admin panel.
 - Removed adminUsers panel from admin.html.
 - Other admin features remain unchanged.
+
+
+Admin Stable PC Fix:
+- Removed sidebar sticky movement.
+- Removed hover transform movement.
+- Removed admin fade/jump animation on PC.
+- Fixed admin grid width and content overflow.
+- Tables stay inside right panel with horizontal scroll if needed.
+- PC admin panel should no longer shake/move.

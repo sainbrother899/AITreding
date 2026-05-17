@@ -2344,3 +2344,209 @@ body[data-admin-page="true"] .ghost-btn{
 [data-admin-tab="adminUsers"]{
   display:none!important;
 }
+
+
+/* =========================================================
+   ADMIN PC STABLE FIX — no layout shaking / no movement
+   ========================================================= */
+@media(min-width:901px){
+  html,
+  body[data-admin-page="true"]{
+    overflow-x:hidden!important;
+    width:100%!important;
+  }
+
+  body[data-admin-page="true"] main{
+    display:block!important;
+    width:100%!important;
+    max-width:1440px!important;
+    min-width:0!important;
+    margin:0 auto!important;
+    padding:24px!important;
+    box-sizing:border-box!important;
+  }
+
+  body[data-admin-page="true"] #appPage,
+  body[data-admin-page="true"] .admin-premium-page{
+    width:100%!important;
+    max-width:none!important;
+    min-width:0!important;
+    box-sizing:border-box!important;
+  }
+
+  body[data-admin-page="true"] .admin-premium-hero{
+    width:100%!important;
+    max-width:none!important;
+    min-width:0!important;
+    margin:0 0 20px 0!important;
+    transform:none!important;
+    animation:none!important;
+    box-sizing:border-box!important;
+  }
+
+  body[data-admin-page="true"] .admin-layout{
+    display:grid!important;
+    grid-template-columns:260px minmax(0,1fr)!important;
+    gap:20px!important;
+    width:100%!important;
+    max-width:none!important;
+    min-width:0!important;
+    align-items:start!important;
+    box-sizing:border-box!important;
+  }
+
+  body[data-admin-page="true"] .admin-menu{
+    position:relative!important;
+    top:auto!important;
+    left:auto!important;
+    width:260px!important;
+    min-width:260px!important;
+    max-width:260px!important;
+    height:auto!important;
+    max-height:none!important;
+    overflow:visible!important;
+    transform:none!important;
+    animation:none!important;
+    box-sizing:border-box!important;
+  }
+
+  body[data-admin-page="true"] .admin-content{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    overflow:hidden!important;
+    transform:none!important;
+    animation:none!important;
+    box-sizing:border-box!important;
+  }
+
+  body[data-admin-page="true"] .admin-panel{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    transform:none!important;
+    animation:none!important;
+    transition:none!important;
+    box-sizing:border-box!important;
+  }
+
+  body[data-admin-page="true"] .admin-panel:not(.active-admin-panel){
+    display:none!important;
+  }
+
+  body[data-admin-page="true"] .active-admin-panel{
+    display:block!important;
+  }
+
+  body[data-admin-page="true"] .card,
+  body[data-admin-page="true"] .table-card,
+  body[data-admin-page="true"] .admin-panel > .card{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    margin-left:0!important;
+    margin-right:0!important;
+    transform:none!important;
+    animation:none!important;
+    transition:background .15s ease,border-color .15s ease!important;
+    box-sizing:border-box!important;
+  }
+
+  body[data-admin-page="true"] .admin-tab{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    transform:none!important;
+    animation:none!important;
+    transition:background .15s ease,color .15s ease,border-color .15s ease!important;
+    box-sizing:border-box!important;
+  }
+
+  body[data-admin-page="true"] .admin-tab:hover{
+    transform:none!important;
+  }
+
+  body[data-admin-page="true"] .analytics-grid,
+  body[data-admin-page="true"] .admin-quick-grid{
+    display:grid!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    gap:14px!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    box-sizing:border-box!important;
+  }
+
+  body[data-admin-page="true"] .admin-two-grid{
+    display:grid!important;
+    grid-template-columns:minmax(320px,420px) minmax(0,1fr)!important;
+    gap:16px!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    box-sizing:border-box!important;
+  }
+
+  body[data-admin-page="true"] .wallet-grid{
+    display:grid!important;
+    grid-template-columns:minmax(320px,420px) minmax(0,1fr)!important;
+    gap:16px!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    box-sizing:border-box!important;
+  }
+
+  body[data-admin-page="true"] .table-wrap{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    overflow-x:auto!important;
+    overflow-y:hidden!important;
+    -webkit-overflow-scrolling:auto!important;
+    box-sizing:border-box!important;
+  }
+
+  body[data-admin-page="true"] table{
+    width:100%!important;
+    min-width:760px!important;
+    table-layout:auto!important;
+    transform:none!important;
+    animation:none!important;
+  }
+
+  body[data-admin-page="true"] th,
+  body[data-admin-page="true"] td{
+    white-space:nowrap!important;
+  }
+
+  body[data-admin-page="true"] input,
+  body[data-admin-page="true"] select,
+  body[data-admin-page="true"] textarea,
+  body[data-admin-page="true"] button{
+    transform:none!important;
+    animation:none!important;
+  }
+
+  body[data-admin-page="true"] .bottom-nav,
+  body[data-admin-page="true"] .pro-bottom-nav{
+    display:none!important;
+  }
+
+  /* Disable animated fade that was causing visual jump */
+  @keyframes adminFade{
+    from{opacity:1;transform:none}
+    to{opacity:1;transform:none}
+  }
+}
+
+/* Global admin stability: disable hover movement */
+body[data-admin-page="true"] *{
+  scroll-behavior:auto!important;
+}
+
+body[data-admin-page="true"] .admin-tab:hover,
+body[data-admin-page="true"] .card:hover,
+body[data-admin-page="true"] .table-card:hover{
+  transform:none!important;
+}
