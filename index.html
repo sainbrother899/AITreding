@@ -120,10 +120,62 @@
               <p id="engineReason" class="muted small">Fetching market prices...</p>
             </div>
 
-            <label class="input-label">Trade Amount</label>
-            <input id="tradeAmountInput" type="number" value="100" min="1"/>
-            <button id="executeTradeBtn" class="primary-btn">Add Simulated Trade</button>
-            <p class="tiny-warning">This is a simulation UI. Real exchange trading API is not connected.</p>
+            <div class="order-ticket">
+              <div class="section-head">
+                <div>
+                  <p class="label">Order Ticket</p>
+                  <h3>Place Simulation Order</h3>
+                </div>
+                <span class="pill">SIM</span>
+              </div>
+
+              <label class="input-label">Coin</label>
+              <select id="coinSelect">
+                <option value="BTCUSDT">BTC/USDT</option>
+                <option value="ETHUSDT">ETH/USDT</option>
+                <option value="SOLUSDT">SOL/USDT</option>
+                <option value="BNBUSDT">BNB/USDT</option>
+              </select>
+
+              <div class="order-row">
+                <div>
+                  <label class="input-label">Order Type</label>
+                  <select id="orderType">
+                    <option value="MARKET">Market</option>
+                    <option value="LIMIT">Limit</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="input-label">Leverage</label>
+                  <select id="leverageSelect">
+                    <option value="1">1x</option>
+                    <option value="2">2x</option>
+                    <option value="5">5x</option>
+                    <option value="10">10x</option>
+                  </select>
+                </div>
+              </div>
+
+              <label class="input-label">Margin Amount</label>
+              <input id="tradeAmountInput" type="number" value="100" min="1"/>
+
+              <div class="order-row">
+                <div>
+                  <label class="input-label">Take Profit Optional</label>
+                  <input id="takeProfitInput" type="number" placeholder="TP price"/>
+                </div>
+                <div>
+                  <label class="input-label">Stop Loss Optional</label>
+                  <input id="stopLossInput" type="number" placeholder="SL price"/>
+                </div>
+              </div>
+
+              <div class="trade-actions">
+                <button id="buyTradeBtn" class="buy-btn">BUY / LONG</button>
+                <button id="sellTradeBtn" class="sell-btn">SELL / SHORT</button>
+              </div>
+              <p class="tiny-warning">Simulation only. Real exchange order/API is not connected.</p>
+            </div>
           </div>
 
           <div class="card chart-card">
@@ -135,14 +187,32 @@
           </div>
         </div>
 
+
+        <div class="market-depth-grid">
+          <div class="card">
+            <div class="section-head">
+              <div><p class="label">Order Book</p><h2>BTC/USDT Depth</h2></div>
+              <span class="pill">LIVE</span>
+            </div>
+            <div id="orderBook" class="order-book"></div>
+          </div>
+          <div class="card">
+            <div class="section-head">
+              <div><p class="label">Recent Fills</p><h2>Trade Feed</h2></div>
+              <span class="pill">SIM</span>
+            </div>
+            <div id="recentFills" class="recent-fills"></div>
+          </div>
+        </div>
+
         <div class="card table-card">
           <div class="section-head">
-            <div><p class="label">Trade History</p><h2>Positions</h2></div>
+            <div><p class="label">Open Positions</p><h2>Live Positions</h2></div>
             <button id="clearTradesBtn" class="ghost-btn">Clear</button>
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Coin</th><th>Side</th><th>Amount</th><th>Entry</th><th>Current</th><th>PnL</th><th>Status</th></tr></thead>
+              <thead><tr><th>Coin</th><th>Side</th><th>Margin</th><th>Lev.</th><th>Entry</th><th>Current</th><th>PnL</th><th>TP/SL</th><th>Action</th></tr></thead>
               <tbody id="activeTradesLog"></tbody>
             </table>
           </div>
@@ -199,7 +269,25 @@
             <button id="saveAdminBtn" class="primary-btn">Save Signal</button>
           </div>
 
-          <div class="card table-card">
+  
+        <div class="market-depth-grid">
+          <div class="card">
+            <div class="section-head">
+              <div><p class="label">Order Book</p><h2>BTC/USDT Depth</h2></div>
+              <span class="pill">LIVE</span>
+            </div>
+            <div id="orderBook" class="order-book"></div>
+          </div>
+          <div class="card">
+            <div class="section-head">
+              <div><p class="label">Recent Fills</p><h2>Trade Feed</h2></div>
+              <span class="pill">SIM</span>
+            </div>
+            <div id="recentFills" class="recent-fills"></div>
+          </div>
+        </div>
+
+        <div class="card table-card">
             <div class="section-head"><div><p class="label">Manual Payment Requests</p><h2>Verify Users</h2></div><button id="clearPaymentsBtn" class="ghost-btn">Clear</button></div>
             <div class="table-wrap"><table><thead><tr><th>Plan</th><th>Name</th><th>Mobile</th><th>UTR</th><th>Action</th></tr></thead><tbody id="paymentRequestsLog"></tbody></table></div>
           </div>

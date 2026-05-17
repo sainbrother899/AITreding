@@ -75,3 +75,17 @@ Important:
 - Admin is still local fallback: admin@aitrade.local / admin123
 - For production, create a secure server-side admin/auth system.
 - Screenshot upload stores filename only in this static version. Real file upload needs Supabase Storage bucket.
+
+
+Real-Feel Simulation Update:
+- Added BUY / SELL separate buttons
+- Added coin selector: BTC, ETH, SOL, BNB
+- Added Market / Limit UI
+- Added leverage selector
+- Added TP/SL input fields
+- Open positions now update live PnL
+- Close position button added
+- Closing position returns margin + PnL to balance
+- Added simulated order book panel
+- Added recent fills feed
+- Added trade open animation

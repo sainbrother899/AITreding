@@ -22,3 +22,80 @@ main{position:relative;padding:24px 5vw 96px}.card{background:linear-gradient(18
 .single-tab{grid-template-columns:1fr}.single-tab .tab{cursor:default}
 
 .checklist{display:grid;gap:12px;color:#d7e8ff}.checklist p{padding:12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.035)}
+
+
+.order-ticket{
+  margin-top:16px;
+  border:1px solid var(--line);
+  border-radius:22px;
+  padding:16px;
+  background:rgba(255,255,255,.035);
+}
+.order-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+.trade-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:14px;
+}
+.buy-btn,.sell-btn,.close-btn{
+  border:0;
+  border-radius:16px;
+  padding:14px 12px;
+  font-weight:900;
+  cursor:pointer;
+}
+.buy-btn{
+  background:linear-gradient(135deg,var(--green),#16a34a);
+  color:#00150c;
+  box-shadow:0 0 28px rgba(0,229,155,.22);
+}
+.sell-btn{
+  background:linear-gradient(135deg,var(--red),#b91c1c);
+  color:#fff;
+  box-shadow:0 0 28px rgba(255,72,101,.2);
+}
+.close-btn{
+  padding:9px 12px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.06);
+  color:var(--text);
+  border-radius:12px;
+}
+.market-depth-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:22px;
+  margin-top:22px;
+}
+.order-book,.recent-fills{
+  display:grid;
+  gap:8px;
+}
+.book-row,.fill-row{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:10px;
+  padding:10px 12px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:rgba(255,255,255,.03);
+  font-size:13px;
+}
+.book-row.ask span:first-child,.fill-row.sell span:first-child{color:var(--red);font-weight:900}
+.book-row.bid span:first-child,.fill-row.buy span:first-child{color:var(--green);font-weight:900}
+.trade-flash{
+  animation:tradeFlash .9s ease both;
+}
+@keyframes tradeFlash{
+  0%{box-shadow:0 0 0 rgba(0,229,155,0);transform:scale(1)}
+  35%{box-shadow:0 0 42px rgba(0,229,155,.35);transform:scale(1.015)}
+  100%{box-shadow:0 0 0 rgba(0,229,155,0);transform:scale(1)}
+}
+@media(max-width:700px){
+  .order-row,.trade-actions,.market-depth-grid{grid-template-columns:1fr}
+}

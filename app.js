@@ -32,6 +32,8 @@ const defaultState = {
   note: "Admin + AI engine combined signal.",
   trades: [],
   paymentRequests: [],
+  closedTrades: [],
+  recentFills: [],
   selectedPaymentPlan: "Pro",
   referrals: [],
   prices: {}
@@ -493,19 +495,19 @@ function runIndicatorEngine() {
   $("engineReason").textContent = reason;
 }
 
-function executeTrade() {
+function placeTrade(side) {
   if (state.signalsUsed >= numericSignalLimit()) {
     toast("Signal limit complete. Upgrade plan.");
     showPage("subscription");
     return;
   }
 
-  if (state.signal === "WAIT") {
-    toast("Signal is WAIT. Trade not added.");
-    return;
-  }
-
   const amount = Number($("tradeAmountInput")?.value);
+  const coin = $("coinSelect")?.value || "BTCUSDT";
+  const orderType = $("orderType")?.value || "MARKET";
+  const leverage = Number($("leverageSelect")?.value || 1);
+  const tp = Number($("takeProfitInput")?.value || 0);
+  const sl = Number($("stopLossInput")?.value || 0);
   const bal = state.mode === "DEMO" ? state.demoBalance : state.realBalance;
 
   if (!amount || amount <= 0 || amount > bal) {
@@ -513,7 +515,7 @@ function executeTrade() {
     return;
   }
 
-  const entry = state.prices.BTCUSDT?.price || 65000;
+  const entry = state.prices[coin]?.price || fallbackPrice(coin);
 
   if (state.mode === "DEMO") state.demoBalance -= amount;
   else state.realBalance -= amount;
@@ -522,21 +524,90 @@ function executeTrade() {
 
   const trade = {
     id: "t_" + Date.now(),
-    coin: "BTCUSDT",
-    side: state.signal,
+    coin,
+    side,
+    orderType,
+    leverage,
     amount,
     entry,
     current: entry,
     pnl: 0,
-    status: "RUNNING",
-    time: new Date().toLocaleString()
+    roi: 0,
+    takeProfit: tp || null,
+    stopLoss: sl || null,
+    status: "OPEN",
+    openedAt: new Date().toLocaleString()
   };
 
   state.trades.unshift(trade);
+  state.recentFills = state.recentFills || [];
+  state.recentFills.unshift({ side, coin, price: entry, amount, time: new Date().toLocaleTimeString() });
+  state.recentFills = state.recentFills.slice(0, 8);
+
   saveTradeToSupabase(trade);
   saveState();
   render();
-  toast("Trade added.");
+
+  document.querySelector(".wallet-card")?.classList.add("trade-flash");
+  setTimeout(() => document.querySelector(".wallet-card")?.classList.remove("trade-flash"), 900);
+
+  toast(`${side} ${coin.replace("USDT","/USDT")} position opened.`);
+}
+
+function executeTrade() {
+  placeTrade(state.signal === "SELL" ? "SELL" : "BUY");
+}
+
+function fallbackPrice(coin) {
+  const map = { BTCUSDT: 65000, ETHUSDT: 3200, SOLUSDT: 150, BNBUSDT: 580 };
+  return map[coin] || 100;
+}
+
+function closeTrade(id) {
+  const index = state.trades.findIndex(t => t.id === id);
+  if (index === -1) return;
+
+  const trade = state.trades[index];
+  updateTradePnl(trade);
+
+  const refund = Number(trade.amount || 0) + Number(trade.pnl || 0);
+
+  if (state.mode === "DEMO") state.demoBalance += refund;
+  else state.realBalance += refund;
+
+  trade.status = "CLOSED";
+  trade.closedAt = new Date().toLocaleString();
+
+  state.closedTrades = state.closedTrades || [];
+  state.closedTrades.unshift({ ...trade });
+
+  state.recentFills = state.recentFills || [];
+  state.recentFills.unshift({ side: "CLOSE", coin: trade.coin, price: trade.current, amount: trade.amount, time: new Date().toLocaleTimeString() });
+
+  state.trades.splice(index, 1);
+  saveState();
+  render();
+  toast(`Position closed. PnL: ${money(trade.pnl)}`);
+}
+
+function updateTradePnl(t) {
+  const current = state.prices[t.coin]?.price || t.current || t.entry;
+  t.current = current;
+  const diff = t.side === "BUY" ? (current - t.entry) : (t.entry - current);
+  t.pnl = (diff / t.entry) * t.amount * (t.leverage || 1);
+  t.roi = t.amount ? (t.pnl / t.amount) * 100 : 0;
+
+  if (t.takeProfit) {
+    if ((t.side === "BUY" && current >= t.takeProfit) || (t.side === "SELL" && current <= t.takeProfit)) {
+      t.hitNote = "TP HIT";
+    }
+  }
+
+  if (t.stopLoss) {
+    if ((t.side === "BUY" && current <= t.stopLoss) || (t.side === "SELL" && current >= t.stopLoss)) {
+      t.hitNote = "SL HIT";
+    }
+  }
 }
 
 async function saveTradeToSupabase(trade) {
@@ -561,38 +632,57 @@ function renderTrades() {
   const table = $("activeTradesLog");
   if (!table) return;
 
-  const btc = state.prices.BTCUSDT?.price || 0;
-
-  state.trades.forEach(t => {
-    if (t.coin === "BTCUSDT" && btc) {
-      t.current = btc;
-      const diff = t.side === "BUY" ? (btc - t.entry) : (t.entry - btc);
-      t.pnl = (diff / t.entry) * t.amount;
-    }
-  });
+  state.trades.forEach(updateTradePnl);
 
   const rows = state.trades.map(t => `
     <tr>
-      <td>${t.coin}</td>
+      <td>${t.coin.replace("USDT","/USDT")}</td>
       <td class="${t.side === "BUY" ? "buy-text" : "sell-text"}">${t.side}</td>
       <td>${money(t.amount)}</td>
+      <td>${t.leverage || 1}x</td>
       <td>${money(t.entry)}</td>
       <td>${money(t.current)}</td>
-      <td class="${t.pnl >= 0 ? "pnl-plus" : "pnl-minus"}">${t.pnl >= 0 ? "+" : ""}${money(t.pnl)}</td>
-      <td>${t.status}</td>
+      <td class="${t.pnl >= 0 ? "pnl-plus" : "pnl-minus"}">${t.pnl >= 0 ? "+" : ""}${money(t.pnl)}<br><small>${(t.roi || 0).toFixed(2)}%</small></td>
+      <td><small>TP: ${t.takeProfit ? money(t.takeProfit) : "-"}<br>SL: ${t.stopLoss ? money(t.stopLoss) : "-"}<br>${t.hitNote || ""}</small></td>
+      <td><button class="close-btn" onclick="closeTrade('${t.id}')">Close</button></td>
     </tr>
   `).join("");
 
-  table.innerHTML = rows || `<tr><td colspan="7" class="empty">No trades yet.</td></tr>`;
+  table.innerHTML = rows || `<tr><td colspan="9" class="empty">No open positions yet.</td></tr>`;
+
+  renderOrderBook();
+  renderRecentFills();
   saveState();
+}
+
+function renderOrderBook() {
+  const el = $("orderBook");
+  if (!el) return;
+  const btc = state.prices.BTCUSDT?.price || 65000;
+  const rows = [];
+  for (let i = 3; i >= 1; i--) {
+    rows.push({ type: "ASK", price: btc + i * 8.5, qty: (Math.random() * 1.8 + .2).toFixed(4) });
+  }
+  for (let i = 1; i <= 3; i++) {
+    rows.push({ type: "BID", price: btc - i * 8.5, qty: (Math.random() * 1.8 + .2).toFixed(4) });
+  }
+  el.innerHTML = rows.map(r => `<div class="book-row ${r.type === "ASK" ? "ask" : "bid"}"><span>${r.type}</span><span>${money(r.price)}</span><span>${r.qty}</span></div>`).join("");
+}
+
+function renderRecentFills() {
+  const el = $("recentFills");
+  if (!el) return;
+  const fills = state.recentFills || [];
+  el.innerHTML = fills.map(f => `<div class="fill-row ${String(f.side).toLowerCase()}"><span>${f.side}</span><span>${f.coin.replace("USDT","/USDT")}</span><span>${money(f.price)}</span></div>`).join("") || `<p class="muted small">No recent fills yet.</p>`;
 }
 
 function renderAnalytics() {
   if (!$("totalTradesMetric")) return;
 
-  const total = state.trades.length;
-  const pnl = state.trades.reduce((a, t) => a + Number(t.pnl || 0), 0);
-  const wins = state.trades.filter(t => t.pnl > 0).length;
+  const allTrades = [...(state.trades || []), ...(state.closedTrades || [])];
+  const total = allTrades.length;
+  const pnl = allTrades.reduce((a, t) => a + Number(t.pnl || 0), 0);
+  const wins = allTrades.filter(t => t.pnl > 0).length;
 
   $("totalTradesMetric").textContent = total;
   $("totalPnlMetric").textContent = money(pnl);
@@ -604,7 +694,7 @@ function renderAnalytics() {
   $("refBonusMetric").textContent = rupee(bonus);
 
   $("pnlBars").innerHTML = (
-    state.trades.slice(0, 8).map((t, i) => `
+    allTrades.slice(0, 8).map((t, i) => `
       <div class="pnl-bar">
         <span>Trade ${i + 1}</span>
         <div class="pnl-track"><i class="${t.pnl < 0 ? "loss" : ""}" style="width:${Math.min(100, Math.abs(t.pnl) * 8 + 8)}%"></i></div>
@@ -796,7 +886,9 @@ function bind() {
   if ($("realBtn")) $("realBtn").addEventListener("click", () => { state.mode = "REAL"; saveState(); render(); toast("Real UI selected. Exchange API not connected."); });
 
   if ($("executeTradeBtn")) $("executeTradeBtn").addEventListener("click", executeTrade);
-  if ($("clearTradesBtn")) $("clearTradesBtn").addEventListener("click", () => { state.trades = []; saveState(); render(); });
+  if ($("buyTradeBtn")) $("buyTradeBtn").addEventListener("click", () => placeTrade("BUY"));
+  if ($("sellTradeBtn")) $("sellTradeBtn").addEventListener("click", () => placeTrade("SELL"));
+  if ($("clearTradesBtn")) $("clearTradesBtn").addEventListener("click", () => { state.trades = []; state.closedTrades = []; saveState(); render(); });
 
   if ($("saveAdminBtn")) $("saveAdminBtn").addEventListener("click", saveAdminSettings);
   if ($("clearPaymentsBtn")) $("clearPaymentsBtn").addEventListener("click", () => { state.paymentRequests = []; saveState(); render(); });
@@ -844,3 +936,5 @@ window.addEventListener("load", async () => {
   setInterval(fetchRealPrices, 30000);
   setInterval(loadRemoteData, 45000);
 });
+
+window.closeTrade = closeTrade;
