@@ -1,5 +1,7 @@
 const CONFIG = window.APP_CONFIG || {};
 const IS_ADMIN_PAGE = document.body?.dataset?.adminPage === "true";
+const MIN_DEPOSIT_AMOUNT = 1000;
+const MIN_WITHDRAW_AMOUNT = 1000;
 let supabaseClient = null;
 
 if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY && window.supabase) {
@@ -686,6 +688,7 @@ function render() {
   renderPayments();
   renderDeposits();
   renderWithdrawals();
+  renderWithdrawalEligibility();
   renderAdminPanel();
   renderPlans();
   renderKyc();
@@ -1078,6 +1081,11 @@ async function submitDepositRequest() {
     return;
   }
 
+  if (amount < MIN_DEPOSIT_AMOUNT) {
+    toast("Minimum deposit amount is ₹1000.");
+    return;
+  }
+
   let remoteId = "d_" + Date.now();
 
   if (supabaseClient && state.user?.id) {
@@ -1130,6 +1138,70 @@ async function submitDepositRequest() {
 }
 
 
+
+function currentUserIdSafe() {
+  return String(state.user?.id || "local");
+}
+
+function realAccountTrades() {
+  normalizeAccounts();
+  return [
+    ...(state.accounts?.REAL?.trades || []),
+    ...(state.accounts?.REAL?.closedTrades || [])
+  ];
+}
+
+function approvedDepositTotal(userId = currentUserIdSafe()) {
+  return (state.depositRequests || [])
+    .filter(d => String(d.userId) === String(userId) && d.status === "APPROVED")
+    .reduce((a, d) => a + Number(d.amount || 0), 0);
+}
+
+function approvedWithdrawalTotal(userId = currentUserIdSafe()) {
+  return (state.withdrawalRequests || [])
+    .filter(w => String(w.userId) === String(userId) && w.status === "APPROVED")
+    .reduce((a, w) => a + Number(w.amount || 0), 0);
+}
+
+function pendingWithdrawalTotal(userId = currentUserIdSafe()) {
+  return (state.withdrawalRequests || [])
+    .filter(w => String(w.userId) === String(userId) && w.status === "PENDING")
+    .reduce((a, w) => a + Number(w.amount || 0), 0);
+}
+
+function realTradeVolume() {
+  return realAccountTrades()
+    .reduce((a, t) => a + Number(t.amount || 0), 0);
+}
+
+function realProfitEligible() {
+  return realAccountTrades()
+    .reduce((a, t) => a + Math.max(0, Number(t.pnl || 0)), 0);
+}
+
+function withdrawableAmount() {
+  const deposits = approvedDepositTotal();
+  const traded = realTradeVolume();
+  const profit = realProfitEligible();
+  const approvedW = approvedWithdrawalTotal();
+  const pendingW = pendingWithdrawalTotal();
+
+  // Rule:
+  // Deposit amount unlocks only up to traded volume.
+  // Profit is also withdrawable.
+  // Pending + approved withdrawals reduce available amount.
+  const unlockedDeposit = Math.min(deposits, traded);
+  return Math.max(0, unlockedDeposit + profit - approvedW - pendingW);
+}
+
+function renderWithdrawalEligibility() {
+  if ($("approvedDepositText")) $("approvedDepositText").textContent = money(approvedDepositTotal());
+  if ($("tradeVolumeText")) $("tradeVolumeText").textContent = money(realTradeVolume());
+  if ($("profitEligibleText")) $("profitEligibleText").textContent = money(realProfitEligible());
+  if ($("withdrawableAmountText")) $("withdrawableAmountText").textContent = money(withdrawableAmount());
+}
+
+
 function openWithdrawModal() {
   $("withdrawModal")?.classList.add("show");
 }
@@ -1147,14 +1219,25 @@ async function submitWithdrawRequest() {
 
   normalizeAccounts();
   const realBalance = Number(state.accounts?.REAL?.balance || state.realBalance || 0);
+  const eligible = withdrawableAmount();
 
   if (!amount || amount <= 0 || !account || !name) {
     toast("Amount, account/UPI and name required.");
     return;
   }
 
+  if (amount < MIN_WITHDRAW_AMOUNT) {
+    toast("Minimum withdrawal amount is ₹1000.");
+    return;
+  }
+
   if (amount > realBalance) {
     toast("Insufficient Real Account balance.");
+    return;
+  }
+
+  if (amount > eligible) {
+    toast(`Withdrawable amount only ${money(eligible)}. Deposit unlocks after trading volume.`);
     return;
   }
 
@@ -1253,9 +1336,13 @@ async function approveWithdrawal(id) {
   normalizeAccounts();
   const amount = Number(req.amount || 0);
 
-  // For the logged-in user/admin local preview, deduct from REAL account ledger state
-  state.accounts.REAL.balance = Math.max(0, Number(state.accounts.REAL.balance || state.realBalance || 0) - amount);
-  state.realBalance = state.accounts.REAL.balance;
+  // Deduct balance through wallet_ledger. Do not deduct admin's local wallet.
+  // If the current page belongs to the same user, update local preview immediately.
+  if (String(state.user?.id) === String(req.userId) && state.user?.role !== "admin") {
+    state.accounts.REAL.balance = Math.max(0, Number(state.accounts.REAL.balance || state.realBalance || 0) - amount);
+    state.realBalance = state.accounts.REAL.balance;
+  }
+
   req.status = "APPROVED";
 
   if (supabaseClient) {

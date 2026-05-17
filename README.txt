@@ -237,3 +237,18 @@ Withdrawal Flow Update:
 - Admin can approve/reject withdrawal requests.
 - Approved withdrawal creates wallet_ledger negative entry.
 - Latest SQL includes withdrawal_requests table and policies.
+
+
+Withdrawal Rule Fix:
+- Withdrawal now checks eligible withdrawable amount.
+- Approved deposit unlocks only up to Real Account trade volume.
+- Positive profit is also withdrawable.
+- Pending/approved withdrawals reduce withdrawable amount.
+- Admin approval no longer deducts admin's local wallet by mistake.
+- User balance is reduced through wallet_ledger negative entry after approval.
+
+
+Minimum Amount Update:
+- Minimum deposit set to ₹1000.
+- Minimum withdrawal set to ₹1000.
+- Requests below ₹1000 are blocked on user side.

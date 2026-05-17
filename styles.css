@@ -1822,3 +1822,31 @@ body.demo-mode-active .real-only-nav{display:none!important}
 @media(max-width:520px){
   .wallet-action-grid{grid-template-columns:1fr}
 }
+
+
+/* ===== WITHDRAWAL ELIGIBILITY RULE UI ===== */
+.withdraw-rule-box{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:16px 0;
+}
+.withdraw-rule-box div{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.035);
+  border-radius:14px;
+  padding:12px;
+}
+.withdraw-rule-box span{
+  display:block;
+  color:var(--muted);
+  font-size:12px;
+  margin-bottom:6px;
+}
+.withdraw-rule-box b{
+  color:var(--green);
+  font-size:15px;
+}
+@media(max-width:520px){
+  .withdraw-rule-box{grid-template-columns:1fr}
+}

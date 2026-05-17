@@ -335,6 +335,13 @@
             <p class="label">Wallet</p>
             <h2>Deposit Balance</h2>
             <div class="wallet-big" id="walletPageBalance">$0.00</div>
+            <div class="withdraw-rule-box">
+              <div><span>Approved Deposit</span><b id="approvedDepositText">$0.00</b></div>
+              <div><span>Trade Volume</span><b id="tradeVolumeText">$0.00</b></div>
+              <div><span>Profit Eligible</span><b id="profitEligibleText">$0.00</b></div>
+              <div><span>Withdrawable</span><b id="withdrawableAmountText">$0.00</b></div>
+            </div>
+
             <div class="wallet-action-grid">
               <button id="openDepositBtn2" class="primary-btn">Deposit Now</button>
               <button id="openWithdrawBtn" class="withdraw-btn">Withdraw</button>
@@ -435,7 +442,7 @@
         <p><strong>Account No:</strong> <span id="depositAccountNoText">000000000000</span></p>
         <p><strong>IFSC:</strong> <span id="depositIfscText">ABCD0000000</span></p>
       </div>
-      <label class="input-label">Deposit Amount</label><input id="depositAmount" type="number" min="1" placeholder="Enter amount"/>
+      <label class="input-label">Deposit Amount</label><input id="depositAmount" type="number" min="1000" placeholder="Minimum ₹1000"/>
       <label class="input-label">Transaction / UTR Number</label><input id="depositTxn" placeholder="Example: 4158XXXXXX"/>
       <label class="input-label">Upload Payment Screenshot</label><input id="depositScreenshot" type="file" accept="image/*"/>
       <button id="submitDepositRequest" class="primary-btn">Submit Deposit Request</button>
@@ -451,7 +458,7 @@
       <h2>Withdraw Funds</h2>
 
       <label class="input-label">Withdrawal Amount</label>
-      <input id="withdrawAmount" type="number" min="1" placeholder="Enter amount"/>
+      <input id="withdrawAmount" type="number" min="1000" placeholder="Minimum ₹1000"/>
 
       <label class="input-label">Withdrawal Method</label>
       <select id="withdrawMethod">
@@ -469,7 +476,7 @@
       <input id="withdrawIfsc" placeholder="IFSC for bank withdrawal"/>
 
       <button id="submitWithdrawRequest" class="primary-btn">Submit Withdrawal Request</button>
-      <p class="tiny-warning">Approval के बाद amount आपके Real Account balance से deduct होगा.</p>
+      <p class="tiny-warning">Minimum withdrawal ₹1000. Approval के बाद amount आपके Real Account balance से deduct होगा.</p>
     </div>
   </div>
 
