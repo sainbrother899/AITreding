@@ -449,3 +449,9 @@ AI Mass Trade Close Update:
 - Mass trade PnL is calculated and saved to managed_trades + wallet_ledger.
 - User history will show closed AI Mass trades as CLOSED.
 - No new SQL needed if managed_trades table already exists.
+
+
+More Buttons Fix:
+- More page internal buttons now open KYC, Plans, Referral and Profile.
+- Added Profile page.
+- Added direct navigation handler for More page buttons.

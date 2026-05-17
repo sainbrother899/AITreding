@@ -3665,3 +3665,42 @@ function finalEligibleUsersForAiTrade(target = "ALL") {
 window.closeMassTradeById = closeMassTradeById;
 window.closeSelectedMassTrade = closeSelectedMassTrade;
 window.closeAllMassTrades = closeAllMassTrades;
+
+
+/* More page internal buttons navigation fix */
+function openUserPageDirect(pageId) {
+  if (!pageId) return;
+
+  const target = document.getElementById(pageId);
+  if (!target) {
+    console.warn("Page not found:", pageId);
+    return;
+  }
+
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active-page"));
+  target.classList.add("active-page");
+
+  document.querySelectorAll(".nav-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.page === pageId);
+  });
+
+  try {
+    if (pageId === "profilepage") {
+      if ($("profileNameText")) $("profileNameText").textContent = state.user?.name || "User";
+      if ($("profileEmailText")) $("profileEmailText").textContent = state.user?.email || "-";
+      if ($("profilePlanText")) $("profilePlanText").textContent = state.user?.plan || getPlan?.() || "Free";
+      if ($("profileModeText")) $("profileModeText").textContent = state.mode || "DEMO";
+    }
+    if (typeof render === "function") setTimeout(() => { try { render(); } catch(e){} }, 50);
+  } catch(e) {}
+}
+
+document.addEventListener("click", function(e){
+  const moreBtn = e.target.closest(".more-open-btn, #topMoreMenuBtn, .ghost-btn[data-page]");
+  if (!moreBtn) return;
+  const pageId = moreBtn.dataset.page;
+  if (!pageId) return;
+  e.preventDefault();
+  e.stopPropagation();
+  openUserPageDirect(pageId);
+}, true);
