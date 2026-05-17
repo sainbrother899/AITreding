@@ -296,3 +296,11 @@ Total Wallet Balance Fix:
   Approved Deposit + Profit/Loss - Approved Withdrawal - Pending Withdrawal.
 - Withdrawable amount calculation was not touched.
 - This specifically fixes total balance staying same while withdrawal/eligible amounts changed.
+
+
+WebSocket Live PnL Update:
+- Added Binance public WebSocket live stream for BTC/ETH/SOL/BNB.
+- Price and PnL update almost instantly.
+- Wallet equity updates live with open PnL.
+- Falls back to normal API polling if WebSocket disconnects.
+- No SQL required for this update.

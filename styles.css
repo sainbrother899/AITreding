@@ -1866,3 +1866,16 @@ body.demo-mode-active .real-only-nav{display:none!important}
     grid-template-columns:1fr 1fr!important;
   }
 }
+
+
+/* ===== LIVE WEBSOCKET STATUS ===== */
+#marketStatusDot{
+  transition:.25s ease;
+  font-weight:900;
+}
+.pnl-plus,#todayPnlMini.pnl-plus{
+  text-shadow:0 0 16px rgba(0,229,155,.18);
+}
+.pnl-minus,#todayPnlMini.pnl-minus{
+  text-shadow:0 0 16px rgba(255,63,96,.18);
+}

@@ -2426,3 +2426,126 @@ setInterval(() => {
     if (document.getElementById("mockRealBalance")) document.getElementById("mockRealBalance").textContent = money(accountEquity("REAL"));
   }catch(e){}
 }, 1200);
+
+
+
+/* =========================================================
+   Binance WebSocket Live Price + Instant PnL Update
+   ========================================================= */
+let livePriceSocket = null;
+let livePriceReconnectTimer = null;
+let livePriceRenderLock = false;
+
+function setLivePriceStatus(text, ok = true) {
+  const dot = document.getElementById("marketStatusDot");
+  if (dot) {
+    dot.textContent = ok ? "● " + text : "● " + text;
+    dot.style.color = ok ? "#00e59b" : "#ffc247";
+  }
+}
+
+function startLivePriceWebSocket() {
+  const streams = [
+    "btcusdt@ticker",
+    "ethusdt@ticker",
+    "solusdt@ticker",
+    "bnbusdt@ticker"
+  ].join("/");
+
+  const url = "wss://stream.binance.com:9443/stream?streams=" + streams;
+
+  try {
+    if (livePriceSocket && (livePriceSocket.readyState === WebSocket.OPEN || livePriceSocket.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    livePriceSocket = new WebSocket(url);
+    setLivePriceStatus("Connecting Live Feed", false);
+
+    livePriceSocket.onopen = function () {
+      setLivePriceStatus("Market Live", true);
+      clearTimeout(livePriceReconnectTimer);
+    };
+
+    livePriceSocket.onmessage = function (event) {
+      try {
+        const msg = JSON.parse(event.data);
+        const d = msg.data || {};
+        const symbol = String(d.s || "").toUpperCase();
+
+        if (!symbol) return;
+
+        state.prices[symbol] = {
+          price: Number(d.c || 0),
+          change: Number(d.P || 0)
+        };
+
+        // Smooth fast UI update without full heavy render on every tick.
+        liveFastPnLUpdate();
+      } catch (e) {
+        console.warn("Live price parse failed", e);
+      }
+    };
+
+    livePriceSocket.onerror = function () {
+      setLivePriceStatus("Live Feed Error", false);
+    };
+
+    livePriceSocket.onclose = function () {
+      setLivePriceStatus("Reconnecting Feed", false);
+      clearTimeout(livePriceReconnectTimer);
+      livePriceReconnectTimer = setTimeout(startLivePriceWebSocket, 2500);
+    };
+  } catch (e) {
+    console.warn("WebSocket init failed", e);
+    setLivePriceStatus("Using Fallback Prices", false);
+  }
+}
+
+function liveFastPnLUpdate() {
+  if (livePriceRenderLock) return;
+
+  livePriceRenderLock = true;
+
+  requestAnimationFrame(() => {
+    try {
+      // Update open positions PnL immediately.
+      if (typeof renderTrades === "function") renderTrades();
+
+      // Update top tickers and mini price text.
+      if (typeof renderTickers === "function") renderTickers();
+      if (typeof renderPremiumMetrics === "function") renderPremiumMetrics();
+      if (typeof finalRebuildUISync === "function") finalRebuildUISync();
+      if (typeof liveWalletEquityTick === "function") liveWalletEquityTick();
+
+      // Chart pair price text.
+      if (typeof updatePairTextsFast === "function") updatePairTextsFast();
+      if (typeof updateSelectedPairUI === "function") updateSelectedPairUI();
+
+      // AI engine can react to fresh price.
+      if (typeof runIndicatorEngine === "function") runIndicatorEngine();
+
+      saveState();
+    } catch (e) {
+      console.warn("Live PnL update failed", e);
+    }
+
+    livePriceRenderLock = false;
+  });
+}
+
+// Start live stream after app load.
+window.addEventListener("load", function () {
+  setTimeout(startLivePriceWebSocket, 1000);
+});
+
+// Keep fallback polling, but reduce unnecessary calls if WebSocket is connected.
+const originalFetchRealPricesForFallback = typeof fetchRealPrices === "function" ? fetchRealPrices : null;
+if (originalFetchRealPricesForFallback) {
+  fetchRealPrices = async function () {
+    if (livePriceSocket && livePriceSocket.readyState === WebSocket.OPEN) {
+      return;
+    }
+    return originalFetchRealPricesForFallback();
+  };
+}
