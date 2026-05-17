@@ -213,3 +213,9 @@ Trade Page Fix:
 - Trade page chart container fixed back to crypto_live_chart so TradingView works.
 - Order Book and Recent Fills IDs restored so existing JS works.
 - Trade tab now re-initializes chart/feed when opened.
+
+
+Auto Pair Chart Update:
+- Trade page pair selector now changes TradingView chart automatically.
+- BTC/ETH/SOL/BNB selection updates chart symbol.
+- Pair title and selected price text also update.

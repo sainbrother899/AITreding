@@ -1688,7 +1688,7 @@ function initTradingViewChart() {
 
   new TradingView.widget({
     autosize: true,
-    symbol: "BINANCE:BTCUSDT",
+    symbol: "BINANCE:" + (document.getElementById("coinSelect")?.value || currentChartSymbol || "BTCUSDT"),
     interval: "5",
     timezone: "Asia/Kolkata",
     theme: "dark",
@@ -1866,3 +1866,113 @@ document.addEventListener("click", function(e){
 window.addEventListener("load", function(){
   setTimeout(initTradePageFix, 600);
 });
+
+
+
+/* Auto pair chart switch update */
+let currentChartSymbol = "BTCUSDT";
+
+function pairLabel(symbol) {
+  return String(symbol || "BTCUSDT").replace("USDT", "/USDT");
+}
+
+function reloadTradingViewForPair(symbol) {
+  currentChartSymbol = symbol || "BTCUSDT";
+  const chart = document.getElementById("crypto_live_chart");
+  if (!chart) return;
+
+  chart.dataset.loaded = "";
+  chart.innerHTML = "";
+
+  if (typeof TradingView === "undefined") {
+    chart.innerHTML = "<div style='padding:30px;color:#91a7c4'>Chart loading...</div>";
+    return;
+  }
+
+  new TradingView.widget({
+    autosize: true,
+    symbol: "BINANCE:" + currentChartSymbol,
+    interval: "5",
+    timezone: "Asia/Kolkata",
+    theme: "dark",
+    style: "1",
+    locale: "en",
+    enable_publishing: false,
+    hide_side_toolbar: false,
+    allow_symbol_change: true,
+    container_id: "crypto_live_chart"
+  });
+
+  chart.dataset.loaded = "1";
+  updateSelectedPairUI();
+}
+
+function updateSelectedPairUI() {
+  const coin = document.getElementById("coinSelect")?.value || currentChartSymbol || "BTCUSDT";
+  currentChartSymbol = coin;
+
+  const price = state?.prices?.[coin]?.price || 0;
+  const change = state?.prices?.[coin]?.change || 0;
+
+  document.querySelectorAll(".pair-pill").forEach(el => {
+    el.textContent = "🟠 " + pairLabel(coin) + "⌄";
+  });
+
+  document.querySelectorAll(".chart-card h2, .pro-trading-panel h2").forEach(el => {
+    if (el.textContent.includes("/") || el.textContent.includes("USDT")) {
+      el.textContent = pairLabel(coin);
+    }
+  });
+
+  if (document.getElementById("proPairPrice")) {
+    document.getElementById("proPairPrice").textContent = money(price);
+  }
+  if (document.getElementById("tradePairPrice")) {
+    document.getElementById("tradePairPrice").textContent = money(price);
+  }
+
+  const changeText = `${Number(change) >= 0 ? "+" : ""}${Number(change || 0).toFixed(2)}%`;
+  if (document.getElementById("proPairChange")) document.getElementById("proPairChange").textContent = " " + changeText;
+  if (document.getElementById("tradePairChange")) document.getElementById("tradePairChange").textContent = " " + changeText;
+
+  if (document.getElementById("userSignalCoin")) {
+    document.getElementById("userSignalCoin").textContent = pairLabel(coin);
+  }
+  if (document.getElementById("activeSignalMini")) {
+    document.getElementById("activeSignalMini").textContent = `${state?.signal || "WAIT"} ${coin.replace("USDT", "")}`;
+  }
+}
+
+function bindAutoPairChart() {
+  const select = document.getElementById("coinSelect");
+  if (!select || select.dataset.pairBound === "1") return;
+
+  select.dataset.pairBound = "1";
+  currentChartSymbol = select.value || "BTCUSDT";
+
+  select.addEventListener("change", function () {
+    reloadTradingViewForPair(this.value);
+    if (typeof renderOrderBook === "function") renderOrderBook();
+    if (typeof renderRecentFills === "function") renderRecentFills();
+  });
+}
+
+document.addEventListener("click", function(e){
+  const btn = e.target.closest("[data-page='tradepage']");
+  if (btn) {
+    setTimeout(() => {
+      bindAutoPairChart();
+      const selected = document.getElementById("coinSelect")?.value || currentChartSymbol;
+      reloadTradingViewForPair(selected);
+    }, 300);
+  }
+});
+
+window.addEventListener("load", function(){
+  setTimeout(() => {
+    bindAutoPairChart();
+    updateSelectedPairUI();
+  }, 800);
+});
+
+setInterval(updateSelectedPairUI, 1500);
