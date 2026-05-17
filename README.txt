@@ -58,3 +58,20 @@ Configured:
 Before going live:
 - Replace manual gateway details in config.js with your real UPI/Bank details.
 - Run supabase-schema.sql in Supabase SQL Editor.
+
+
+Final Stable Update:
+- Supabase Auth signup/login added for normal users.
+- Local separate admin login kept on admin.html.
+- User side blocks admin login.
+- Admin side blocks normal user login.
+- Payment requests now save to Supabase payment_requests table.
+- Admin approval updates payment status and user plan in Supabase profiles table.
+- Referral save/fetch improved.
+- setup.html added with simple checklist.
+- SQL updated with drop-policy safety so re-running SQL does not fail.
+
+Important:
+- Admin is still local fallback: admin@aitrade.local / admin123
+- For production, create a secure server-side admin/auth system.
+- Screenshot upload stores filename only in this static version. Real file upload needs Supabase Storage bucket.

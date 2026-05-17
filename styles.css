@@ -20,3 +20,5 @@ main{position:relative;padding:24px 5vw 96px}.card{background:linear-gradient(18
 @media(max-width:620px){.topbar{padding:13px 14px}.brand p{display:none}.brand h1{font-size:16px}.logo{width:42px;height:42px;border-radius:15px}main{padding:18px 14px 100px}.auth-grid{min-height:auto}.hero-copy h2{font-size:38px}.hero-points,.ticker-grid,.analytics-grid,.plans-grid{grid-template-columns:1fr}.card{padding:16px;border-radius:22px}.bottom-nav{width:calc(100% - 20px);overflow:auto;justify-content:flex-start}.nav-btn{white-space:nowrap;padding:11px 13px}#crypto_live_chart{height:430px}.stats-row{grid-template-columns:1fr}.section-title h2{font-size:29px}.wallet-card>h2{font-size:30px}}
 
 .single-tab{grid-template-columns:1fr}.single-tab .tab{cursor:default}
+
+.checklist{display:grid;gap:12px;color:#d7e8ff}.checklist p{padding:12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.035)}

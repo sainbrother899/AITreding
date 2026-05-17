@@ -1,5 +1,5 @@
--- Supabase Database Setup
--- Supabase Dashboard > SQL Editor > New Query > Paste > Run
+-- AI Trading Assistant Supabase Schema
+-- Supabase Dashboard > SQL Editor > New Query > Paste this full file > Run
 
 create table if not exists public.profiles (
   id text primary key,
@@ -52,7 +52,21 @@ alter table public.trades enable row level security;
 alter table public.payment_requests enable row level security;
 alter table public.referrals enable row level security;
 
--- Basic public policies for test build. Tighten before production.
+drop policy if exists "public read profiles" on public.profiles;
+drop policy if exists "public insert profiles" on public.profiles;
+drop policy if exists "public update profiles" on public.profiles;
+
+drop policy if exists "public read trades" on public.trades;
+drop policy if exists "public insert trades" on public.trades;
+
+drop policy if exists "public read payments" on public.payment_requests;
+drop policy if exists "public insert payments" on public.payment_requests;
+drop policy if exists "public update payments" on public.payment_requests;
+
+drop policy if exists "public read referrals" on public.referrals;
+drop policy if exists "public insert referrals" on public.referrals;
+
+-- Open policies for test build. Tighten these before real production.
 create policy "public read profiles" on public.profiles for select using (true);
 create policy "public insert profiles" on public.profiles for insert with check (true);
 create policy "public update profiles" on public.profiles for update using (true);
