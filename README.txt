@@ -338,3 +338,11 @@ Premium Admin UI Update:
 - Added mobile-app style responsive layout.
 - Kept existing IDs/data-admin-tab logic intact.
 - Existing admin features/logic remain same.
+
+
+Admin PC Layout Fix:
+- PC admin now uses proper desktop dashboard width.
+- Left sidebar fixed/sticky.
+- Right content full-width.
+- Tables and cards expand properly on PC.
+- Mobile admin compact style remains unchanged.

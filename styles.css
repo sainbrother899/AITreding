@@ -2214,3 +2214,126 @@ body[data-admin-page="true"] .ghost-btn{
     max-width:100%!important;
   }
 }
+
+
+/* =========================================================
+   ADMIN PC DESKTOP LAYOUT FIX
+   PC पर admin full dashboard, mobile पर compact
+   ========================================================= */
+@media(min-width:901px){
+  body[data-admin-page="true"] main{
+    max-width:1480px!important;
+    width:100%!important;
+    margin:0 auto!important;
+    padding:24px 24px 110px!important;
+    display:block!important;
+  }
+
+  body[data-admin-page="true"] #appPage{
+    width:100%!important;
+    max-width:none!important;
+  }
+
+  body[data-admin-page="true"] .admin-premium-page{
+    width:100%!important;
+    max-width:none!important;
+  }
+
+  body[data-admin-page="true"] .admin-premium-hero{
+    width:100%!important;
+    max-width:none!important;
+    margin-bottom:22px!important;
+    padding:22px 24px!important;
+  }
+
+  body[data-admin-page="true"] .admin-layout{
+    display:grid!important;
+    grid-template-columns:280px minmax(0,1fr)!important;
+    gap:22px!important;
+    width:100%!important;
+    max-width:none!important;
+    align-items:start!important;
+  }
+
+  body[data-admin-page="true"] .admin-menu{
+    position:sticky!important;
+    top:104px!important;
+    width:280px!important;
+    max-width:280px!important;
+    height:auto!important;
+    max-height:calc(100vh - 130px)!important;
+    overflow:auto!important;
+  }
+
+  body[data-admin-page="true"] .admin-content{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+  }
+
+  body[data-admin-page="true"] .admin-panel{
+    width:100%!important;
+    max-width:none!important;
+  }
+
+  body[data-admin-page="true"] .card,
+  body[data-admin-page="true"] .table-card,
+  body[data-admin-page="true"] .admin-panel > .card{
+    width:100%!important;
+    max-width:none!important;
+    margin-left:0!important;
+    margin-right:0!important;
+  }
+
+  body[data-admin-page="true"] .analytics-grid,
+  body[data-admin-page="true"] .admin-quick-grid{
+    width:100%!important;
+    max-width:none!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  }
+
+  body[data-admin-page="true"] .admin-two-grid{
+    width:100%!important;
+    max-width:none!important;
+    grid-template-columns:minmax(360px,420px) minmax(0,1fr)!important;
+  }
+
+  body[data-admin-page="true"] .wallet-grid{
+    grid-template-columns:minmax(360px,420px) minmax(0,1fr)!important;
+    width:100%!important;
+    max-width:none!important;
+  }
+
+  body[data-admin-page="true"] .table-wrap{
+    width:100%!important;
+    max-width:100%!important;
+    overflow:auto!important;
+  }
+
+  body[data-admin-page="true"] table{
+    width:100%!important;
+    min-width:820px!important;
+  }
+
+  body[data-admin-page="true"] #adminOverview .card,
+  body[data-admin-page="true"] #adminSignals .card,
+  body[data-admin-page="true"] #adminPlans .card,
+  body[data-admin-page="true"] #adminKyc .card,
+  body[data-admin-page="true"] #adminTrades .card,
+  body[data-admin-page="true"] #adminReferrals .card,
+  body[data-admin-page="true"] #adminMassTrade .card,
+  body[data-admin-page="true"] #adminManagedTrade .card{
+    max-width:none!important;
+  }
+
+  body[data-admin-page="true"] .bottom-nav,
+  body[data-admin-page="true"] .pro-bottom-nav{
+    display:none!important;
+  }
+
+  body[data-admin-page="true"] input,
+  body[data-admin-page="true"] select,
+  body[data-admin-page="true"] textarea{
+    width:100%!important;
+  }
+}
