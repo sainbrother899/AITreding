@@ -815,7 +815,8 @@ function placeTrade(side) {
 
   const entry = state.prices[coin]?.price || fallbackPrice(coin);
 
-  acc.balance -= amount;
+  // Simulation margin is not deducted from wallet balance on open.
+  // Balance changes only when trade is closed by net PnL.
   syncAccountBackups();
   acc.signalsUsed++;
 
@@ -873,13 +874,14 @@ function closeTrade(id) {
   const trade = acc.trades[index];
   updateTradePnl(trade);
 
-  const margin = Number(trade.amount || 0);
   const pnl = Number(trade.pnl || 0);
-  const refund = Math.max(0, margin + pnl);
 
-  // Close trade effect:
-  // Profit adds to wallet, loss reduces returned margin.
-  acc.balance = Number(acc.balance || 0) + refund;
+  // IMPORTANT FIX:
+  // Previous version added margin + pnl on close, causing double balance.
+  // Now wallet settlement is NET PnL only.
+  // Example: 100000 balance, trade 100000, profit 18 => wallet becomes 100018, not 200018.
+  acc.balance = Number(acc.balance || 0) + pnl;
+  if (acc.balance < 0) acc.balance = 0;
 
   trade.status = "CLOSED";
   trade.closedAt = new Date().toLocaleString();
@@ -887,16 +889,19 @@ function closeTrade(id) {
   acc.closedTrades = acc.closedTrades || [];
   acc.closedTrades.unshift({ ...trade });
 
-  if (state.mode === "REAL") {
-    state.realTradeVolumeTotal = Number(state.realTradeVolumeTotal || 0) + 0;
-    if (pnl > 0 && !trade.profitCounted) {
-      state.realProfitTotal = Number(state.realProfitTotal || 0) + pnl;
-      trade.profitCounted = true;
-    }
+  if (state.mode === "REAL" && pnl > 0 && !trade.profitCounted) {
+    state.realProfitTotal = Number(state.realProfitTotal || 0) + pnl;
+    trade.profitCounted = true;
   }
 
   acc.recentFills = acc.recentFills || [];
-  acc.recentFills.unshift({ side: "CLOSE", coin: trade.coin, price: trade.current, amount: trade.amount, time: new Date().toLocaleTimeString() });
+  acc.recentFills.unshift({
+    side: "CLOSE",
+    coin: trade.coin,
+    price: trade.current,
+    amount: trade.amount,
+    time: new Date().toLocaleTimeString()
+  });
 
   acc.trades.splice(index, 1);
   syncAccountBackups();
@@ -906,7 +911,7 @@ function closeTrade(id) {
   const msg = pnl >= 0
     ? `Trade closed. Profit added: ${money(pnl)}`
     : `Trade closed. Loss deducted: ${money(Math.abs(pnl))}`;
-  toast(msg + " | Trade closed and wallet updated.");
+  toast(msg + " | Wallet updated.");
 }
 
 function updateTradePnl(t) {

@@ -274,3 +274,10 @@ Withdrawal Reserved Balance Fix:
 - Admin approval deducts actual Real balance, without visual double deduction.
 - Rejected withdrawal restores displayed wallet total because pending reserve is removed.
 - Wallet now shows Pending Withdrawal amount.
+
+
+Trade Close Double Balance Fix:
+- Fixed bug where closing a trade added margin + profit and doubled wallet balance.
+- Trade open no longer deducts simulation margin from wallet.
+- Trade close now applies only net PnL:
+  100000 wallet + 18 profit = 100018 wallet.
