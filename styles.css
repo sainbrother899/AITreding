@@ -240,3 +240,28 @@ textarea{
 @media(max-width:950px){
   .admin-two-grid{grid-template-columns:1fr}
 }
+
+.signal-details{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:14px 0;
+}
+.signal-details div{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.035);
+  border-radius:14px;
+  padding:12px;
+}
+.signal-details span{
+  display:block;
+  color:var(--muted);
+  font-size:12px;
+  margin-bottom:5px;
+}
+.signal-details strong{
+  font-size:14px;
+}
+@media(max-width:520px){
+  .signal-details{grid-template-columns:1fr}
+}

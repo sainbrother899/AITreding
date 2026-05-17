@@ -524,6 +524,10 @@ function render() {
   if ($("signalBox")) $("signalBox").className = "signal-box " + state.signal.toLowerCase();
   if ($("aiSignalText")) $("aiSignalText").textContent = state.signal === "WAIT" ? "WAIT / NO TRADE" : `${state.signal} BTC NOW`;
   if ($("signalNote")) $("signalNote").textContent = `${state.note} | Risk: ${state.riskLevel || "MEDIUM"} | Confidence: ${state.confidence || 70}%`;
+  if ($("userSignalCoin")) $("userSignalCoin").textContent = String(state.signalCoin || "BTCUSDT").replace("USDT","/USDT");
+  if ($("userTargetPrice")) $("userTargetPrice").textContent = state.targetPrice ? money(state.targetPrice) : "-";
+  if ($("userStopLoss")) $("userStopLoss").textContent = state.stopLoss ? money(state.stopLoss) : "-";
+  if ($("userSignalExpiry")) $("userSignalExpiry").textContent = state.signalExpiry || "30 minutes";
 
   if ($("adminSignal")) $("adminSignal").value = state.signal;
   if ($("adminNote")) $("adminNote").value = state.note;

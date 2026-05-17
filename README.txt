@@ -123,3 +123,10 @@ Plans + KYC Update:
 - Admin KYC approval/rejection added.
 - Latest SQL includes subscription_plans and kyc_requests.
 - Still not included: admin password change, website name/logo edit, maintenance mode.
+
+
+User/Admin Separation Fix:
+- Removed admin panel from index.html user dashboard.
+- Admin panel remains only in admin.html.
+- User dashboard keeps only user-facing items:
+  plans, KYC, deposit status, signal details, wallet, trades, referrals.
