@@ -3134,3 +3134,27 @@ window.addEventListener("load", function(){
 
 window.cancelManagedTradeById = cancelManagedTradeById;
 window.cancelSelectedManagedTrade = cancelSelectedManagedTrade;
+
+
+/* Top More / data-page direct navigation fix */
+function safeOpenPageFromButton(btn) {
+  const page = btn?.dataset?.page;
+  if (!page) return;
+  if (typeof showPage === "function") {
+    showPage(page);
+    return;
+  }
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active-page"));
+  document.getElementById(page)?.classList.add("active-page");
+}
+
+document.addEventListener("click", function(e){
+  const btn = e.target.closest("[data-page]");
+  if (!btn) return;
+
+  // Allow all non-nav shortcut buttons like top 3-dot and More page cards.
+  if (btn.id === "topMoreMenuBtn" || btn.classList.contains("more-open-btn") || btn.classList.contains("history-open-btn")) {
+    e.preventDefault();
+    safeOpenPageFromButton(btn);
+  }
+});

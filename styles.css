@@ -2669,3 +2669,62 @@ body[data-admin-page="true"] .table-card:hover{
     max-width:100%!important;
   }
 }
+
+
+/* ===== TOP MORE PAGE FIX ===== */
+#morepage{
+  width:430px;
+  max-width:430px;
+  margin:0 auto;
+}
+.more-grid{
+  width:430px;
+  max-width:430px;
+  margin:0 auto;
+  display:grid;
+  gap:14px;
+}
+.more-card{
+  text-align:center;
+  padding:20px!important;
+}
+.more-icon{
+  width:58px;
+  height:58px;
+  border-radius:18px;
+  display:grid;
+  place-items:center;
+  margin:0 auto 14px;
+  background:linear-gradient(135deg,#00e59b,#17d3ff);
+  color:#00150d;
+  font-size:24px;
+  font-weight:900;
+}
+.more-card h3{
+  margin:0 0 6px;
+}
+.more-card p{
+  margin:0 0 14px;
+  color:#9db1cf;
+  font-size:13px;
+}
+.more-open-btn{
+  min-height:44px;
+  border:0;
+  border-radius:12px;
+  background:linear-gradient(135deg,#00e59b,#17d3ff);
+  color:#00150d;
+  font-weight:900;
+  padding:0 18px;
+  cursor:pointer;
+}
+.more-open-btn:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
+@media(max-width:520px){
+  #morepage,.more-grid{
+    width:100%;
+    max-width:100%;
+  }
+}

@@ -398,3 +398,9 @@ History Nav + Top More Update:
 - Bottom nav More replaced with History.
 - Top header has 3-dot More button.
 - History page now includes AI/Admin Trade History and User Manual Trade History.
+
+
+Top More Button Fix:
+- 3-dot top More button now opens morepage.
+- Added direct data-page click handler for shortcut buttons.
+- Ensured More page exists with KYC, Plans, Referral, Profile cards.
