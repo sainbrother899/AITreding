@@ -581,12 +581,37 @@ function showAuthTab(tab) {
   $("registerForm")?.classList.toggle("active-form", tab === "register");
 }
 
+
+function enforceAccountNavigation() {
+  const isDemo = state.mode !== "REAL";
+  document.body.classList.toggle("demo-mode-active", isDemo);
+
+  document.querySelectorAll(".real-only-nav").forEach(btn => {
+    btn.style.display = isDemo ? "none" : "";
+  });
+
+  // If user is on a real-only page and switches to demo, push to dashboard.
+  const activeRealOnly = document.querySelector(".page.active-page.real-only-page");
+  if (isDemo && activeRealOnly) {
+    document.querySelectorAll(".page").forEach(p => p.classList.remove("active-page"));
+    $("dashboard")?.classList.add("active-page");
+    document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.dataset.page === "dashboard"));
+  }
+}
+
 function showPage(page) {
   if (!$(page)) return;
+
+  if (state.mode !== "REAL" && $(page).classList.contains("real-only-page")) {
+    toast("Demo Account में सिर्फ Home और PnL available हैं.");
+    page = "dashboard";
+  }
+
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active-page"));
   $(page).classList.add("active-page");
 
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.dataset.page === page));
+  enforceAccountNavigation();
   render();
 }
 
@@ -602,6 +627,7 @@ function render() {
     : "Demo account balance, demo signals and demo positions only.";
   $("demoBtn")?.classList.toggle("active", state.mode === "DEMO");
   $("realBtn")?.classList.toggle("active", state.mode === "REAL");
+  enforceAccountNavigation();
 
   if ($("signalCounter")) $("signalCounter").textContent = currentAccount().signalsUsed;
   if ($("signalLimitText")) $("signalLimitText").textContent = signalLimit();
@@ -1645,8 +1671,19 @@ function bind() {
   document.querySelectorAll(".nav-btn").forEach(b => b.addEventListener("click", () => showPage(b.dataset.page)));
   document.querySelectorAll(".admin-tab").forEach(b => b.addEventListener("click", () => switchAdminTab(b.dataset.adminTab)));
 
-  if ($("demoBtn")) $("demoBtn").addEventListener("click", () => { state.mode = "DEMO"; saveState(); render(); toast("Demo Account selected."); });
-  if ($("realBtn")) $("realBtn").addEventListener("click", () => { state.mode = "REAL"; saveState(); render(); toast("Real Account selected. Exchange API not connected."); });
+  if ($("demoBtn")) $("demoBtn").addEventListener("click", () => {
+    state.mode = "DEMO";
+    saveState();
+    showPage("dashboard");
+    render();
+    toast("Demo Account selected.");
+  });
+  if ($("realBtn")) $("realBtn").addEventListener("click", () => {
+    state.mode = "REAL";
+    saveState();
+    render();
+    toast("Real Account selected. Exchange API not connected.");
+  });
 
   if ($("executeTradeBtn")) $("executeTradeBtn").addEventListener("click", executeTrade);
   if ($("buyTradeBtn")) $("buyTradeBtn").addEventListener("click", () => placeTrade("BUY"));

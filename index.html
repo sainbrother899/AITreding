@@ -78,11 +78,11 @@
     <section id="appPage" class="hidden">
       <nav class="bottom-nav">
         <button class="nav-btn active" data-page="dashboard">Home</button>
-        <button class="nav-btn" data-page="wallet">Wallet</button>
-        <button class="nav-btn" data-page="kyc">KYC</button>
+        <button class="nav-btn real-only-nav" data-page="wallet">Wallet</button>
+        <button class="nav-btn real-only-nav" data-page="kyc">KYC</button>
         <button class="nav-btn" data-page="analytics">PnL</button>
-        <button class="nav-btn" data-page="subscription">Plan</button>
-        <button class="nav-btn" data-page="referral">Referral</button>
+        <button class="nav-btn real-only-nav" data-page="subscription">Plan</button>
+        <button class="nav-btn real-only-nav" data-page="referral">Referral</button>
         
       </nav>
 
@@ -95,6 +95,10 @@
               <p class="label">Selected Account</p>
               <h3 id="accountModeTitle">Demo Account</h3>
               <p id="accountModeText">Demo balance, demo signals and demo trades are separate.</p>
+            </div>
+
+            <div id="demoOnlyNotice" class="demo-only-notice">
+              Demo Account में सिर्फ Home और PnL sections available हैं. KYC, Deposit, Plans और Referral Real Account में मिलेंगे.
             </div>
 
             <div class="mode-switch">
@@ -237,7 +241,7 @@
       </section>
 
 
-      <section id="wallet" class="page">
+      <section id="wallet" class="page real-only-page">
         <div class="wallet-grid">
           <div class="card">
             <p class="label">Wallet</p>
@@ -282,13 +286,13 @@
         </div>
       </section>
 
-      <section id="subscription" class="page">
+      <section id="subscription" class="page real-only-page">
         <div class="section-title"><p class="label">Manual Gateway</p><h2>Subscription Plans</h2><p>Payment UPI/Bank से करें, फिर UTR और screenshot submit करें।</p></div>
         <div class="plans-grid" id="dynamicPlansGrid"></div>
       </section>
 
 
-      <section id="kyc" class="page">
+      <section id="kyc" class="page real-only-page">
         <div class="wallet-grid">
           <div class="card">
             <p class="label">KYC Verification</p>
@@ -332,7 +336,7 @@
         </div>
       </section>
 
-      <section id="referral" class="page">
+      <section id="referral" class="page real-only-page">
         <div class="card referral-card">
           <p class="label">Referral System</p>
           <h2>Your Referral Code</h2>

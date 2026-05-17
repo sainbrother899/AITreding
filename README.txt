@@ -152,3 +152,9 @@ Demo/Real Account Separation Update:
 - Using demo signals will not reduce real account signals.
 - Using real signals will not reduce demo account signals.
 - Switching account mode shows only that account's data.
+
+
+Demo Navigation Restriction:
+- Demo Account now shows only Home and PnL/Analytics navigation.
+- Wallet, KYC, Plans and Referral are hidden in Demo Account.
+- Real Account shows all user sections.

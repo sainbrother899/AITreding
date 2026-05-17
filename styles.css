@@ -290,3 +290,18 @@ textarea{
   text-align:center;
   font-weight:900;
 }
+
+
+.demo-only-notice{
+  display:none;
+  border:1px solid rgba(255,189,46,.35);
+  background:rgba(255,189,46,.08);
+  color:#ffe2a0;
+  border-radius:16px;
+  padding:12px 14px;
+  font-size:13px;
+  line-height:1.5;
+  margin-bottom:14px;
+}
+body.demo-mode-active .demo-only-notice{display:block}
+body.demo-mode-active .real-only-nav{display:none!important}
