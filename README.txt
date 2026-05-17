@@ -267,3 +267,10 @@ Trade PnL Wallet Fix:
 - Closing a trade returns margin + profit/loss to account balance.
 - Profit increases wallet, loss reduces returned margin.
 - Demo and Real wallet equity remain separate.
+
+
+Withdrawal Reserved Balance Fix:
+- Pending withdrawal now reduces displayed Real wallet total/equity immediately.
+- Admin approval deducts actual Real balance, without visual double deduction.
+- Rejected withdrawal restores displayed wallet total because pending reserve is removed.
+- Wallet now shows Pending Withdrawal amount.

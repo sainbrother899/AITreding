@@ -662,7 +662,15 @@ function currentOpenPnl(mode = state.mode) {
 function accountEquity(mode = state.mode) {
   normalizeAccounts();
   const key = mode === "REAL" ? "REAL" : "DEMO";
-  return Number(state.accounts[key].balance || 0) + currentOpenPnl(key);
+  const rawEquity = Number(state.accounts[key].balance || 0) + currentOpenPnl(key);
+
+  // For Real Account, pending withdrawals are reserved/locked,
+  // so total wallet equity shown to user should reduce immediately.
+  if (key === "REAL" && typeof pendingWithdrawalTotal === "function") {
+    return Math.max(0, rawEquity - pendingWithdrawalTotal());
+  }
+
+  return rawEquity;
 }
 
 function syncAccountBackups() {
@@ -1270,6 +1278,7 @@ function renderWithdrawalEligibility() {
   if ($("tradeVolumeText")) $("tradeVolumeText").textContent = money(realTradeVolume());
   if ($("profitEligibleText")) $("profitEligibleText").textContent = money(realProfitEligible());
   if ($("withdrawableAmountText")) $("withdrawableAmountText").textContent = money(withdrawableAmount());
+  if ($("pendingWithdrawalText")) $("pendingWithdrawalText").textContent = money(pendingWithdrawalTotal());
 }
 
 
@@ -1365,7 +1374,7 @@ async function submitWithdrawRequest() {
   if ($("withdrawName")) $("withdrawName").value = "";
   if ($("withdrawIfsc")) $("withdrawIfsc").value = "";
 
-  toast("Withdrawal request submitted for approval.");
+  toast("Withdrawal request submitted. Amount reserved from wallet total.");
 }
 
 function renderWithdrawals() {

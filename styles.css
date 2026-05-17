@@ -1856,3 +1856,13 @@ body.demo-mode-active .real-only-nav{display:none!important}
 #walletPageBalance{
   text-shadow:0 0 18px rgba(0,229,155,.18);
 }
+
+/* Pending withdrawal reserved balance */
+.withdraw-rule-box{
+  grid-template-columns:1fr 1fr!important;
+}
+@media(min-width:901px){
+  .withdraw-rule-box{
+    grid-template-columns:1fr 1fr!important;
+  }
+}
