@@ -1,205 +1,236 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AI Crypto Trading Assistant</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>AI Trading Assistant Pro</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://s3.tradingview.com/tv.js"></script>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
-  <div class="bg-glow"></div>
+  <div class="neon-bg">
+    <span></span><span></span><span></span><span></span>
+  </div>
 
   <header class="topbar">
     <div class="brand">
       <div class="logo">AI</div>
       <div>
-        <h1>AI Crypto Trading Assistant</h1>
-        <p>Live chart, admin signals, demo dashboard and subscription access</p>
+        <h1>AI Trading Assistant</h1>
+        <p>Signals • Real prices • Referrals • PnL analytics</p>
       </div>
     </div>
-
-    <nav class="nav">
-      <button class="nav-btn active" data-page="dashboard">Dashboard</button>
-      <button class="nav-btn" data-page="subscription">Subscription</button>
-      <button class="nav-btn" data-page="admin">Admin</button>
-    </nav>
+    <div class="auth-actions">
+      <span id="userBadge" class="pill">Guest</span>
+      <button id="logoutBtn" class="ghost-btn hidden">Logout</button>
+    </div>
   </header>
 
   <main>
-    <section id="dashboard" class="page active-page">
-      <div class="grid hero-grid">
-        <div class="card wallet-card">
-          <div class="mode-switch">
-            <button id="demoBtn" class="mode-btn active">Demo</button>
-            <button id="realBtn" class="mode-btn">Real</button>
+    <section id="authPage" class="auth-page">
+      <div class="auth-grid">
+        <div class="hero-copy">
+          <p class="label">Mobile app style trading dashboard</p>
+          <h2>Smart crypto signal dashboard with admin control</h2>
+          <p class="muted">Login/Register, Supabase-ready database, manual gateway, referral tracking, AI-style indicator engine and live market data.</p>
+          <div class="hero-points">
+            <p>✅ 5 free indicators/day</p>
+            <p>✅ Real BTC/ETH/SOL prices</p>
+            <p>✅ Manual payment verification</p>
+            <p>✅ Admin-controlled signals</p>
+          </div>
+        </div>
+
+        <div class="card auth-card">
+          <div class="tabs">
+            <button class="tab active" data-auth-tab="login">Login</button>
+            <button class="tab" data-auth-tab="register">Register</button>
           </div>
 
-          <p class="label">Available Balance</p>
-          <h2 id="walletBalance">$10,000.00</h2>
+          <div id="loginForm" class="auth-form active-form">
+            <label>Email</label>
+            <input id="loginEmail" type="email" placeholder="user@email.com"/>
+            <label>Password</label>
+            <input id="loginPassword" type="password" placeholder="Password"/>
+            <button id="loginBtn" class="primary-btn">Login</button>
+            <button id="guestBtn" class="ghost-full">Continue as Demo User</button>
+            <p class="tiny-warning">Admin test login: admin@aitrade.local / admin123</p>
+          </div>
 
+          <div id="registerForm" class="auth-form">
+            <label>Name</label>
+            <input id="regName" placeholder="Your name"/>
+            <label>Email</label>
+            <input id="regEmail" type="email" placeholder="user@email.com"/>
+            <label>Mobile</label>
+            <input id="regMobile" placeholder="Mobile number"/>
+            <label>Password</label>
+            <input id="regPassword" type="password" placeholder="Create password"/>
+            <label>Referral Code Optional</label>
+            <input id="regReferral" placeholder="Friend referral code"/>
+            <button id="registerBtn" class="primary-btn">Create Account</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="appPage" class="hidden">
+      <nav class="bottom-nav">
+        <button class="nav-btn active" data-page="dashboard">Home</button>
+        <button class="nav-btn" data-page="analytics">PnL</button>
+        <button class="nav-btn" data-page="subscription">Plan</button>
+        <button class="nav-btn" data-page="referral">Referral</button>
+        <button id="adminNavBtn" class="nav-btn hidden" data-page="admin">Admin</button>
+      </nav>
+
+      <section id="dashboard" class="page active-page">
+        <div class="ticker-grid" id="tickerGrid"></div>
+
+        <div class="grid hero-grid">
+          <div class="card wallet-card">
+            <div class="mode-switch">
+              <button id="demoBtn" class="mode-btn active">Demo</button>
+              <button id="realBtn" class="mode-btn">Real UI</button>
+            </div>
+
+            <p class="label">Available Balance</p>
+            <h2 id="walletBalance">$10,000.00</h2>
+
+            <div class="stats-row">
+              <div><span>Signals Used</span><strong><span id="signalCounter">0</span>/<span id="signalLimitText">5</span></strong></div>
+              <div><span>Plan</span><strong id="planText">Free</strong></div>
+            </div>
+
+            <div id="signalBox" class="signal-box buy">
+              <p>Current AI Indicator</p>
+              <h3 id="aiSignalText">BUY BTC NOW</h3>
+              <span id="signalNote">Admin + AI engine combined signal.</span>
+            </div>
+
+            <div class="ai-engine">
+              <div class="section-head">
+                <div>
+                  <p class="label">AI Indicator Engine</p>
+                  <h3 id="engineSignal">Analyzing...</h3>
+                </div>
+                <span id="engineConfidence" class="pill">0%</span>
+              </div>
+              <div class="meter"><i id="confidenceMeter"></i></div>
+              <p id="engineReason" class="muted small">Fetching market prices...</p>
+            </div>
+
+            <label class="input-label">Trade Amount</label>
+            <input id="tradeAmountInput" type="number" value="100" min="1"/>
+            <button id="executeTradeBtn" class="primary-btn">Add Simulated Trade</button>
+            <p class="tiny-warning">This is a simulation UI. Real exchange trading API is not connected.</p>
+          </div>
+
+          <div class="card chart-card">
+            <div class="section-head">
+              <div><p class="label">Live Chart</p><h2>BTC/USDT</h2></div>
+              <span class="live-pill">LIVE</span>
+            </div>
+            <div id="crypto_live_chart"></div>
+          </div>
+        </div>
+
+        <div class="card table-card">
+          <div class="section-head">
+            <div><p class="label">Trade History</p><h2>Positions</h2></div>
+            <button id="clearTradesBtn" class="ghost-btn">Clear</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Coin</th><th>Side</th><th>Amount</th><th>Entry</th><th>Current</th><th>PnL</th><th>Status</th></tr></thead>
+              <tbody id="activeTradesLog"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="analytics" class="page">
+        <div class="analytics-grid">
+          <div class="card metric-card"><p>Total Trades</p><h2 id="totalTradesMetric">0</h2></div>
+          <div class="card metric-card"><p>Total PnL</p><h2 id="totalPnlMetric">$0.00</h2></div>
+          <div class="card metric-card"><p>Win Rate</p><h2 id="winRateMetric">0%</h2></div>
+          <div class="card metric-card"><p>Referral Bonus</p><h2 id="refBonusMetric">₹0</h2></div>
+        </div>
+        <div class="card">
+          <p class="label">PnL Analytics</p>
+          <h2>Performance Overview</h2>
+          <div id="pnlBars" class="pnl-bars"></div>
+        </div>
+      </section>
+
+      <section id="subscription" class="page">
+        <div class="section-title"><p class="label">Manual Gateway</p><h2>Subscription Plans</h2><p>Payment UPI/Bank से करें, फिर UTR और screenshot submit करें।</p></div>
+        <div class="plans-grid">
+          <div class="card plan-card"><h3>Free</h3><p class="price">₹0</p><ul><li>5 signals/day</li><li>Demo dashboard</li><li>Live prices</li></ul><button class="ghost-full">Current</button></div>
+          <div class="card plan-card featured"><span class="tag">Popular</span><h3>Pro</h3><p class="price">₹499/mo</p><ul><li>50 signals/day</li><li>Advanced AI indicator</li><li>Referral bonus tracking</li></ul><button class="primary-btn plan-btn" data-plan="Pro">Pay Manually</button></div>
+          <div class="card plan-card"><h3>Elite</h3><p class="price">₹999/mo</p><ul><li>Unlimited signals UI</li><li>PnL analytics</li><li>Priority dashboard</li></ul><button class="primary-btn plan-btn" data-plan="Elite">Pay Manually</button></div>
+        </div>
+      </section>
+
+      <section id="referral" class="page">
+        <div class="card referral-card">
+          <p class="label">Referral System</p>
+          <h2>Your Referral Code</h2>
+          <div class="ref-code" id="myReferralCode">----</div>
+          <button id="copyReferralBtn" class="primary-btn">Copy Referral Link</button>
           <div class="stats-row">
-            <div>
-              <span class="label">Free Signals Today</span>
-              <strong><span id="signalCounter">0</span>/5</strong>
-            </div>
-            <div>
-              <span class="label">Trades Today</span>
-              <strong><span id="tradeCounter">0</span>/10</strong>
-            </div>
-          </div>
-
-          <div id="signalBox" class="signal-box buy">
-            <p>Current AI Signal</p>
-            <h3 id="aiSignalText">BUY BTC NOW</h3>
-            <span id="signalNote">Admin controlled signal. Educational simulator only.</span>
-          </div>
-
-          <label class="input-label" for="tradeAmountInput">Amount (USD)</label>
-          <input id="tradeAmountInput" type="number" min="1" placeholder="Enter amount" value="100" />
-
-          <div class="quick-buttons">
-            <button data-pct="25">25%</button>
-            <button data-pct="50">50%</button>
-            <button data-pct="75">75%</button>
-            <button data-pct="100">100%</button>
-          </div>
-
-          <button id="executeTradeBtn" class="primary-btn">Execute Simulated Trade</button>
-          <p class="tiny-warning">No real broker/API is connected. This dashboard does not place real market orders.</p>
-        </div>
-
-        <div class="card chart-card">
-          <div class="section-head">
-            <div>
-              <p class="label">Live Market Chart</p>
-              <h2>BTC/USDT Binance Feed</h2>
-            </div>
-            <span class="live-pill">LIVE</span>
-          </div>
-          <div id="crypto_live_chart"></div>
-        </div>
-      </div>
-
-      <div class="card table-card">
-        <div class="section-head">
-          <div>
-            <p class="label">Active Trades</p>
-            <h2>Live Positions</h2>
-          </div>
-          <button id="clearTradesBtn" class="ghost-btn">Clear</button>
-        </div>
-
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Coin</th>
-                <th>Type</th>
-                <th>Amount</th>
-                <th>Entry Price</th>
-                <th>Profit/Loss</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="activeTradesLog">
-              <tr><td colspan="6" class="empty">No active trades running currently.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <section id="subscription" class="page">
-      <div class="section-title">
-        <p class="label">Plans</p>
-        <h2>Unlock More AI Signals</h2>
-        <p>Free users get 5 indicators/signals per day. Upgrade for more signal access.</p>
-      </div>
-
-      <div class="plans-grid">
-        <div class="card plan-card">
-          <h3>Free</h3>
-          <p class="price">₹0</p>
-          <ul>
-            <li>5 free signals per day</li>
-            <li>Demo dashboard</li>
-            <li>Live TradingView chart</li>
-          </ul>
-          <button class="ghost-btn plan-btn" data-plan="Free">Current Plan</button>
-        </div>
-
-        <div class="card plan-card featured">
-          <span class="tag">Popular</span>
-          <h3>Pro</h3>
-          <p class="price">₹499/month</p>
-          <ul>
-            <li>50 signals per day</li>
-            <li>Demo + Real dashboard UI</li>
-            <li>Admin signal alerts</li>
-          </ul>
-          <button class="primary-btn plan-btn" data-plan="Pro">Activate Pro UI</button>
-        </div>
-
-        <div class="card plan-card">
-          <h3>Elite</h3>
-          <p class="price">₹999/month</p>
-          <ul>
-            <li>Unlimited signals UI</li>
-            <li>Priority signal panel</li>
-            <li>Advanced dashboard layout</li>
-          </ul>
-          <button class="primary-btn plan-btn" data-plan="Elite">Activate Elite UI</button>
-        </div>
-      </div>
-    </section>
-
-    <section id="admin" class="page">
-      <div class="admin-grid">
-        <div class="card">
-          <div class="section-head">
-            <div>
-              <p class="label">Admin Panel</p>
-              <h2>Manage Signal</h2>
-            </div>
-            <span class="admin-pill">Local Admin</span>
-          </div>
-
-          <label class="input-label">Select Signal</label>
-          <select id="adminSignal">
-            <option value="BUY">BUY BTC NOW</option>
-            <option value="SELL">SELL BTC NOW</option>
-            <option value="WAIT">WAIT / NO TRADE</option>
-          </select>
-
-          <label class="input-label">Signal Note</label>
-          <input id="adminNote" placeholder="Example: BTC near support zone" />
-
-          <label class="input-label">Free Signal Limit</label>
-          <input id="adminFreeLimit" type="number" min="1" value="5" />
-
-          <button id="saveAdminBtn" class="primary-btn">Save Admin Settings</button>
-          <p class="tiny-warning">This admin panel stores settings in browser localStorage. Backend/database can be added later.</p>
-        </div>
-
-        <div class="card">
-          <p class="label">Setup Status</p>
-          <h2>What is working now</h2>
-          <div class="checklist">
-            <p>✅ Proper HTML/CSS/JS structure</p>
-            <p>✅ TradingView live chart widget</p>
-            <p>✅ Demo/Real dashboard toggle</p>
-            <p>✅ 5 free signals/day logic</p>
-            <p>✅ Subscription UI</p>
-            <p>✅ Admin signal management UI</p>
-            <p>✅ Local trade history</p>
+            <div><span>Total Referrals</span><strong id="refCount">0</strong></div>
+            <div><span>Referral Bonus</span><strong id="refBonus">₹0</strong></div>
           </div>
         </div>
-      </div>
+      </section>
+
+      <section id="admin" class="page">
+        <div class="admin-grid">
+          <div class="card">
+            <p class="label">Real Admin Login Panel</p>
+            <h2>Manage Signal</h2>
+            <label class="input-label">Admin Signal</label>
+            <select id="adminSignal"><option value="BUY">BUY BTC NOW</option><option value="SELL">SELL BTC NOW</option><option value="WAIT">WAIT / NO TRADE</option></select>
+            <label class="input-label">Signal Note</label>
+            <input id="adminNote" placeholder="Market note"/>
+            <label class="input-label">Free Signal Limit</label>
+            <input id="adminFreeLimit" type="number" value="5" min="1"/>
+            <button id="saveAdminBtn" class="primary-btn">Save Signal</button>
+          </div>
+
+          <div class="card table-card">
+            <div class="section-head"><div><p class="label">Manual Payment Requests</p><h2>Verify Users</h2></div><button id="clearPaymentsBtn" class="ghost-btn">Clear</button></div>
+            <div class="table-wrap"><table><thead><tr><th>Plan</th><th>Name</th><th>Mobile</th><th>UTR</th><th>Action</th></tr></thead><tbody id="paymentRequestsLog"></tbody></table></div>
+          </div>
+        </div>
+      </section>
     </section>
   </main>
 
+  <div id="paymentModal" class="modal-backdrop">
+    <div class="modal-card">
+      <button id="closePaymentModal" class="modal-close">×</button>
+      <p class="label">Manual Payment Gateway</p>
+      <h2 id="paymentPlanTitle">Subscription</h2>
+      <div class="payment-box">
+        <p><strong>UPI ID:</strong> yourupi@bank</p>
+        <p><strong>Account Name:</strong> AI Trading Assistant</p>
+        <p><strong>Bank:</strong> Your Bank Name</p>
+        <p><strong>Account No:</strong> 000000000000</p>
+        <p><strong>IFSC:</strong> ABCD0000000</p>
+      </div>
+      <label class="input-label">Your Name</label><input id="payerName"/>
+      <label class="input-label">Mobile Number</label><input id="payerMobile"/>
+      <label class="input-label">Transaction / UTR Number</label><input id="transactionId"/>
+      <label class="input-label">Upload Payment Screenshot</label><input id="paymentScreenshot" type="file" accept="image/*"/>
+      <button id="submitManualPayment" class="primary-btn">Submit Payment Request</button>
+      <p class="tiny-warning">Admin verify करने के बाद plan activate होगा।</p>
+    </div>
+  </div>
+
   <div id="toast"></div>
+  <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

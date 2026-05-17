@@ -1,21 +1,42 @@
-# AI Trading Static Website
+AI Trading Assistant Pro Update
 
-Working files:
+Added:
+- Login/Register UI
+- Local admin login: admin@aitrade.local / admin123
+- Supabase-ready config and SQL schema
+- Real crypto prices using Binance public ticker API
+- Manual payment gateway, UTR and screenshot input
+- Admin payment approval
+- User referral code and referral link
+- PnL analytics dashboard
+- AI-style indicator engine using live BTC 24h movement
+- Mobile app style UI
+- Dark neon animated background
+
+Not Added:
+- Razorpay subscription
+- Telegram signal bot
+
+Files:
 - index.html
 - styles.css
 - app.js
+- config.js
+- supabase-schema.sql
 
-How to use:
-1. Upload all 3 files to GitHub repo root.
-2. Make sure the file names are exactly:
-   - index.html
-   - styles.css
-   - app.js
-3. Open with GitHub Pages, Hostinger, or any static hosting.
+How to upload:
+1. Extract ZIP.
+2. Upload all files to GitHub repo root or Hostinger public_html.
+3. Open index.html / website URL.
+4. For Supabase:
+   - Create Supabase project
+   - Run supabase-schema.sql in SQL editor
+   - Copy Project URL + anon public key into config.js
 
 Important:
-- This is an educational/static simulator.
-- It shows TradingView live chart.
-- It does not place real broker trades.
-- Admin settings are saved in browser localStorage.
-- Real backend, login, payments and database can be added later.
+This is still a frontend/static + Supabase-ready build. For production you should add:
+- Secure server-side admin verification
+- Proper Supabase Auth
+- Storage bucket for payment screenshots
+- Legal disclaimers and compliance
+- Exchange API only if licensed/allowed
