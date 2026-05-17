@@ -35,7 +35,7 @@ const defaultState = {
     REAL: { balance: 0, signalsUsed: 0, trades: [], closedTrades: [], recentFills: [] }
   },
   signal: "BUY",
-  note: "Admin + AI engine combined signal.",
+  note: "AI engine combined signal.",
   signalCoin: "BTCUSDT",
   entryPrice: "",
   targetPrice: "",
@@ -560,7 +560,10 @@ function showApp() {
   $("appPage")?.classList.remove("hidden");
   $("logoutBtn")?.classList.remove("hidden");
 
-  if ($("userBadge")) $("userBadge").textContent = (state.user?.role === "admin" ? "Admin: " : "User: ") + (state.user?.name || "");
+  if ($("userBadgeText")) $("userBadgeText").textContent = state.user?.name || "User";
+  else if ($("userBadge")) $("userBadge").textContent = "User: " + (state.user?.name || "");
+  if ($("userAvatar")) $("userAvatar").textContent = (state.user?.name || "U").slice(0,1).toUpperCase();
+  if ($("userVipBadge")) $("userVipBadge").textContent = getPlan().toUpperCase();
 
   const adminNav = $("adminNavBtn");
   if (adminNav) adminNav.classList.toggle("hidden", state.user?.role !== "admin");
@@ -585,6 +588,7 @@ function showAuthTab(tab) {
 function enforceAccountNavigation() {
   const isDemo = state.mode !== "REAL";
   document.body.classList.toggle("demo-mode-active", isDemo);
+  document.body.classList.toggle("real-mode-active", !isDemo);
 
   document.querySelectorAll(".real-only-nav").forEach(btn => {
     btn.style.display = isDemo ? "none" : "";
@@ -659,6 +663,7 @@ function render() {
   renderAdminPanel();
   renderPlans();
   renderKyc();
+  renderPremiumMetrics();
   renderAnalytics();
   renderReferral();
 }
@@ -894,7 +899,10 @@ function renderOrderBook() {
   for (let i = 1; i <= 3; i++) {
     rows.push({ type: "BID", price: btc - i * 8.5, qty: (Math.random() * 1.8 + .2).toFixed(4) });
   }
-  el.innerHTML = rows.map(r => `<div class="book-row ${r.type === "ASK" ? "ask" : "bid"}"><span>${r.type}</span><span>${money(r.price)}</span><span>${r.qty}</span></div>`).join("");
+  el.innerHTML = rows.map(r => {
+    const depth = Math.min(85, Math.max(18, Number(r.qty) * 38));
+    return `<div class="book-row ${r.type === "ASK" ? "ask" : "bid"}" style="--depth:${depth}%"><span>${r.type}</span><span>${money(r.price)}</span><span>${r.qty}</span></div>`;
+  }).join("");
 }
 
 function renderRecentFills() {
@@ -1222,6 +1230,34 @@ function switchAdminTab(tabId) {
   document.querySelectorAll(".admin-tab").forEach(b => b.classList.toggle("active", b.dataset.adminTab === tabId));
   document.querySelectorAll(".admin-panel").forEach(p => p.classList.remove("active-admin-panel"));
   $(tabId)?.classList.add("active-admin-panel");
+}
+
+
+
+function renderPremiumMetrics() {
+  const acc = currentAccount();
+  const allTrades = [...(acc.trades || []), ...(acc.closedTrades || [])];
+  const pnl = allTrades.reduce((a,t)=>a+Number(t.pnl||0),0);
+  const wins = allTrades.filter(t => Number(t.pnl||0) > 0).length;
+  const winRate = allTrades.length ? Math.round((wins / allTrades.length) * 100) : 0;
+  const btc = state.prices.BTCUSDT || { price: 0, change: 0 };
+
+  if ($("todayPnlMini")) {
+    $("todayPnlMini").textContent = money(pnl);
+    $("todayPnlMini").className = pnl >= 0 ? "pnl-plus" : "pnl-minus";
+  }
+  if ($("winRateMini")) $("winRateMini").textContent = winRate + "%";
+  if ($("marketMoodMini")) {
+    $("marketMoodMini").textContent = btc.change > .6 ? "Bullish" : btc.change < -.6 ? "Bearish" : "Neutral";
+    $("marketMoodMini").className = btc.change >= 0 ? "pnl-plus" : "pnl-minus";
+  }
+  if ($("activeSignalMini")) $("activeSignalMini").textContent = `${state.signal || "WAIT"} ${String(state.signalCoin || "BTCUSDT").replace("USDT","")}`;
+  if ($("headerBtcPrice")) $("headerBtcPrice").textContent = money(btc.price || 0);
+
+  if ($("signalEntryMeta")) $("signalEntryMeta").textContent = state.entryPrice ? money(state.entryPrice) : "Market";
+  if ($("signalTarget1Meta")) $("signalTarget1Meta").textContent = state.targetPrice ? money(state.targetPrice) : "-";
+  if ($("signalStopMeta")) $("signalStopMeta").textContent = state.stopLoss ? money(state.stopLoss) : "-";
+  if ($("signalCountdown")) $("signalCountdown").textContent = state.signalExpiry || "30m";
 }
 
 
@@ -1751,6 +1787,7 @@ window.addEventListener("load", async () => {
 
   fetchRealPrices();
   setInterval(fetchRealPrices, 30000);
+  setInterval(() => { renderOrderBook(); }, 2500);
   setInterval(loadRemoteData, 45000);
 });
 

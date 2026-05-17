@@ -158,3 +158,14 @@ Demo Navigation Restriction:
 - Demo Account now shows only Home and PnL/Analytics navigation.
 - Wallet, KYC, Plans and Referral are hidden in Demo Account.
 - Real Account shows all user sections.
+
+
+Premium User UI Update:
+- Compact bottom navigation with icon-style labels.
+- Header live BTC ticker and profile badge.
+- Market insight cards: Today PnL, Win Rate, Market Mood, Active Signal.
+- Improved signal card with entry, target, stop loss and expiry.
+- Real account risk notice.
+- Larger chart layout on desktop.
+- Order book depth bars and smoother recent fill effect.
+- User side keeps admin wording removed.

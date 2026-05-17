@@ -21,8 +21,13 @@
         <p>Signals • Real prices • Referrals • PnL analytics</p>
       </div>
     </div>
-    <div class="auth-actions">
-      <span id="userBadge" class="pill">Guest</span>
+    <div id="headerMarketTicker" class="header-market-ticker">
+        <span>BTC <b id="headerBtcPrice">$0</b></span>
+        <span id="marketStatusDot">● Market Live</span>
+      </div>
+
+      <div class="auth-actions">
+      <span id="userBadge" class="pill profile-pill"><i id="userAvatar">U</i><span id="userBadgeText">Guest</span><em id="userVipBadge">FREE</em></span>
       <button id="logoutBtn" class="ghost-btn hidden">Logout</button>
     </div>
   </header>
@@ -77,17 +82,24 @@
 
     <section id="appPage" class="hidden">
       <nav class="bottom-nav">
-        <button class="nav-btn active" data-page="dashboard">Home</button>
-        <button class="nav-btn real-only-nav" data-page="wallet">Wallet</button>
-        <button class="nav-btn real-only-nav" data-page="kyc">KYC</button>
-        <button class="nav-btn" data-page="analytics">PnL</button>
-        <button class="nav-btn real-only-nav" data-page="subscription">Plan</button>
-        <button class="nav-btn real-only-nav" data-page="referral">Referral</button>
+        <button class="nav-btn active" data-page="dashboard">⌂ Home</button>
+        <button class="nav-btn real-only-nav" data-page="wallet">▣ Wallet</button>
+        <button class="nav-btn real-only-nav" data-page="kyc">✓ KYC</button>
+        <button class="nav-btn" data-page="analytics">↗ PnL</button>
+        <button class="nav-btn real-only-nav" data-page="subscription">★ Plan</button>
+        <button class="nav-btn real-only-nav" data-page="referral">⤴ Referral</button>
         
       </nav>
 
       <section id="dashboard" class="page active-page">
         <div class="ticker-grid" id="tickerGrid"></div>
+
+        <div id="marketInsightGrid" class="market-insight-grid">
+          <div class="mini-metric"><span>Today PnL</span><strong id="todayPnlMini">$0.00</strong></div>
+          <div class="mini-metric"><span>Win Rate</span><strong id="winRateMini">0%</strong></div>
+          <div class="mini-metric"><span>Market Mood</span><strong id="marketMoodMini">Neutral</strong></div>
+          <div class="mini-metric"><span>Active Signal</span><strong id="activeSignalMini">BUY</strong></div>
+        </div>
 
         <div class="grid hero-grid">
           <div class="card wallet-card">
@@ -109,6 +121,7 @@
             <p class="label">Available Balance</p>
             <h2 id="walletBalance">$10,000.00</h2>
             <button id="openDepositBtn" class="deposit-shortcut">Deposit Funds</button>
+            <div id="realRiskNotice" class="real-risk-notice">Real Account: confirm amount, signal and risk before opening any position.</div>
 
             <div class="stats-row">
               <div><span>Signals Used</span><strong><span id="signalCounter">0</span>/<span id="signalLimitText">5</span></strong></div>
@@ -202,7 +215,7 @@
           <div class="card chart-card">
             <div class="section-head">
               <div><p class="label">Live Chart</p><h2>BTC/USDT</h2></div>
-              <span class="live-pill">LIVE</span>
+              <div class="chart-tools"><span class="live-pill">LIVE</span><span class="chart-hint">5m candles</span></div>
             </div>
             <div id="crypto_live_chart"></div>
           </div>
