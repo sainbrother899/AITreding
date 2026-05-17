@@ -1697,3 +1697,40 @@ body.demo-mode-active .real-only-nav{display:none!important}
     max-width:430px!important;
   }
 }
+
+
+/* ===== TRADE PAGE FIX ===== */
+#tradepage .full-trade-panel{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+#tradepage #crypto_live_chart{
+  height:330px!important;
+  min-height:330px!important;
+  border-radius:16px!important;
+  overflow:hidden!important;
+  background:#050912!important;
+  border:1px solid rgba(255,255,255,.06)!important;
+}
+
+.trade-page-ticket-wrap{
+  margin-top:14px;
+}
+
+.trade-page-ticket-wrap .order-ticket{
+  margin-top:0!important;
+}
+
+#dashboard .order-ticket{
+  display:none!important;
+}
+
+@media(min-width:901px){
+  #tradepage .full-trade-panel{
+    width:430px!important;
+    max-width:430px!important;
+    margin:0 auto!important;
+  }
+}

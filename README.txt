@@ -206,3 +206,10 @@ PC Mobile Frame Update:
 - Desktop/PC view now also stays in centered mobile-app width.
 - Dashboard no longer stretches full desktop width.
 - Useful for PC editing/testing while keeping mobile UI look.
+
+
+Trade Page Fix:
+- BUY/SELL order ticket moved from Home to Trade page.
+- Trade page chart container fixed back to crypto_live_chart so TradingView works.
+- Order Book and Recent Fills IDs restored so existing JS works.
+- Trade tab now re-initializes chart/feed when opened.

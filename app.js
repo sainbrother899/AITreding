@@ -1844,3 +1844,25 @@ function finalRebuildUISync(){
   }catch(e){}
 }
 setInterval(finalRebuildUISync, 800);
+
+
+/* Trade page fix: ensure chart/orderbook/feed render when Trade tab opens */
+function initTradePageFix(){
+  try{
+    const chart = document.getElementById("crypto_live_chart");
+    if (chart && !chart.dataset.loaded && typeof initTradingViewChart === "function") {
+      setTimeout(initTradingViewChart, 150);
+    }
+    if (typeof renderOrderBook === "function") renderOrderBook();
+    if (typeof renderRecentFills === "function") renderRecentFills();
+  }catch(e){}
+}
+
+document.addEventListener("click", function(e){
+  const btn = e.target.closest("[data-page='tradepage']");
+  if (btn) setTimeout(initTradePageFix, 250);
+});
+
+window.addEventListener("load", function(){
+  setTimeout(initTradePageFix, 600);
+});
