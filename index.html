@@ -157,6 +157,17 @@
             <button id="openDepositBtn" class="deposit-shortcut">Deposit Funds</button>
             <div id="realRiskNotice" class="real-risk-notice">Real Account: confirm amount, signal and risk before opening any position.</div>
 
+            <div id="aiTradeUsageBox" class="ai-trade-usage-box">
+              <div>
+                <span>AI/Admin Trades Today</span>
+                <strong><b id="aiTradeUsedText">0</b>/<b id="aiTradeLimitText">5</b></strong>
+              </div>
+              <label class="auto-trade-toggle">
+                <input id="autoTradePermission" type="checkbox" checked/>
+                <span>Allow AI/Admin Auto Trade</span>
+              </label>
+            </div>
+
             <div class="stats-row">
               <div><span>Signals Used</span><strong><span id="signalCounter">0</span>/<span id="signalLimitText">5</span></strong></div>
               <div><span>Plan</span><strong id="planText">Free</strong></div>

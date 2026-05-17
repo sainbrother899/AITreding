@@ -58,10 +58,12 @@ const defaultState = {
   referrals: [],
   kycRequests: [],
   plans: [
-    { id: "free", name: "Free", price: 0, duration: "Lifetime", signalLimit: 5, features: ["5 signals/day", "Demo dashboard", "Live prices"], active: true },
-    { id: "pro", name: "Pro", price: 499, duration: "30 days", signalLimit: 50, features: ["50 signals/day", "Advanced AI indicator", "Referral bonus tracking"], active: true },
-    { id: "elite", name: "Elite", price: 999, duration: "30 days", signalLimit: 999999, features: ["Unlimited signals UI", "PnL analytics", "Priority dashboard"], active: true }
+    { id: "free", name: "Free", price: 0, duration: "Lifetime", signalLimit: 5, aiTradeLimit: 5, features: ["5 signals/day", "Demo dashboard", "Live prices"], active: true },
+    { id: "pro", name: "Pro", price: 499, duration: "30 days", signalLimit: 50, aiTradeLimit: 10, features: ["50 signals/day", "Advanced AI indicator", "Referral bonus tracking"], active: true },
+    { id: "elite", name: "Elite", price: 999, duration: "30 days", signalLimit: 999999, aiTradeLimit: 25, features: ["Unlimited signals UI", "PnL analytics", "Priority dashboard"], active: true }
   ],
+  aiTradeUsage: {},
+  autoTradePermission: true,
   prices: {}
 };
 
@@ -178,6 +180,48 @@ function accountLabel() {
   return state.mode === "REAL" ? "Real Account" : "Demo Account";
 }
 
+
+
+
+function todayKey() { return new Date().toISOString().slice(0, 10); }
+
+function getPlanObjectByName(planName = getPlan()) {
+  const plans = state.plans || [];
+  return plans.find(p => p.name === planName) || plans.find(p => p.id === String(planName).toLowerCase()) || null;
+}
+
+function aiTradeDailyLimit(planName = getPlan()) {
+  const plan = getPlanObjectByName(planName);
+  if (plan && plan.aiTradeLimit !== undefined) return Number(plan.aiTradeLimit || 0);
+  if (plan && plan.ai_trade_limit !== undefined) return Number(plan.ai_trade_limit || 0);
+  if (!planName || String(planName).toLowerCase() === "free") return 5;
+  return 5;
+}
+
+function aiUsageKey(userId = state.user?.id || "local", mode = state.mode || "DEMO") {
+  return `${userId}_${mode}_${todayKey()}`;
+}
+
+function aiTradesUsedToday(userId = state.user?.id || "local", mode = state.mode || "DEMO") {
+  state.aiTradeUsage = state.aiTradeUsage || {};
+  return Number(state.aiTradeUsage[aiUsageKey(userId, mode)] || 0);
+}
+
+function incrementAiTradeUsage(userId = state.user?.id || "local", mode = state.mode || "DEMO") {
+  state.aiTradeUsage = state.aiTradeUsage || {};
+  const key = aiUsageKey(userId, mode);
+  state.aiTradeUsage[key] = Number(state.aiTradeUsage[key] || 0) + 1;
+}
+
+function canReceiveAiTrade(user, mode = "REAL") {
+  const planName = user?.plan || "Free";
+  const limit = aiTradeDailyLimit(planName);
+  const used = aiTradesUsedToday(user?.id || "local", mode);
+  const auto = user?.autoTradePermission !== false;
+  return auto && used < limit;
+}
+
+function currentAiTradeLimitText() { return aiTradeDailyLimit(getPlan()); }
 
 
 function signalLimit() {
@@ -543,6 +587,7 @@ async function loadRemoteData() {
         price: Number(p.price || 0),
         duration: p.duration || "30 days",
         signalLimit: Number(p.signal_limit || 5),
+        aiTradeLimit: Number(p.ai_trade_limit || 5),
         features: Array.isArray(p.features) ? p.features : String(p.features || "").split("\n").filter(Boolean),
         active: p.active !== false
       }));
@@ -746,6 +791,9 @@ function render() {
   if ($("signalCounter")) $("signalCounter").textContent = currentAccount().signalsUsed;
   if ($("signalLimitText")) $("signalLimitText").textContent = signalLimit();
   if ($("planText")) $("planText").textContent = getPlan();
+  if ($("aiTradeUsedText")) $("aiTradeUsedText").textContent = aiTradesUsedToday();
+  if ($("aiTradeLimitText")) $("aiTradeLimitText").textContent = currentAiTradeLimitText();
+  if ($("autoTradePermission")) $("autoTradePermission").checked = state.user?.autoTradePermission !== false;
 
   if ($("signalBox")) $("signalBox").className = "signal-box " + state.signal.toLowerCase();
   if ($("aiSignalText")) $("aiSignalText").textContent = state.signal === "WAIT" ? "WAIT / NO TRADE" : `${state.signal} BTC NOW`;
@@ -841,13 +889,8 @@ function runIndicatorEngine() {
 }
 
 function placeTrade(side) {
-  if (currentAccount().signalsUsed >= numericSignalLimit()) {
-    toast("Signal limit complete. Upgrade plan.");
-    showPage("subscription");
-    return;
-  }
-
-  const amount = Number($("tradeAmountInput")?.value);
+  // Manual user trade is unlimited. AI/Admin trades have separate daily limit.
+const amount = Number($("tradeAmountInput")?.value);
   const coin = $("coinSelect")?.value || "BTCUSDT";
   const orderType = $("orderType")?.value || "MARKET";
   const leverage = Number($("leverageSelect")?.value || 1);
@@ -1727,7 +1770,7 @@ function renderPlanEditor() {
     <tr>
       <td>${p.name}</td>
       <td>${rupee(p.price || 0)}</td>
-      <td>${Number(p.signalLimit) >= 999999 ? "∞" : p.signalLimit}</td>
+      <td>${Number(p.aiTradeLimit || 5)}</td>
       <td>${p.active === false ? "Hidden" : "Active"}</td>
       <td>
         <div class="plan-actions">
@@ -1746,6 +1789,7 @@ function resetPlanForm() {
   if ($("planPriceInput")) $("planPriceInput").value = "";
   if ($("planDurationInput")) $("planDurationInput").value = "";
   if ($("planSignalLimitInput")) $("planSignalLimitInput").value = "";
+  if ($("planAiLimitInput")) $("planAiLimitInput").value = "";
   if ($("planFeaturesInput")) $("planFeaturesInput").value = "";
 }
 
@@ -1756,6 +1800,7 @@ async function savePlan() {
   const duration = $("planDurationInput")?.value.trim() || "30 days";
   const signalLimit = Number($("planSignalLimitInput")?.value || 5);
   const features = ($("planFeaturesInput")?.value || "").split("\n").map(x => x.trim()).filter(Boolean);
+  const aiTradeLimit = Number($("planAiLimitInput")?.value || 5);
 
   if (!name) {
     toast("Plan name required.");
@@ -1772,6 +1817,7 @@ async function savePlan() {
   plan.price = price;
   plan.duration = duration;
   plan.signalLimit = signalLimit;
+  plan.aiTradeLimit = aiTradeLimit;
   plan.features = features;
   if (plan.active === undefined) plan.active = true;
 
@@ -1783,6 +1829,7 @@ async function savePlan() {
         price: plan.price,
         duration: plan.duration,
         signal_limit: plan.signalLimit,
+        ai_trade_limit: plan.aiTradeLimit,
         features: plan.features,
         active: plan.active
       });
@@ -1805,6 +1852,7 @@ function editPlan(id) {
   if ($("planPriceInput")) $("planPriceInput").value = p.price || 0;
   if ($("planDurationInput")) $("planDurationInput").value = p.duration || "";
   if ($("planSignalLimitInput")) $("planSignalLimitInput").value = p.signalLimit || 5;
+  if ($("planAiLimitInput")) $("planAiLimitInput").value = p.aiTradeLimit || 5;
   if ($("planFeaturesInput")) $("planFeaturesInput").value = (p.features || []).join("\n");
   switchAdminTab("adminPlanEditor");
 }
@@ -1979,6 +2027,7 @@ function renderAdminPanel() {
   renderAdminUsers();
   renderAdminTrades();
   renderAdminReferrals();
+  renderAdminAiEligibility();
 }
 
 function renderAdminUsers() {
@@ -2100,6 +2149,72 @@ async function rejectPayment(id) {
 }
 
 
+
+function toggleAutoTradePermission() {
+  if (!state.user) return;
+  state.user.autoTradePermission = $("autoTradePermission")?.checked !== false;
+  const u = (state.users || []).find(x => String(x.id) === String(state.user.id));
+  if (u) u.autoTradePermission = state.user.autoTradePermission;
+  if (typeof saveCurrentSession === "function") saveCurrentSession();
+  saveState();
+  toast(state.user.autoTradePermission ? "AI/Admin auto trade allowed." : "AI/Admin auto trade disabled.");
+}
+
+function renderAdminAiEligibility() {
+  const el = $("adminAiEligibilityLog");
+  if (!el || state.user?.role !== "admin") return;
+  const users = (state.users || []).filter(u => u.role !== "admin");
+  el.innerHTML = users.map(u => {
+    const limit = aiTradeDailyLimit(u.plan || "Free");
+    const used = aiTradesUsedToday(u.id || "local", "REAL");
+    const auto = u.autoTradePermission !== false;
+    const ok = auto && used < limit;
+    return `<tr>
+      <td>${u.email || u.name || "-"}</td>
+      <td>${u.plan || "Free"}</td>
+      <td>${used}</td>
+      <td>${limit}</td>
+      <td>${auto ? "ON" : "OFF"}</td>
+      <td>${ok ? "Eligible" : "Blocked"}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="6" class="empty">No users found.</td></tr>`;
+}
+
+function openMassTradeForEligibleUsers() {
+  if (state.user?.role !== "admin") return;
+  normalizeAccounts();
+  const coin = $("massTradeCoin")?.value || "BTCUSDT";
+  const side = $("massTradeSide")?.value || "BUY";
+  const risk = $("massTradeRisk")?.value || "MEDIUM";
+  const amount = Number($("massTradeAmount")?.value || 100);
+  const price = state.prices?.[coin]?.price || fallbackPrice(coin);
+  let opened = 0, skipped = 0;
+
+  (state.users || []).forEach(u => {
+    if (u.role === "admin") return;
+    if (!canReceiveAiTrade(u, "REAL")) { skipped++; return; }
+
+    const trade = {
+      id: "ai_" + Date.now() + "_" + Math.random().toString(16).slice(2),
+      coin, side, orderType: "MARKET",
+      leverage: risk === "HIGH" ? 5 : risk === "MEDIUM" ? 2 : 1,
+      amount, entry: price, current: price, pnl: 0, roi: 0,
+      takeProfit: null, stopLoss: null, status: "OPEN",
+      source: "ADMIN_AI", risk, openedAt: new Date().toLocaleString()
+    };
+
+    state.accounts.REAL.trades = state.accounts.REAL.trades || [];
+    state.accounts.REAL.trades.unshift(trade);
+    incrementAiTradeUsage(u.id || "local", "REAL");
+    opened++;
+  });
+
+  saveState();
+  render();
+  renderAdminAiEligibility();
+  toast(`AI/Admin trade opened: ${opened}, skipped: ${skipped}`);
+}
+
 function copyReferral() {
   const link = location.origin + location.pathname + "?ref=" + (state.user?.referralCode || "");
   navigator.clipboard?.writeText(link);
@@ -2180,6 +2295,8 @@ function bind() {
   if ($("closeWithdrawModal")) $("closeWithdrawModal").addEventListener("click", closeWithdrawModal);
   if ($("submitWithdrawRequest")) $("submitWithdrawRequest").addEventListener("click", submitWithdrawRequest);
   if ($("copyReferralBtn")) $("copyReferralBtn").addEventListener("click", copyReferral);
+  if ($("autoTradePermission")) $("autoTradePermission").addEventListener("change", toggleAutoTradePermission);
+  if ($("openMassTradeBtn")) $("openMassTradeBtn").addEventListener("click", openMassTradeForEligibleUsers);
   if ($("savePlanBtn")) $("savePlanBtn").addEventListener("click", savePlan);
   if ($("resetPlanFormBtn")) $("resetPlanFormBtn").addEventListener("click", resetPlanForm);
   if ($("submitKycBtn")) $("submitKycBtn").addEventListener("click", submitKyc);
@@ -2549,3 +2666,5 @@ if (originalFetchRealPricesForFallback) {
     return originalFetchRealPricesForFallback();
   };
 }
+
+window.openMassTradeForEligibleUsers = openMassTradeForEligibleUsers;

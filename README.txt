@@ -304,3 +304,19 @@ WebSocket Live PnL Update:
 - Wallet equity updates live with open PnL.
 - Falls back to normal API polling if WebSocket disconnects.
 - No SQL required for this update.
+
+
+Reverted:
+- Removed Fast Load Optimization / lazy-load update.
+- Restored previous working live WebSocket PnL version.
+
+
+Admin/AI Trade Daily Limit Update:
+- User manual trades are unlimited.
+- Admin/AI trades have daily plan-based limit.
+- Free default = 5 Admin/AI trades per day.
+- Plan Editor now has AI/Admin Trades Per Day field.
+- User dashboard shows AI/Admin trade usage.
+- User can toggle Allow AI/Admin Auto Trade ON/OFF.
+- Admin panel has Mass Trade tab for eligible users.
+- SQL updated with subscription_plans.ai_trade_limit column.

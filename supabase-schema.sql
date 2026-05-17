@@ -78,6 +78,7 @@ create table if not exists public.subscription_plans (
   price numeric default 0,
   duration text,
   signal_limit numeric default 5,
+  ai_trade_limit numeric default 5,
   features jsonb default '[]'::jsonb,
   active boolean default true
 );
@@ -217,3 +218,7 @@ on conflict (id) do nothing;
 -- DEPOSIT = approved deposit amount
 -- WITHDRAWAL = approved withdrawal amount as negative value
 -- TRADE_PNL = closed trade profit/loss, positive or negative
+
+
+alter table public.subscription_plans add column if not exists ai_trade_limit numeric default 5;
+update public.subscription_plans set ai_trade_limit = 5 where ai_trade_limit is null;

@@ -1879,3 +1879,20 @@ body.demo-mode-active .real-only-nav{display:none!important}
 .pnl-minus,#todayPnlMini.pnl-minus{
   text-shadow:0 0 16px rgba(255,63,96,.18);
 }
+
+
+/* ===== AI/Admin Trade Daily Limit UI ===== */
+.ai-trade-usage-box{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.035);
+  border-radius:16px;
+  padding:13px;
+  display:grid;
+  gap:11px;
+  margin:12px 0;
+}
+.ai-trade-usage-box span{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}
+.ai-trade-usage-box strong{color:var(--green);font-size:18px}
+.auto-trade-toggle{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.auto-trade-toggle input{width:18px;height:18px;accent-color:#00e59b;min-height:auto!important}
+.auto-trade-toggle span{margin:0;color:var(--text);font-weight:800}

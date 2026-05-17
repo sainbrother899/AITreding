@@ -222,6 +222,7 @@
             <button class="admin-tab" data-admin-tab="adminPlanEditor">Plan Editor</button>
             <button class="admin-tab" data-admin-tab="adminKyc">KYC</button>
             <button class="admin-tab" data-admin-tab="adminTrades">Trades</button>
+            <button class="admin-tab" data-admin-tab="adminMassTrade">Mass Trade</button>
             <button class="admin-tab" data-admin-tab="adminReferrals">Referrals</button>
           </div>
 
@@ -388,6 +389,9 @@
                   <label class="input-label">Signal Limit</label>
                   <input id="planSignalLimitInput" type="number" placeholder="50"/>
 
+                  <label class="input-label">AI/Admin Trades Per Day</label>
+                  <input id="planAiLimitInput" type="number" placeholder="5"/>
+
                   <label class="input-label">Features</label>
                   <textarea id="planFeaturesInput" placeholder="One feature per line"></textarea>
 
@@ -401,7 +405,7 @@
                   </div>
                   <div class="table-wrap">
                     <table>
-                      <thead><tr><th>Name</th><th>Price</th><th>Signals</th><th>Status</th><th>Action</th></tr></thead>
+                      <thead><tr><th>Name</th><th>Price</th><th>AI/day</th><th>Status</th><th>Action</th></tr></thead>
                       <tbody id="adminPlansEditorLog"></tbody>
                     </table>
                   </div>
@@ -433,6 +437,54 @@
                   <table>
                     <thead><tr><th>User</th><th>Coin</th><th>Side</th><th>Margin</th><th>Entry</th><th>Current</th><th>PnL</th><th>Status</th></tr></thead>
                     <tbody id="adminTradesLog"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            
+            <div id="adminMassTrade" class="admin-panel">
+              <div class="card">
+                <p class="label">AI/Admin Mass Trade</p>
+                <h2>Open Trade For Eligible Users</h2>
+                <p class="muted small">Manual user trades unlimited हैं. यह limit सिर्फ AI/Admin trades पर apply होगी.</p>
+
+                <label class="input-label">Coin</label>
+                <select id="massTradeCoin">
+                  <option value="BTCUSDT">BTC/USDT</option>
+                  <option value="ETHUSDT">ETH/USDT</option>
+                  <option value="SOLUSDT">SOL/USDT</option>
+                  <option value="BNBUSDT">BNB/USDT</option>
+                </select>
+
+                <label class="input-label">Side</label>
+                <select id="massTradeSide">
+                  <option value="BUY">BUY / LONG</option>
+                  <option value="SELL">SELL / SHORT</option>
+                </select>
+
+                <label class="input-label">Risk Level</label>
+                <select id="massTradeRisk">
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                </select>
+
+                <label class="input-label">Trade Amount</label>
+                <input id="massTradeAmount" type="number" value="100" min="1"/>
+
+                <button id="openMassTradeBtn" class="primary-btn">Open For Eligible Users</button>
+                <p class="tiny-warning">Eligible = Auto Trade ON + plan daily AI/Admin limit available.</p>
+              </div>
+
+              <div class="card table-card">
+                <div class="section-head">
+                  <div><p class="label">AI/Admin Trade Limit</p><h2>User Eligibility Preview</h2></div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>User</th><th>Plan</th><th>AI Trades Today</th><th>Limit</th><th>Auto</th><th>Status</th></tr></thead>
+                    <tbody id="adminAiEligibilityLog"><tr><td colspan="6" class="empty">No users found.</td></tr></tbody>
                   </table>
                 </div>
               </div>
