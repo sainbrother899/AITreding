@@ -252,3 +252,11 @@ Minimum Amount Update:
 - Minimum deposit set to ₹1000.
 - Minimum withdrawal set to ₹1000.
 - Requests below ₹1000 are blocked on user side.
+
+
+Final Withdrawal Balance Fix:
+- Real trade volume and profit are now saved cumulatively.
+- Withdrawable amount no longer resets just because trade history changes.
+- Admin approval immediately deducts Real Account balance in shared local state.
+- Approved withdrawal will not double-deduct if clicked twice.
+- Withdrawable = unlocked deposit based on trade volume + profit - pending/approved withdrawals.

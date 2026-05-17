@@ -49,6 +49,9 @@ const defaultState = {
   paymentRequests: [],
   depositRequests: [],
   withdrawalRequests: [],
+  realTradeVolumeTotal: 0,
+  realProfitTotal: 0,
+  realApprovedDepositTotal: 0,
   closedTrades: [],
   recentFills: [],
   selectedPaymentPlan: "Pro",
@@ -801,6 +804,11 @@ function placeTrade(side) {
   };
 
   acc.trades.unshift(trade);
+
+  if (state.mode === "REAL") {
+    state.realTradeVolumeTotal = Number(state.realTradeVolumeTotal || 0) + Number(amount || 0);
+  }
+
   acc.recentFills = acc.recentFills || [];
   acc.recentFills.unshift({ side, coin, price: entry, amount, time: new Date().toLocaleTimeString() });
   acc.recentFills = acc.recentFills.slice(0, 8);
@@ -841,6 +849,11 @@ function closeTrade(id) {
 
   acc.closedTrades = acc.closedTrades || [];
   acc.closedTrades.unshift({ ...trade });
+
+  if (state.mode === "REAL" && Number(trade.pnl || 0) > 0 && !trade.profitCounted) {
+    state.realProfitTotal = Number(state.realProfitTotal || 0) + Number(trade.pnl || 0);
+    trade.profitCounted = true;
+  }
 
   acc.recentFills = acc.recentFills || [];
   acc.recentFills.unshift({ side: "CLOSE", coin: trade.coin, price: trade.current, amount: trade.amount, time: new Date().toLocaleTimeString() });
@@ -1139,6 +1152,12 @@ async function submitDepositRequest() {
 
 
 
+function ensureWithdrawalTotals() {
+  state.realTradeVolumeTotal = Number(state.realTradeVolumeTotal || 0);
+  state.realProfitTotal = Number(state.realProfitTotal || 0);
+  state.realApprovedDepositTotal = Number(state.realApprovedDepositTotal || 0);
+}
+
 function currentUserIdSafe() {
   return String(state.user?.id || "local");
 }
@@ -1152,9 +1171,13 @@ function realAccountTrades() {
 }
 
 function approvedDepositTotal(userId = currentUserIdSafe()) {
-  return (state.depositRequests || [])
+  ensureWithdrawalTotals();
+
+  const localApproved = (state.depositRequests || [])
     .filter(d => String(d.userId) === String(userId) && d.status === "APPROVED")
     .reduce((a, d) => a + Number(d.amount || 0), 0);
+
+  return Math.max(Number(state.realApprovedDepositTotal || 0), localApproved);
 }
 
 function approvedWithdrawalTotal(userId = currentUserIdSafe()) {
@@ -1170,28 +1193,39 @@ function pendingWithdrawalTotal(userId = currentUserIdSafe()) {
 }
 
 function realTradeVolume() {
-  return realAccountTrades()
+  ensureWithdrawalTotals();
+
+  const liveVolume = realAccountTrades()
     .reduce((a, t) => a + Number(t.amount || 0), 0);
+
+  return Math.max(Number(state.realTradeVolumeTotal || 0), liveVolume);
 }
 
 function realProfitEligible() {
-  return realAccountTrades()
+  ensureWithdrawalTotals();
+
+  const liveProfit = realAccountTrades()
     .reduce((a, t) => a + Math.max(0, Number(t.pnl || 0)), 0);
+
+  return Math.max(Number(state.realProfitTotal || 0), liveProfit);
 }
 
 function withdrawableAmount() {
+  ensureWithdrawalTotals();
+
   const deposits = approvedDepositTotal();
   const traded = realTradeVolume();
   const profit = realProfitEligible();
   const approvedW = approvedWithdrawalTotal();
   const pendingW = pendingWithdrawalTotal();
 
-  // Rule:
-  // Deposit amount unlocks only up to traded volume.
-  // Profit is also withdrawable.
-  // Pending + approved withdrawals reduce available amount.
+  // Deposit unlock rule:
+  // 1) Deposit amount unlocks only after equal trade volume.
+  // 2) Positive profit is withdrawable.
+  // 3) Pending + approved withdrawals reduce available amount.
   const unlockedDeposit = Math.min(deposits, traded);
-  return Math.max(0, unlockedDeposit + profit - approvedW - pendingW);
+  const totalEligible = unlockedDeposit + profit;
+  return Math.max(0, totalEligible - approvedW - pendingW);
 }
 
 function renderWithdrawalEligibility() {
@@ -1334,16 +1368,25 @@ async function approveWithdrawal(id) {
   if (!req) return;
 
   normalizeAccounts();
+  ensureWithdrawalTotals();
+
   const amount = Number(req.amount || 0);
 
-  // Deduct balance through wallet_ledger. Do not deduct admin's local wallet.
-  // If the current page belongs to the same user, update local preview immediately.
-  if (String(state.user?.id) === String(req.userId) && state.user?.role !== "admin") {
-    state.accounts.REAL.balance = Math.max(0, Number(state.accounts.REAL.balance || state.realBalance || 0) - amount);
-    state.realBalance = state.accounts.REAL.balance;
+  if (req.status === "APPROVED") {
+    toast("Withdrawal already approved.");
+    return;
   }
 
+  // Deduct from shared Real Account balance immediately.
+  state.accounts.REAL.balance = Math.max(0, Number(state.accounts.REAL.balance || state.realBalance || 0) - amount);
+  state.realBalance = state.accounts.REAL.balance;
+
+  // Also store on local user record if available.
+  const u = (state.users || []).find(x => String(x.id) === String(req.userId));
+  if (u) u.realBalance = Math.max(0, Number(u.realBalance || 0) - amount);
+
   req.status = "APPROVED";
+  req.approvedAt = new Date().toLocaleString();
 
   if (supabaseClient) {
     try {
@@ -1361,7 +1404,7 @@ async function approveWithdrawal(id) {
 
   saveState();
   render();
-  toast("Withdrawal approved.");
+  toast("Withdrawal approved and Real balance deducted.");
 }
 
 async function rejectWithdrawal(id) {
@@ -2235,3 +2278,5 @@ window.addEventListener("load", function() {
 
 window.approveWithdrawal = approveWithdrawal;
 window.rejectWithdrawal = rejectWithdrawal;
+
+setInterval(() => { try { renderWithdrawalEligibility(); } catch(e){} }, 1500);
