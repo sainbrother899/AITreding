@@ -876,6 +876,7 @@ function render() {
   renderWithdrawals();
   renderWithdrawalEligibility();
   renderUserManagedTrades();
+  finalRefreshAllUserAnalytics();
   renderUserManualTrades();
   renderAdminPanel();
   renderPlans();
@@ -3214,3 +3215,130 @@ function syncManagedPnLIntoMetrics() {
   } catch(e) {}
 }
 setInterval(syncManagedPnLIntoMetrics, 1200);
+
+
+/* ===== FINAL UNIFIED USER PNL ANALYTICS FIX ===== */
+function finalBelongsToCurrentUser(t) {
+  const uid = String(state.user?.id || "local");
+  const email = String(state.user?.email || "").toLowerCase();
+  const tid = String(t.userId || t.user_id || "");
+  const temail = String(t.userEmail || t.user_email || "").toLowerCase();
+  return !tid && !temail ? true : tid === uid || (!!email && temail === email);
+}
+
+function finalUserManualTrades() {
+  normalizeAccounts();
+  const mode = state.mode || "DEMO";
+  const acc = state.accounts?.[mode] || currentAccount?.() || {};
+  const open = (acc.trades || []).filter(t => (t.source || "USER") === "USER" || (t.source || "USER") === "MANUAL" || !t.source);
+  const closed = (acc.closedTrades || []).filter(t => (t.source || "USER") === "USER" || (t.source || "USER") === "MANUAL" || !t.source);
+  return [...open, ...closed].map(t => {
+    if ((t.status || "OPEN") === "OPEN" && typeof updateTradePnl === "function") updateTradePnl(t);
+    return { ...t, pnl: Number(t.pnl || 0), status: t.status || "OPEN", source: t.source || "USER" };
+  });
+}
+
+function finalUserManagedClosedTrades() {
+  if ((state.mode || "DEMO") !== "REAL") return [];
+  return (state.managedTrades || [])
+    .filter(t => finalBelongsToCurrentUser(t))
+    .filter(t => String(t.status || "").toUpperCase() === "CLOSED")
+    .map(t => ({
+      ...t,
+      coin: t.coin,
+      side: t.side,
+      amount: Number(t.amount || 0),
+      entry: Number(t.entry || t.entry_price || 0),
+      current: Number(t.close || t.close_price || t.current || 0),
+      close: Number(t.close || t.close_price || 0),
+      pnl: Number(t.pnl || 0),
+      status: "CLOSED",
+      source: "ADMIN_MANAGED"
+    }));
+}
+
+function finalAllUserPnlTrades() {
+  return [...finalUserManualTrades(), ...finalUserManagedClosedTrades()];
+}
+
+function finalRenderPnLAnalytics() {
+  if (!state.user || state.user.role === "admin") return;
+
+  const rows = finalAllUserPnlTrades();
+  const totalTrades = rows.length;
+  const totalPnl = rows.reduce((a, t) => a + Number(t.pnl || 0), 0);
+  const wins = rows.filter(t => Number(t.pnl || 0) > 0).length;
+  const winRate = totalTrades ? Math.round((wins / totalTrades) * 100) : 0;
+
+  if ($("totalTradesMetric")) $("totalTradesMetric").textContent = totalTrades;
+  if ($("totalPnlMetric")) {
+    $("totalPnlMetric").textContent = money(totalPnl);
+    $("totalPnlMetric").className = totalPnl >= 0 ? "pnl-plus" : "pnl-minus";
+  }
+  if ($("winRateMetric")) $("winRateMetric").textContent = winRate + "%";
+
+  if ($("todayPnlMini")) {
+    $("todayPnlMini").textContent = money(totalPnl);
+    $("todayPnlMini").className = totalPnl >= 0 ? "pnl-plus" : "pnl-minus";
+  }
+  if ($("winRateMini")) $("winRateMini").textContent = winRate + "%";
+
+  if ($("pnlBars")) {
+    const last = rows.slice(0, 10).reverse();
+    $("pnlBars").innerHTML = last.map(t => {
+      const pnl = Number(t.pnl || 0);
+      const h = Math.min(100, Math.max(8, Math.abs(pnl) / Math.max(1, Math.abs(totalPnl)) * 100));
+      return `<div class="pnl-bar ${pnl >= 0 ? "profit" : "loss"}" style="height:${h}%"><span>${money(pnl)}</span></div>`;
+    }).join("") || `<p class="empty">No PnL data yet.</p>`;
+  }
+}
+
+function finalRenderUserManualTrades() {
+  const el = $("userManualTradesLog");
+  if (!el) return;
+  const rows = finalUserManualTrades();
+  el.innerHTML = rows.map(t => {
+    const cls = Number(t.pnl || 0) >= 0 ? "pnl-plus" : "pnl-minus";
+    const currentOrClose = t.status === "CLOSED" ? (t.current || t.close || t.entry) : (t.current || t.entry);
+    return `<tr>
+      <td>${String(t.coin || "").replace("USDT","/USDT")}</td>
+      <td>${t.side || "-"}</td>
+      <td>${money(t.amount || 0)}</td>
+      <td>${money(t.entry || 0)}</td>
+      <td>${money(currentOrClose || 0)}</td>
+      <td class="${cls}">${money(t.pnl || 0)}</td>
+      <td>${t.status || "OPEN"}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="7" class="empty">No manual trades yet.</td></tr>`;
+}
+
+function finalRenderUserManagedTrades() {
+  const el = $("userManagedTradesLog");
+  if (!el) return;
+  const rows = finalUserManagedClosedTrades();
+  el.innerHTML = rows.map(t => {
+    const cls = Number(t.pnl || 0) >= 0 ? "pnl-plus" : "pnl-minus";
+    return `<tr>
+      <td>${String(t.coin || "").replace("USDT","/USDT")}</td>
+      <td>${t.side || "-"}</td>
+      <td>${money(t.amount || 0)}</td>
+      <td>${money(t.entry || 0)}</td>
+      <td>${t.close ? money(t.close) : "-"}</td>
+      <td class="${cls}">${money(t.pnl || 0)}</td>
+      <td>${t.status || "CLOSED"}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="7" class="empty">No closed AI/Admin trades yet.</td></tr>`;
+}
+
+function finalRefreshAllUserAnalytics() {
+  try {
+    finalRenderPnLAnalytics();
+    finalRenderUserManualTrades();
+    finalRenderUserManagedTrades();
+  } catch(e) {
+    console.warn("Final PnL analytics render failed", e);
+  }
+}
+
+setInterval(finalRefreshAllUserAnalytics, 1000);
+window.addEventListener("load", () => setTimeout(finalRefreshAllUserAnalytics, 1200));
