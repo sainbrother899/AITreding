@@ -138,3 +138,8 @@ Separate Session Fix:
 - Admin login will not logout user dashboard.
 - User login will not logout admin dashboard.
 - Use index.html for user and admin.html for admin in separate tabs/windows.
+
+
+User Side Text Cleanup:
+- Removed admin/admin.html wording from user login page and dashboard.
+- Admin access still remains in admin.html, but user side does not mention it.
