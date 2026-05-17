@@ -81,6 +81,7 @@ function loadState() {
 
 function saveState() {
   normalizeAccounts();
+  if (typeof syncAccountBackups === "function") syncAccountBackups();
   state.demoBalance = state.accounts.DEMO.balance;
   state.realBalance = state.accounts.REAL.balance;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -649,12 +650,35 @@ function showPage(page) {
   render();
 }
 
+
+function currentOpenPnl(mode = state.mode) {
+  normalizeAccounts();
+  const key = mode === "REAL" ? "REAL" : "DEMO";
+  const acc = state.accounts[key];
+  (acc.trades || []).forEach(updateTradePnl);
+  return (acc.trades || []).reduce((a, t) => a + Number(t.pnl || 0), 0);
+}
+
+function accountEquity(mode = state.mode) {
+  normalizeAccounts();
+  const key = mode === "REAL" ? "REAL" : "DEMO";
+  return Number(state.accounts[key].balance || 0) + currentOpenPnl(key);
+}
+
+function syncAccountBackups() {
+  normalizeAccounts();
+  state.demoBalance = Number(state.accounts.DEMO.balance || 0);
+  state.realBalance = Number(state.accounts.REAL.balance || 0);
+}
+
 function render() {
   if (!state.user) return;
 
   const acc = currentAccount();
-  if ($("walletBalance")) $("walletBalance").textContent = money(acc.balance);
-  if ($("walletPageBalance")) $("walletPageBalance").textContent = money(state.accounts.REAL.balance);
+  const selectedEquity = accountEquity(state.mode);
+  const realEquity = accountEquity("REAL");
+  if ($("walletBalance")) $("walletBalance").textContent = money(selectedEquity);
+  if ($("walletPageBalance")) $("walletPageBalance").textContent = money(realEquity);
   if ($("accountModeTitle")) $("accountModeTitle").textContent = accountLabel();
   if ($("accountModeText")) $("accountModeText").textContent = state.mode === "REAL"
     ? "Real account balance, real-account signals and real-account positions only."
@@ -784,6 +808,7 @@ function placeTrade(side) {
   const entry = state.prices[coin]?.price || fallbackPrice(coin);
 
   acc.balance -= amount;
+  syncAccountBackups();
   acc.signalsUsed++;
 
   const trade = {
@@ -840,9 +865,13 @@ function closeTrade(id) {
   const trade = acc.trades[index];
   updateTradePnl(trade);
 
-  const refund = Number(trade.amount || 0) + Number(trade.pnl || 0);
+  const margin = Number(trade.amount || 0);
+  const pnl = Number(trade.pnl || 0);
+  const refund = Math.max(0, margin + pnl);
 
-  acc.balance += refund;
+  // Close trade effect:
+  // Profit adds to wallet, loss reduces returned margin.
+  acc.balance = Number(acc.balance || 0) + refund;
 
   trade.status = "CLOSED";
   trade.closedAt = new Date().toLocaleString();
@@ -850,18 +879,26 @@ function closeTrade(id) {
   acc.closedTrades = acc.closedTrades || [];
   acc.closedTrades.unshift({ ...trade });
 
-  if (state.mode === "REAL" && Number(trade.pnl || 0) > 0 && !trade.profitCounted) {
-    state.realProfitTotal = Number(state.realProfitTotal || 0) + Number(trade.pnl || 0);
-    trade.profitCounted = true;
+  if (state.mode === "REAL") {
+    state.realTradeVolumeTotal = Number(state.realTradeVolumeTotal || 0) + 0;
+    if (pnl > 0 && !trade.profitCounted) {
+      state.realProfitTotal = Number(state.realProfitTotal || 0) + pnl;
+      trade.profitCounted = true;
+    }
   }
 
   acc.recentFills = acc.recentFills || [];
   acc.recentFills.unshift({ side: "CLOSE", coin: trade.coin, price: trade.current, amount: trade.amount, time: new Date().toLocaleTimeString() });
 
   acc.trades.splice(index, 1);
+  syncAccountBackups();
   saveState();
   render();
-  toast(`Position closed. PnL: ${money(trade.pnl)}`);
+
+  const msg = pnl >= 0
+    ? `Trade closed. Profit added: ${money(pnl)}`
+    : `Trade closed. Loss deducted: ${money(Math.abs(pnl))}`;
+  toast(msg + " | Trade closed and wallet updated.");
 }
 
 function updateTradePnl(t) {
@@ -2159,8 +2196,8 @@ function finalRebuildUISync(){
     if (typeof state === "undefined") return;
     const name = state.user?.name || "Trader";
     if (document.getElementById("mockUserName")) document.getElementById("mockUserName").textContent = name;
-    if (document.getElementById("mockDemoBalance")) document.getElementById("mockDemoBalance").textContent = money(state.accounts?.DEMO?.balance || state.demoBalance || 10000);
-    if (document.getElementById("mockRealBalance")) document.getElementById("mockRealBalance").textContent = money(state.accounts?.REAL?.balance || state.realBalance || 0);
+    if (document.getElementById("mockDemoBalance")) document.getElementById("mockDemoBalance").textContent = money(accountEquity("DEMO"));
+    if (document.getElementById("mockRealBalance")) document.getElementById("mockRealBalance").textContent = money(accountEquity("REAL"));
     const btc = state.prices?.BTCUSDT || {price:0,change:0};
     if (document.getElementById("proPairPrice")) document.getElementById("proPairPrice").textContent = money(btc.price || 0);
     if (document.getElementById("proPairChange")) document.getElementById("proPairChange").textContent = `${Number(btc.change || 0) >= 0 ? "+" : ""}${Number(btc.change || 0).toFixed(2)}%`;
@@ -2280,3 +2317,14 @@ window.approveWithdrawal = approveWithdrawal;
 window.rejectWithdrawal = rejectWithdrawal;
 
 setInterval(() => { try { renderWithdrawalEligibility(); } catch(e){} }, 1500);
+
+
+function liveWalletEquityTick(){
+  try{
+    if (document.getElementById("walletBalance")) document.getElementById("walletBalance").textContent = money(accountEquity(state.mode));
+    if (document.getElementById("walletPageBalance")) document.getElementById("walletPageBalance").textContent = money(accountEquity("REAL"));
+    if (document.getElementById("mockDemoBalance")) document.getElementById("mockDemoBalance").textContent = money(accountEquity("DEMO"));
+    if (document.getElementById("mockRealBalance")) document.getElementById("mockRealBalance").textContent = money(accountEquity("REAL"));
+  }catch(e){}
+}
+setInterval(liveWalletEquityTick, 1200);

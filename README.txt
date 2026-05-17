@@ -260,3 +260,10 @@ Final Withdrawal Balance Fix:
 - Admin approval immediately deducts Real Account balance in shared local state.
 - Approved withdrawal will not double-deduct if clicked twice.
 - Withdrawable = unlocked deposit based on trade volume + profit - pending/approved withdrawals.
+
+
+Trade PnL Wallet Fix:
+- Open trade PnL now reflects in wallet equity live.
+- Closing a trade returns margin + profit/loss to account balance.
+- Profit increases wallet, loss reduces returned margin.
+- Demo and Real wallet equity remain separate.

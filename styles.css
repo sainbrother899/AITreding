@@ -1850,3 +1850,9 @@ body.demo-mode-active .real-only-nav{display:none!important}
 @media(max-width:520px){
   .withdraw-rule-box{grid-template-columns:1fr}
 }
+
+/* ===== PNL WALLET FIX UI ===== */
+#walletBalance,
+#walletPageBalance{
+  text-shadow:0 0 18px rgba(0,229,155,.18);
+}
