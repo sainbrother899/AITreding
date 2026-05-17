@@ -191,3 +191,12 @@ Full User Dashboard Rebuild:
 - New bottom nav with center AI Signal button.
 - Working IDs preserved for app.js logic.
 - Admin remains separate in admin.html.
+
+
+FINAL REBUILD V2 ZIP:
+- Full premium mockup-style user dashboard polish.
+- Center AI bottom-nav button added.
+- Desktop: left dashboard + right chart/orderbook panel.
+- Mobile-first responsive design.
+- Existing working JS IDs preserved.
+- Admin files remain separate.

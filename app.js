@@ -1828,3 +1828,19 @@ function updateFullRedesignUI(){
   }catch(e){}
 }
 setInterval(updateFullRedesignUI, 1000);
+
+
+/* Final Rebuild V2 UI sync */
+function finalRebuildUISync(){
+  try{
+    if (typeof state === "undefined") return;
+    const name = state.user?.name || "Trader";
+    if (document.getElementById("mockUserName")) document.getElementById("mockUserName").textContent = name;
+    if (document.getElementById("mockDemoBalance")) document.getElementById("mockDemoBalance").textContent = money(state.accounts?.DEMO?.balance || state.demoBalance || 10000);
+    if (document.getElementById("mockRealBalance")) document.getElementById("mockRealBalance").textContent = money(state.accounts?.REAL?.balance || state.realBalance || 0);
+    const btc = state.prices?.BTCUSDT || {price:0,change:0};
+    if (document.getElementById("proPairPrice")) document.getElementById("proPairPrice").textContent = money(btc.price || 0);
+    if (document.getElementById("proPairChange")) document.getElementById("proPairChange").textContent = `${Number(btc.change || 0) >= 0 ? "+" : ""}${Number(btc.change || 0).toFixed(2)}%`;
+  }catch(e){}
+}
+setInterval(finalRebuildUISync, 800);
