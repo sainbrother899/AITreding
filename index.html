@@ -1,110 +1,205 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Crypto Platform</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Crypto Trading Assistant</title>
+  <script src="https://s3.tradingview.com/tv.js"></script>
+  <link rel="stylesheet" href="styles.css" />
 </head>
-<body class="bg-[#131722] text-white font-sans antialiased">
+<body>
+  <div class="bg-glow"></div>
 
-    <nav class="bg-[#1c2030] border-b border-[#2a2e39] px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center space-x-2">
-            <span class="text-xl font-bold text-[#0ecb81]">AI CRYPTO</span>
-            <span class="text-xs bg-gray-700 px-2 py-0.5 rounded text-gray-300">BOT</span>
-        </div>
-        
-        <div class="flex items-center space-x-6">
-            <div class="flex bg-[#2a2e39] p-1 rounded-lg">
-                <button id="demoBtn" onclick="switchMode('DEMO')" class="px-4 py-1.5 rounded-md text-sm font-medium bg-[#0ecb81] text-white transition-all cursor-pointer">Demo</button>
-                <button id="realBtn" onclick="switchMode('REAL')" class="px-4 py-1.5 rounded-md text-sm font-medium text-gray-400 transition-all cursor-pointer">Real</button>
-            </div>
-            <div class="text-right">
-                <p class="text-xs text-gray-400">Available Balance</p>
-                <p id="walletBalance" class="text-lg font-bold text-[#0ecb81]">$10,000.00</p>
-            </div>
-            <div class="text-sm bg-[#2a2e39] px-3 py-2 rounded-lg border border-[#454b57]">
-                Trades Today: <span id="tradeCounter" class="font-bold text-amber-400">0/10</span>
-            </div>
-        </div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">AI</div>
+      <div>
+        <h1>AI Crypto Trading Assistant</h1>
+        <p>Live chart, admin signals, demo dashboard and subscription access</p>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-btn active" data-page="dashboard">Dashboard</button>
+      <button class="nav-btn" data-page="subscription">Subscription</button>
+      <button class="nav-btn" data-page="admin">Admin</button>
     </nav>
+  </header>
 
-    <main class="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <div class="lg:col-span-2 space-y-6">
-            <div class="bg-[#1c2030] p-4 rounded-xl border border-[#2a2e39]">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="font-semibold text-gray-200">Live Market Chart (Binance Feed)</h2>
-                    <select id="coinSelector" class="bg-[#2a2e39] text-white px-3 py-1.5 rounded border border-[#454b57] outline-none cursor-pointer text-sm">
-                        <option value="BINANCE:BTCUSDT">Bitcoin (BTC/USDT)</option>
-                    </select>
-                </div>
-                <div style="height: 420px; width: 100%;" class="rounded-lg overflow-hidden border border-[#2a2e39]">
-                    <div id="crypto_live_chart" style="height: 100%; width: 100%;"></div>
-                </div>
-            </div>
+  <main>
+    <section id="dashboard" class="page active-page">
+      <div class="grid hero-grid">
+        <div class="card wallet-card">
+          <div class="mode-switch">
+            <button id="demoBtn" class="mode-btn active">Demo</button>
+            <button id="realBtn" class="mode-btn">Real</button>
+          </div>
 
-            <div class="bg-[#1c2030] p-4 rounded-xl border border-[#2a2e39]">
-                <h3 class="text-lg font-semibold mb-4 text-gray-200">Active Trades (Live Positions)</h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="text-gray-400 text-xs border-b border-[#2a2e39]">
-                                <th class="pb-3 pl-2">Coin</th>
-                                <th class="pb-3">Type</th>
-                                <th class="pb-3">Amount</th>
-                                <th class="pb-3">Entry Price</th>
-                                <th class="pb-3">Profit / Loss</th>
-                                <th class="pb-3">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="activeTradesLog" class="text-sm divide-y divide-[#2a2e39]">
-                            <tr id="noTradesRow" class="text-gray-500">
-                                <td colspan="6" class="py-4 text-center">No active trades running currently.</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+          <p class="label">Available Balance</p>
+          <h2 id="walletBalance">$10,000.00</h2>
+
+          <div class="stats-row">
+            <div>
+              <span class="label">Free Signals Today</span>
+              <strong><span id="signalCounter">0</span>/5</strong>
             </div>
+            <div>
+              <span class="label">Trades Today</span>
+              <strong><span id="tradeCounter">0</span>/10</strong>
+            </div>
+          </div>
+
+          <div id="signalBox" class="signal-box buy">
+            <p>Current AI Signal</p>
+            <h3 id="aiSignalText">BUY BTC NOW</h3>
+            <span id="signalNote">Admin controlled signal. Educational simulator only.</span>
+          </div>
+
+          <label class="input-label" for="tradeAmountInput">Amount (USD)</label>
+          <input id="tradeAmountInput" type="number" min="1" placeholder="Enter amount" value="100" />
+
+          <div class="quick-buttons">
+            <button data-pct="25">25%</button>
+            <button data-pct="50">50%</button>
+            <button data-pct="75">75%</button>
+            <button data-pct="100">100%</button>
+          </div>
+
+          <button id="executeTradeBtn" class="primary-btn">Execute Simulated Trade</button>
+          <p class="tiny-warning">No real broker/API is connected. This dashboard does not place real market orders.</p>
         </div>
 
-        <div class="space-y-6">
-            <div class="bg-[#1c2030] p-6 rounded-xl border border-[#2a2e39] flex flex-col justify-between h-[600px]">
-                <div>
-                    <h3 class="text-lg font-semibold mb-4 text-gray-200">AI Trading Assistant</h3>
-                    
-                    <div id="signalBox" class="bg-emerald-950/40 border border-emerald-500/30 p-5 rounded-xl text-center mb-6 transition-all duration-300">
-                        <p class="text-xs text-emerald-400 font-medium uppercase tracking-wider">🟢 Current AI Signal</p>
-                        <h2 id="aiSignalText" class="text-2xl font-black text-emerald-400 mt-1 animate-pulse">BUY BTC NOW</h2>
-                    </div>
-
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-xs text-gray-400 mb-1.5 font-medium">Amount (USD)</label>
-                            <input id="tradeAmountInput" type="number" value="1000" class="w-full bg-[#2a2e39] text-white px-4 py-3 rounded-xl border border-[#454b57] font-bold text-lg focus:border-[#0ecb81] outline-none transition-all">
-                        </div>
-
-                        <div class="grid grid-cols-4 gap-2">
-                            <button onclick="setAmountPct(25)" class="bg-[#2a2e39] hover:bg-gray-700 text-xs font-semibold py-2.5 rounded-lg transition-all cursor-pointer">25%</button>
-                            <button onclick="setAmountPct(50)" class="bg-[#2a2e39] hover:bg-gray-700 text-xs font-semibold py-2.5 rounded-lg transition-all cursor-pointer">50%</button>
-                            <button onclick="setAmountPct(75)" class="bg-[#2a2e39] hover:bg-gray-700 text-xs font-semibold py-2.5 rounded-lg transition-all cursor-pointer">75%</button>
-                            <button onclick="setAmountPct(100)" class="bg-[#2a2e39] hover:bg-gray-700 text-xs font-semibold py-2.5 rounded-lg transition-all cursor-pointer">100%</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-8">
-                    <button id="executeBtn" onclick="executeTrade()" class="w-full bg-[#0ecb81] hover:bg-[#0baf6f] text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-900/20 active:scale-[0.98] transition-all cursor-pointer text-center text-lg">
-                        EXECUTE TRADE (1-Click)
-                    </button>
-                </div>
+        <div class="card chart-card">
+          <div class="section-head">
+            <div>
+              <p class="label">Live Market Chart</p>
+              <h2>BTC/USDT Binance Feed</h2>
             </div>
+            <span class="live-pill">LIVE</span>
+          </div>
+          <div id="crypto_live_chart"></div>
+        </div>
+      </div>
+
+      <div class="card table-card">
+        <div class="section-head">
+          <div>
+            <p class="label">Active Trades</p>
+            <h2>Live Positions</h2>
+          </div>
+          <button id="clearTradesBtn" class="ghost-btn">Clear</button>
         </div>
 
-    </main>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Coin</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Entry Price</th>
+                <th>Profit/Loss</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="activeTradesLog">
+              <tr><td colspan="6" class="empty">No active trades running currently.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
-    <script src="app.js"></script>
+    <section id="subscription" class="page">
+      <div class="section-title">
+        <p class="label">Plans</p>
+        <h2>Unlock More AI Signals</h2>
+        <p>Free users get 5 indicators/signals per day. Upgrade for more signal access.</p>
+      </div>
+
+      <div class="plans-grid">
+        <div class="card plan-card">
+          <h3>Free</h3>
+          <p class="price">₹0</p>
+          <ul>
+            <li>5 free signals per day</li>
+            <li>Demo dashboard</li>
+            <li>Live TradingView chart</li>
+          </ul>
+          <button class="ghost-btn plan-btn" data-plan="Free">Current Plan</button>
+        </div>
+
+        <div class="card plan-card featured">
+          <span class="tag">Popular</span>
+          <h3>Pro</h3>
+          <p class="price">₹499/month</p>
+          <ul>
+            <li>50 signals per day</li>
+            <li>Demo + Real dashboard UI</li>
+            <li>Admin signal alerts</li>
+          </ul>
+          <button class="primary-btn plan-btn" data-plan="Pro">Activate Pro UI</button>
+        </div>
+
+        <div class="card plan-card">
+          <h3>Elite</h3>
+          <p class="price">₹999/month</p>
+          <ul>
+            <li>Unlimited signals UI</li>
+            <li>Priority signal panel</li>
+            <li>Advanced dashboard layout</li>
+          </ul>
+          <button class="primary-btn plan-btn" data-plan="Elite">Activate Elite UI</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="admin" class="page">
+      <div class="admin-grid">
+        <div class="card">
+          <div class="section-head">
+            <div>
+              <p class="label">Admin Panel</p>
+              <h2>Manage Signal</h2>
+            </div>
+            <span class="admin-pill">Local Admin</span>
+          </div>
+
+          <label class="input-label">Select Signal</label>
+          <select id="adminSignal">
+            <option value="BUY">BUY BTC NOW</option>
+            <option value="SELL">SELL BTC NOW</option>
+            <option value="WAIT">WAIT / NO TRADE</option>
+          </select>
+
+          <label class="input-label">Signal Note</label>
+          <input id="adminNote" placeholder="Example: BTC near support zone" />
+
+          <label class="input-label">Free Signal Limit</label>
+          <input id="adminFreeLimit" type="number" min="1" value="5" />
+
+          <button id="saveAdminBtn" class="primary-btn">Save Admin Settings</button>
+          <p class="tiny-warning">This admin panel stores settings in browser localStorage. Backend/database can be added later.</p>
+        </div>
+
+        <div class="card">
+          <p class="label">Setup Status</p>
+          <h2>What is working now</h2>
+          <div class="checklist">
+            <p>✅ Proper HTML/CSS/JS structure</p>
+            <p>✅ TradingView live chart widget</p>
+            <p>✅ Demo/Real dashboard toggle</p>
+            <p>✅ 5 free signals/day logic</p>
+            <p>✅ Subscription UI</p>
+            <p>✅ Admin signal management UI</p>
+            <p>✅ Local trade history</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast"></div>
+  <script src="app.js"></script>
 </body>
 </html>
