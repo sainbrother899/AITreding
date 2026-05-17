@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>AI Trading Assistant Pro</title>
+  <title>Admin Login | AI Trading Assistant</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://s3.tradingview.com/tv.js"></script>
   <link rel="stylesheet" href="styles.css"/>
 </head>
-<body>
+<body data-admin-page="true">
   <div class="neon-bg">
     <span></span><span></span><span></span><span></span>
   </div>
@@ -31,21 +31,20 @@
     <section id="authPage" class="auth-page">
       <div class="auth-grid">
         <div class="hero-copy">
-          <p class="label">Mobile app style trading dashboard</p>
-          <h2>Smart crypto signal dashboard with admin control</h2>
-          <p class="muted">Login/Register, Supabase-ready database, manual gateway, referral tracking, AI-style indicator engine and live market data.</p>
+          <p class="label">Separate admin access</p>
+          <h2>Admin Control Panel</h2>
+          <p class="muted">Manage AI signals, free indicator limits, payment verification, user plans and dashboard control from a separate admin URL.</p>
           <div class="hero-points">
-            <p>✅ 5 free indicators/day</p>
-            <p>✅ Real BTC/ETH/SOL prices</p>
-            <p>✅ Manual payment verification</p>
-            <p>✅ Admin-controlled signals</p>
+            <p>✅ Separate admin login</p>
+            <p>✅ Manage user payments</p>
+            <p>✅ Control BUY/SELL/WAIT signal</p>
+            <p>✅ No admin tab on user side</p>
           </div>
         </div>
 
         <div class="card auth-card">
-          <div class="tabs">
-            <button class="tab active" data-auth-tab="login">Login</button>
-            <button class="tab" data-auth-tab="register">Register</button>
+          <div class="tabs single-tab">
+            <button class="tab active" data-auth-tab="login">Admin Login</button>
           </div>
 
           <div id="loginForm" class="auth-form active-form">
@@ -53,23 +52,8 @@
             <input id="loginEmail" type="email" placeholder="user@email.com"/>
             <label>Password</label>
             <input id="loginPassword" type="password" placeholder="Password"/>
-            <button id="loginBtn" class="primary-btn">Login</button>
-            <button id="guestBtn" class="ghost-full">Continue as Demo User</button>
-            <p class="tiny-warning">Admin login is available separately at admin.html</p>
+            <button id="loginBtn" class="primary-btn">Login</button><p class="tiny-warning">Use your admin credentials only.</p>
           </div>
-
-          <div id="registerForm" class="auth-form">
-            <label>Name</label>
-            <input id="regName" placeholder="Your name"/>
-            <label>Email</label>
-            <input id="regEmail" type="email" placeholder="user@email.com"/>
-            <label>Mobile</label>
-            <input id="regMobile" placeholder="Mobile number"/>
-            <label>Password</label>
-            <input id="regPassword" type="password" placeholder="Create password"/>
-            <label>Referral Code Optional</label>
-            <input id="regReferral" placeholder="Friend referral code"/>
-            <button id="registerBtn" class="primary-btn">Create Account</button>
           </div>
         </div>
       </div>
@@ -77,11 +61,9 @@
 
     <section id="appPage" class="hidden">
       <nav class="bottom-nav">
-        <button class="nav-btn active" data-page="dashboard">Home</button>
+        <button class="nav-btn active" data-page="admin">Admin</button>
+        <button class="nav-btn" data-page="dashboard">User View</button>
         <button class="nav-btn" data-page="analytics">PnL</button>
-        <button class="nav-btn" data-page="subscription">Plan</button>
-        <button class="nav-btn" data-page="referral">Referral</button>
-        
       </nav>
 
       <section id="dashboard" class="page active-page">

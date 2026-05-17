@@ -1,5 +1,6 @@
 const CONFIG = window.APP_CONFIG || {};
 const STORAGE_KEY = "ai_trading_pro_v3";
+const IS_ADMIN_PAGE = document.body?.dataset?.adminPage === "true";
 let supabaseClient = null;
 
 if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY && window.supabase) {
@@ -54,8 +55,19 @@ async function login(){
   const email=$("loginEmail").value.trim().toLowerCase(), password=$("loginPassword").value;
   const user=state.users.find(u=>u.email===email&&u.password===password);
   if(!user){toast("Invalid login details.");return}
+
+  if (IS_ADMIN_PAGE && user.role !== "admin") {
+    toast("Only admin can login on this page.");
+    return;
+  }
+
+  if (!IS_ADMIN_PAGE && user.role === "admin") {
+    toast("Admin login is separate. Open admin.html");
+    return;
+  }
+
   state.user={...user,password:undefined};
-  saveState();showApp();toast("Logged in.");
+  saveState();showApp();toast(user.role==="admin" ? "Admin logged in." : "Logged in.");
 }
 
 function guestLogin(){
@@ -76,9 +88,17 @@ async function saveProfileToSupabase(user){
 function showApp(){
   $("authPage").classList.add("hidden");$("appPage").classList.remove("hidden");$("logoutBtn").classList.remove("hidden");
   $("userBadge").textContent=(state.user?.role==="admin"?"Admin: ":"User: ")+(state.user?.name||"");
-  $("adminNavBtn").classList.toggle("hidden",state.user?.role!=="admin");
-  $("myReferralCode").textContent=state.user?.referralCode||"----";
-  showPage("dashboard");render();setTimeout(initTradingViewChart,100);
+
+  const adminNav = $("adminNavBtn");
+  if (adminNav) adminNav.classList.toggle("hidden", state.user?.role !== "admin");
+
+  const refCode = $("myReferralCode");
+  if (refCode) refCode.textContent=state.user?.referralCode||"----";
+
+  if (IS_ADMIN_PAGE) showPage("admin");
+  else showPage("dashboard");
+
+  render();setTimeout(initTradingViewChart,100);
 }
 
 function showAuthTab(tab){
@@ -198,7 +218,7 @@ function approvePayment(id){
 
 function saveAdminSettings(){state.signal=$("adminSignal").value;state.note=$("adminNote").value.trim()||"Admin signal updated.";state.freeSignalLimit=Math.max(1,Number($("adminFreeLimit").value||5));saveState();render();showPage("dashboard");toast("Admin signal saved.")}
 function copyReferral(){const link=location.origin+location.pathname+"?ref="+(state.user?.referralCode||"");navigator.clipboard?.writeText(link);toast("Referral link copied.");}
-function initReferralFromUrl(){const ref=new URLSearchParams(location.search).get("ref");if(ref)$("regReferral").value=ref.toUpperCase()}
+function initReferralFromUrl(){const ref=new URLSearchParams(location.search).get("ref");if(ref && $("regReferral")) $("regReferral").value=ref.toUpperCase()}
 
 function initTradingViewChart(){
   if(typeof TradingView==="undefined")return;
@@ -208,17 +228,26 @@ function initTradingViewChart(){
 
 function bind(){
   document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>showAuthTab(b.dataset.authTab)));
-  $("registerBtn").addEventListener("click",register);$("loginBtn").addEventListener("click",login);$("guestBtn").addEventListener("click",guestLogin);$("logoutBtn").addEventListener("click",logout);
+  if ($("registerBtn")) $("registerBtn").addEventListener("click",register);
+  if ($("loginBtn")) $("loginBtn").addEventListener("click",login);
+  if ($("guestBtn")) $("guestBtn").addEventListener("click",guestLogin);
+  if ($("logoutBtn")) $("logoutBtn").addEventListener("click",logout);
   document.querySelectorAll(".nav-btn").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.page)));
   $("demoBtn").addEventListener("click",()=>{state.mode="DEMO";saveState();render()});$("realBtn").addEventListener("click",()=>{state.mode="REAL";saveState();render();toast("Real UI selected. Exchange API not connected.")});
   $("executeTradeBtn").addEventListener("click",executeTrade);$("clearTradesBtn").addEventListener("click",()=>{state.trades=[];saveState();render()});
   $("saveAdminBtn").addEventListener("click",saveAdminSettings);$("clearPaymentsBtn").addEventListener("click",()=>{state.paymentRequests=[];saveState();render()});
   document.querySelectorAll(".plan-btn").forEach(b=>b.addEventListener("click",()=>openPaymentModal(b.dataset.plan)));
-  $("closePaymentModal").addEventListener("click",closePaymentModal);$("submitManualPayment").addEventListener("click",submitManualPayment);$("copyReferralBtn").addEventListener("click",copyReferral);
+  $("closePaymentModal").addEventListener("click",closePaymentModal);
+  $("submitManualPayment").addEventListener("click",submitManualPayment);
+  if ($("copyReferralBtn")) $("copyReferralBtn").addEventListener("click",copyReferral);
 }
 
 window.addEventListener("load",()=>{
   bind();initReferralFromUrl();
-  if(state.user)showApp();
+  if(state.user){
+    if (IS_ADMIN_PAGE && state.user.role !== "admin") logout();
+    else if (!IS_ADMIN_PAGE && state.user.role === "admin") logout();
+    else showApp();
+  }
   fetchRealPrices();setInterval(fetchRealPrices,30000);
 });

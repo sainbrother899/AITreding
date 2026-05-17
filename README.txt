@@ -40,3 +40,12 @@ This is still a frontend/static + Supabase-ready build. For production you shoul
 - Storage bucket for payment screenshots
 - Legal disclaimers and compliance
 - Exchange API only if licensed/allowed
+
+
+Separate Admin Login Added:
+- User website: index.html
+- Admin website: admin.html
+- Admin credentials: admin@aitrade.local / admin123
+- User side no longer shows Admin tab.
+- Admin cannot login from index.html.
+- Normal users cannot login from admin.html.
