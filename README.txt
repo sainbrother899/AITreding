@@ -169,3 +169,10 @@ Premium User UI Update:
 - Larger chart layout on desktop.
 - Order book depth bars and smoother recent fill effect.
 - User side keeps admin wording removed.
+
+
+Chart Bottom Feed Update:
+- Order Book moved directly below chart.
+- Recent Trade Feed moved directly below chart.
+- Removed separate lower order book/feed block to reduce empty space.
+- Chart height optimized so lower area looks filled.

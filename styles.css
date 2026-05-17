@@ -493,3 +493,51 @@ body.real-mode-active .real-risk-notice{display:block}
   .mini-metric{padding:12px}
   .mini-metric strong{font-size:16px}
 }
+
+
+.chart-bottom-feed{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+  margin-top:16px;
+}
+.mini-feed-card{
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:rgba(255,255,255,.032);
+  padding:14px;
+  min-height:210px;
+}
+.compact-head{
+  margin-bottom:10px!important;
+}
+.compact-head h3{
+  font-size:18px;
+}
+.compact-order-book,
+.compact-recent-fills{
+  max-height:165px;
+  overflow:hidden;
+}
+.compact-order-book .book-row,
+.compact-recent-fills .fill-row{
+  padding:8px 10px;
+  border-radius:12px;
+  font-size:12px;
+}
+@media(min-width:1100px){
+  .chart-card{
+    min-height:auto!important;
+  }
+  #crypto_live_chart{
+    height:430px!important;
+  }
+}
+@media(max-width:850px){
+  .chart-bottom-feed{
+    grid-template-columns:1fr;
+  }
+  .mini-feed-card{
+    min-height:auto;
+  }
+}
