@@ -2391,7 +2391,8 @@ function renderUserManagedTrades() {
   const rows = (state.managedTrades || []).filter(t => {
     const tid = String(t.userId || "");
     const temail = String(t.userEmail || "").toLowerCase();
-    return tid === uid || (!!email && temail === email);
+    const belongsToUser = tid === uid || (!!email && temail === email);
+    return belongsToUser && String(t.status || "").toUpperCase() === "CLOSED";
   });
 
   el.innerHTML = rows.map(t => {
@@ -2403,9 +2404,9 @@ function renderUserManagedTrades() {
       <td>${money(t.entry || 0)}</td>
       <td>${t.close ? money(t.close) : "-"}</td>
       <td class="${cls}">${money(t.pnl || 0)}</td>
-      <td>${t.status || "OPEN"}</td>
+      <td>${t.status || "CLOSED"}</td>
     </tr>`;
-  }).join("") || `<tr><td colspan="7" class="empty">No AI/Admin trades yet.</td></tr>`;
+  }).join("") || `<tr><td colspan="7" class="empty">No closed AI/Admin trades yet.</td></tr>`;
 }
 
 function renderManagedTradeAdmin() {

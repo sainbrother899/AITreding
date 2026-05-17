@@ -404,3 +404,9 @@ Top More Button Fix:
 - 3-dot top More button now opens morepage.
 - Added direct data-page click handler for shortcut buttons.
 - Ensured More page exists with KYC, Plans, Referral, Profile cards.
+
+
+User History Closed Only Update:
+- User AI/Admin trade history now shows only CLOSED trades.
+- CANCELLED managed trades are hidden from user history.
+- Admin panel still keeps cancelled trades visible for admin tracking.
