@@ -211,3 +211,9 @@ values
 ('pro', 'Pro', 499, '30 days', 50, '["50 signals/day","Advanced AI indicator","Referral bonus tracking"]'::jsonb, true),
 ('elite', 'Elite', 999, '30 days', 999999, '["Unlimited signals UI","PnL analytics","Priority dashboard"]'::jsonb, true)
 on conflict (id) do nothing;
+
+
+-- wallet_ledger type examples:
+-- DEPOSIT = approved deposit amount
+-- WITHDRAWAL = approved withdrawal amount as negative value
+-- TRADE_PNL = closed trade profit/loss, positive or negative

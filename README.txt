@@ -281,3 +281,10 @@ Trade Close Double Balance Fix:
 - Trade open no longer deducts simulation margin from wallet.
 - Trade close now applies only net PnL:
   100000 wallet + 18 profit = 100018 wallet.
+
+
+Wallet Ledger Persist Fix:
+- Closed Real Account trade PnL now saves into Supabase wallet_ledger as TRADE_PNL.
+- Approved withdrawal saves negative ledger entry.
+- Refresh now recalculates Real balance from wallet_ledger.
+- Wallet should no longer reset after page refresh.

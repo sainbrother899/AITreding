@@ -420,6 +420,45 @@ async function saveReferralToSupabase(ref) {
   }
 }
 
+
+async function addWalletLedgerEntry(type, amount, note = "") {
+  if (!supabaseClient || !state.user?.id || state.user?.role === "admin") return;
+
+  try {
+    await supabaseClient.from("wallet_ledger").insert({
+      user_id: state.user.id,
+      type,
+      amount: Number(amount || 0),
+      note
+    });
+  } catch (e) {
+    console.warn("Wallet ledger insert failed", e);
+  }
+}
+
+async function recalcRealBalanceFromLedger() {
+  if (!supabaseClient || !state.user?.id || state.user?.role === "admin") return;
+
+  try {
+    const { data: ledgerRows, error } = await supabaseClient
+      .from("wallet_ledger")
+      .select("amount,type")
+      .eq("user_id", state.user.id);
+
+    if (error) return;
+
+    const total = (ledgerRows || []).reduce((a, x) => a + Number(x.amount || 0), 0);
+
+    normalizeAccounts();
+    state.accounts.REAL.balance = total;
+    state.realBalance = total;
+    saveState();
+  } catch (e) {
+    console.warn("Wallet ledger recalc failed", e);
+  }
+}
+
+
 async function loadRemoteData() {
   if (!supabaseClient) return;
 
@@ -866,7 +905,7 @@ function fallbackPrice(coin) {
   return map[coin] || 100;
 }
 
-function closeTrade(id) {
+async function closeTrade(id) {
   const acc = currentAccount();
   const index = acc.trades.findIndex(t => t.id === id);
   if (index === -1) return;
@@ -905,6 +944,13 @@ function closeTrade(id) {
 
   acc.trades.splice(index, 1);
   syncAccountBackups();
+
+  // Trade PnL ledger entry: persists profit/loss after refresh.
+  if (state.mode === "REAL" && pnl !== 0) {
+    await addWalletLedgerEntry("TRADE_PNL", pnl, `Closed ${trade.side} ${trade.coin}`);
+    await recalcRealBalanceFromLedger();
+  }
+
   saveState();
   render();
 
@@ -1448,6 +1494,10 @@ async function approveWithdrawal(id) {
         amount: -Math.abs(amount),
         note: "Manual withdrawal approved"
       });
+
+      if (String(state.user?.id) === String(req.userId) && state.user?.role !== "admin") {
+        await recalcRealBalanceFromLedger();
+      }
     } catch (e) {
       console.warn("Withdrawal approve remote update failed", e);
     }
@@ -1528,6 +1578,10 @@ async function approveDeposit(id) {
         amount: req.amount,
         note: "Manual deposit approved"
       });
+
+      if (String(state.user?.id) === String(req.userId) && state.user?.role !== "admin") {
+        await recalcRealBalanceFromLedger();
+      }
     } catch (e) {
       console.warn("Deposit approve remote update failed", e);
     }
