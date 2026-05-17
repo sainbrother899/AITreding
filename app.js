@@ -2861,3 +2861,22 @@ window.openMassTradeForEligibleUsers = openMassTradeForEligibleUsers;
 
 window.openManagedTrade = openManagedTrade;
 window.closeManagedTrade = closeManagedTrade;
+
+
+/* Premium Admin UI metric sync */
+function syncAdminPremiumMetrics(){
+  try{
+    const map = [
+      ["adminTotalUsersMini","adminTotalUsers"],
+      ["adminTotalDepositsMini","adminTotalDeposits"],
+      ["adminPendingDepositsMini","adminPendingDeposits"],
+      ["adminOpenTradesMini","adminOpenTrades"]
+    ];
+    map.forEach(([a,b])=>{
+      const target = document.getElementById(a);
+      const source = document.getElementById(b);
+      if(target && source) target.textContent = source.textContent || "0";
+    });
+  }catch(e){}
+}
+setInterval(syncAdminPremiumMetrics, 1000);

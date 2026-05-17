@@ -329,3 +329,12 @@ Managed Trade Control Update:
 - PnL calculates automatically from entry/close price.
 - PnL is added/deducted in wallet ledger as MANAGED_TRADE_PNL.
 - User dashboard can show managed trade as Admin Managed source.
+
+
+Premium Admin UI Update:
+- Rebuilt admin layout visually to match user panel style.
+- Added Admin Command Center hero.
+- Improved sidebar tabs with icon-style labels.
+- Added mobile-app style responsive layout.
+- Kept existing IDs/data-admin-tab logic intact.
+- Existing admin features/logic remain same.

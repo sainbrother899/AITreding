@@ -208,27 +208,44 @@
         </div>
       </section>
 
-      <section id="admin" class="page">
+      <section id="admin" class="page admin-premium-page">
+        <div class="admin-premium-hero">
+          <div>
+            <p class="label">Admin Command Center</p>
+            <h2>AI Trading Control Panel</h2>
+            <span>Manage users, deposits, KYC, plans, trades and AI/Admin execution.</span>
+          </div>
+          <div class="admin-live-card">
+            <b>LIVE</b>
+            <small>Control Mode Active</small>
+          </div>
+        </div>
         <div class="admin-layout">
           <div class="card admin-menu">
             <p class="label">Admin Panel</p>
             <h2>Controls</h2>
-            <button class="admin-tab active" data-admin-tab="adminOverview">Overview</button>
-            <button class="admin-tab" data-admin-tab="adminUsers">Users</button>
-            <button class="admin-tab" data-admin-tab="adminDeposits">Deposits</button>
-            <button class="admin-tab" data-admin-tab="adminWithdrawals">Withdrawals</button>
-            <button class="admin-tab" data-admin-tab="adminSignals">Signals</button>
-            <button class="admin-tab" data-admin-tab="adminPlans">Plans</button>
-            <button class="admin-tab" data-admin-tab="adminPlanEditor">Plan Editor</button>
-            <button class="admin-tab" data-admin-tab="adminKyc">KYC</button>
-            <button class="admin-tab" data-admin-tab="adminTrades">Trades</button>
-            <button class="admin-tab" data-admin-tab="adminMassTrade">Mass Trade</button>
-            <button class="admin-tab" data-admin-tab="adminManagedTrade">Managed Trade</button>
-            <button class="admin-tab" data-admin-tab="adminReferrals">Referrals</button>
+            <button class="admin-tab active" data-admin-tab="adminOverview">⌂ Overview</button>
+            <button class="admin-tab" data-admin-tab="adminUsers">👥 Users</button>
+            <button class="admin-tab" data-admin-tab="adminDeposits">▣ Deposits</button>
+            <button class="admin-tab" data-admin-tab="adminWithdrawals">↧ Withdraw</button>
+            <button class="admin-tab" data-admin-tab="adminSignals">⚡ Signals</button>
+            <button class="admin-tab" data-admin-tab="adminPlans">◇ Plans</button>
+            <button class="admin-tab" data-admin-tab="adminPlanEditor">✎ Plan Edit</button>
+            <button class="admin-tab" data-admin-tab="adminKyc">✓ KYC</button>
+            <button class="admin-tab" data-admin-tab="adminTrades">⇅ Trades</button>
+            <button class="admin-tab" data-admin-tab="adminMassTrade">AI Mass</button>
+            <button class="admin-tab" data-admin-tab="adminManagedTrade">▦ Managed</button>
+            <button class="admin-tab" data-admin-tab="adminReferrals">⤴ Referral</button>
           </div>
 
           <div class="admin-content">
             <div id="adminOverview" class="admin-panel active-admin-panel">
+              <div id="adminQuickGrid" class="admin-quick-grid">
+                <div class="admin-mini-card"><span>Total Users</span><b id="adminTotalUsersMini">0</b></div>
+                <div class="admin-mini-card"><span>Deposits</span><b id="adminTotalDepositsMini">$0</b></div>
+                <div class="admin-mini-card"><span>Pending</span><b id="adminPendingDepositsMini">0</b></div>
+                <div class="admin-mini-card"><span>Open Trades</span><b id="adminOpenTradesMini">0</b></div>
+              </div>
               <div class="analytics-grid">
                 <div class="card metric-card"><p>Total Users</p><h2 id="adminTotalUsers">0</h2></div>
                 <div class="card metric-card"><p>Total Deposits</p><h2 id="adminTotalDeposits">$0.00</h2></div>
