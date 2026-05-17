@@ -1,8 +1,7 @@
-// 1. Supabase Initialization with Your Exact Project Credentials
+// 1. Supabase Initialization
 const SUPABASE_URL = "https://gijafjwjrmymtonddvfv.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_vVZFBYp-tXwKmwCCmIrgdw_-ZVQ1aFG";
 
-// Correct instantiation method for version 2.x
 const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // System State Variables
@@ -11,24 +10,28 @@ let demoBalance = 10000.00;
 let realBalance = 0.00;
 let tradesUsed = 0;
 
-// 2. Initialize TradingView Live Chart
-let chartWidget = new TradingView.widget({
-    "width": "100%",
-    "height": "100%",
-    "symbol": "BINANCE:BTCUSDT",
-    "interval": "5",
-    "timezone": "Asia/Kolkata",
-    "theme": "dark",
-    "style": "1",
-    "locale": "en",
-    "enable_publishing": false,
-    "hide_side_toolbar": false,
-    "container_id": "crypto_live_chart"
-});
+// 2. Safe Chart Initializer Function
+function initTradingViewChart() {
+    if (typeof TradingView !== 'undefined') {
+        new TradingView.widget({
+            "autosize": true,
+            "symbol": "BINANCE:BTCUSDT",
+            "interval": "5",
+            "timezone": "Asia/Kolkata",
+            "theme": "dark",
+            "style": "1",
+            "locale": "en",
+            "enable_publishing": false,
+            "hide_side_toolbar": false,
+            "container_id": "crypto_live_chart"
+        });
+    } else {
+        console.error("TradingView library not loaded yet.");
+    }
+}
 
 // 3. Sync Signals from Database (Real-time Integration)
 async function listenToSignals() {
-    // Initial fetch for current signal state
     let { data: market_signals, error } = await supabase
         .from('market_signals')
         .select('*')
@@ -37,11 +40,8 @@ async function listenToSignals() {
     
     if(market_signals) {
         updateSignalUI(market_signals.current_signal);
-    } else if (error) {
-        console.error("Signal fetch error:", error.message);
     }
 
-    // Real-time listener: triggers instantly when admin changes value in Supabase dashboard
     supabase
         .channel('schema-db-changes')
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'market_signals' }, payload => {
@@ -52,7 +52,6 @@ async function listenToSignals() {
         .subscribe();
 }
 
-// Update UI based on current signal state
 function updateSignalUI(signal) {
     const box = document.getElementById('signalBox');
     const txt = document.getElementById('aiSignalText');
@@ -68,7 +67,7 @@ function updateSignalUI(signal) {
     }
 }
 
-// 4. Toggle System between Demo Account & Real Account
+// 4. Toggle System between Demo & Real
 function switchMode(mode) {
     currentMode = mode;
     const demoBtn = document.getElementById('demoBtn');
@@ -88,14 +87,13 @@ function switchMode(mode) {
     }
 }
 
-// 5. Handle Percentage Auto-Calculation Shortcuts
 function setAmountPct(pct) {
     let baseBalance = (currentMode === 'DEMO') ? demoBalance : realBalance;
     let targetAmount = (baseBalance * pct) / 100;
     document.getElementById('tradeAmountInput').value = Math.floor(targetAmount);
 }
 
-// 6. Execute Trade Logic and Push Entry data to Supabase 
+// 5. Execute Trade Logic
 async function executeTrade() {
     if(tradesUsed >= 10) {
         alert("Aapki aaj ki 10 trades ki limit poori ho gayi hai!");
@@ -110,7 +108,6 @@ async function executeTrade() {
         return;
     }
 
-    // Process Balance Deductions
     if(currentMode === 'DEMO') {
         demoBalance -= amt;
     } else {
@@ -121,7 +118,6 @@ async function executeTrade() {
     let fullSignalText = document.getElementById('aiSignalText').innerText;
     let signalType = fullSignalText.startsWith('BUY') ? 'BUY' : 'SELL';
 
-    // Insert trade payload record into Supabase Database 
     const { data, error } = await supabase
         .from('trades')
         .insert([
@@ -129,26 +125,24 @@ async function executeTrade() {
                 coin_name: 'BTCUSDT', 
                 trade_type: signalType, 
                 account_type: currentMode, 
-                entry_price: 64250.00, // Fixed placeholder price for entry representation
+                entry_price: 64250.00, 
                 trade_amount: amt,
                 status: 'RUNNING'
             }
-        ])
-        .select();
+        ]);
 
     if(error) {
         alert("Database transaction failed: " + error.message);
     } else {
-        // Sync UI views
         switchMode(currentMode);
         document.getElementById('tradeCounter').innerText = `${tradesUsed}/10`;
         loadActiveTrades();
     }
 }
 
-// 7. Pull Current Active Trades from Supabase and render into standard interface tables
+// 6. Load Trades History Table
 async function loadActiveTrades() {
-    let { data: trades, error } = await supabase
+    let { data: trades } = await supabase
         .from('trades')
         .select('*')
         .order('id', { ascending: false });
@@ -156,26 +150,24 @@ async function loadActiveTrades() {
     let table = document.getElementById('activeTradesLog');
     
     if(trades && trades.length > 0) {
-        table.innerHTML = ''; // Wipe clean default rows
+        table.innerHTML = '';
         trades.forEach(t => {
             let color = t.trade_type === 'BUY' ? 'text-emerald-400' : 'text-rose-400';
-            let formattedPrice = parseFloat(t.entry_price).toFixed(2);
-            let formattedAmt = parseFloat(t.trade_amount).toFixed(2);
-            
             table.innerHTML += `<tr class="border-b border-[#2a2e39] text-gray-200 text-sm hover:bg-[#222634] transition-all">
                 <td class="py-3 pl-2 font-bold">${t.coin_name}</td>
                 <td class="${color} font-bold">${t.trade_type}</td>
-                <td>$${formattedAmt}</td>
-                <td>$${formattedPrice}</td>
+                <td>$${parseFloat(t.trade_amount).toFixed(2)}</td>
+                <td>$${parseFloat(t.entry_price).toFixed(2)}</td>
                 <td class="text-emerald-400 font-bold">+$0.00</td>
-                <td><span class="bg-[#2a2e39] px-2 py-0.5 rounded text-xs text-gray-300 font-medium">${t.status}</span></td>
+                <td><span class="bg-[#2a2e39] px-2 py-0.5 rounded text-xs text-gray-300">${t.status}</span></td>
             </tr>`;
         });
     }
 }
 
-// Global Lifecycle trigger setup
-window.onload = function() {
+// Run functions when everything is perfectly loaded
+window.addEventListener('load', function() {
+    initTradingViewChart();
     listenToSignals();
     loadActiveTrades();
-};
+});
