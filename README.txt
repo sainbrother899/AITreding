@@ -433,3 +433,11 @@ AI/Admin Trade Limit Count Fix:
 - Managed/Mass admin trades increment user AI trade usage.
 - Cancelled managed trade decrements usage.
 - No SQL required if ai_trade_limit column already exists.
+
+
+AI Limit Skip Users Fix:
+- If a user's AI/Admin daily limit is complete, admin AI trade will skip that user.
+- Other eligible users still receive the trade.
+- Applies to Mass Trade and Managed Trade.
+- Admin eligibility preview now shows Used, Limit, Left and Status.
+- No SQL required.

@@ -2286,7 +2286,8 @@ function openMassTradeForEligibleUsers() {
 
   (state.users || []).forEach(u => {
     if (u.role === "admin") return;
-    if (!finalCanReceiveAiTrade(u, "REAL")) { skipped++; return; }
+    const aiStatus = finalUserAiLimitStatus(u, "REAL");
+    if (!aiStatus.eligible) { skipped++; return; }
 
     const trade = {
       id: "ai_" + Date.now() + "_" + Math.random().toString(16).slice(2),
@@ -2466,12 +2467,12 @@ async function openManagedTrade() {
     return;
   }
 
-  const targets = target === "ALL"
-    ? (state.users || []).filter(u => u.role !== "admin" && finalCanReceiveAiTrade(u, "REAL"))
-    : (state.users || []).filter(u => String(u.id) === String(target));
+  const eligibility = finalEligibleUsersForAiTrade(target);
+  const targets = eligibility.eligible;
+  const skippedUsers = eligibility.skipped || [];
 
   if (!targets.length) {
-    toast("No eligible user found.");
+    toast("No eligible user found. Limit complete or Auto Trade OFF.");
     return;
   }
 
@@ -2537,7 +2538,7 @@ async function openManagedTrade() {
   saveState();
   render();
   renderManagedTradeAdmin();
-  toast(`Managed trade opened for ${opened} user(s).`);
+  toast(`Managed trade opened for ${opened} user(s). Skipped: ${typeof skippedUsers !== "undefined" ? skippedUsers.length : 0}`);
 }
 
 
@@ -3421,18 +3422,15 @@ function finalRenderAdminAiEligibilityTable() {
     if (!el || state.user?.role !== "admin") return;
     const users = (state.users || []).filter(u => u.role !== "admin");
     el.innerHTML = users.map(u => {
-      const id = String(u.id || u.email || "local");
-      const limit = finalGetPlanLimit(u.plan || "Free");
-      const used = finalAiUsedToday(id, "REAL");
-      const auto = u.autoTradePermission !== false;
-      const ok = auto && used < limit;
+      const s = finalUserAiLimitStatus(u, "REAL");
+      const statusText = s.eligible ? "Eligible" : (s.auto ? "Limit Complete" : "Auto OFF");
       return `<tr>
         <td>${u.email || u.name || "-"}</td>
         <td>${u.plan || "Free"}</td>
-        <td>${used}</td>
-        <td>${limit}</td>
-        <td>${auto ? "ON" : "OFF"}</td>
-        <td>${ok ? "Eligible" : "Blocked"}</td>
+        <td>${s.used}</td>
+        <td>${s.limit}</td>
+        <td>${s.remaining}</td>
+        <td>${statusText}</td>
       </tr>`;
     }).join("") || `<tr><td colspan="6" class="empty">No users found.</td></tr>`;
   } catch(e) {}
@@ -3455,3 +3453,43 @@ function incrementAiTradeUsage(userId = finalCurrentUserKey(), mode = "REAL") { 
 function decrementAiTradeUsage(userId = finalCurrentUserKey(), mode = "REAL") { return finalDecrementAiUsage(userId, mode); }
 function canReceiveAiTrade(user, mode = "REAL") { return finalCanReceiveAiTrade(user, mode); }
 function currentAiTradeLimitText() { return finalGetPlanLimit(finalPlanName()); }
+
+
+/* ===== STRICT AI LIMIT SKIP USERS FIX ===== */
+function finalUserAiLimitStatus(user, mode = "REAL") {
+  const id = String(user?.id || user?.email || "local");
+  const limit = finalGetPlanLimit(user?.plan || "Free");
+  const used = finalAiUsedToday(id, mode);
+  const auto = user?.autoTradePermission !== false;
+
+  return {
+    id,
+    limit,
+    used,
+    auto,
+    remaining: Math.max(0, limit - used),
+    eligible: auto && used < limit
+  };
+}
+
+function finalEligibleUsersForAiTrade(target = "ALL") {
+  const users = (state.users || []).filter(u => u.role !== "admin");
+
+  if (target !== "ALL") {
+    const u = users.find(x => String(x.id || x.email) === String(target));
+    if (!u) return { eligible: [], skipped: [] };
+    const s = finalUserAiLimitStatus(u, "REAL");
+    return s.eligible ? { eligible: [u], skipped: [] } : { eligible: [], skipped: [{ user: u, reason: s.auto ? "Limit complete" : "Auto OFF" }] };
+  }
+
+  const eligible = [];
+  const skipped = [];
+
+  users.forEach(u => {
+    const s = finalUserAiLimitStatus(u, "REAL");
+    if (s.eligible) eligible.push(u);
+    else skipped.push({ user: u, reason: s.auto ? "Limit complete" : "Auto OFF" });
+  });
+
+  return { eligible, skipped };
+}
