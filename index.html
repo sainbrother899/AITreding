@@ -87,15 +87,29 @@
     </section>
 
     <section id="appPage" class="hidden">
-      <nav class="bottom-nav pro-bottom-nav">
-        <button class="nav-btn active" data-page="dashboard"><span class="nav-ico">⌂</span><small>Home</small></button>
-        <button class="nav-btn real-only-nav" data-page="wallet"><span class="nav-ico">▣</span><small>Wallet</small></button>
-        <button class="nav-btn" data-page="analytics"><span class="nav-ico">↗</span><small>PnL</small></button>
-        <button class="nav-btn center-trade-btn" data-page="dashboard"><span class="nav-ico">AI</span><small>Signal</small></button>
-        <button class="nav-btn real-only-nav" data-page="subscription"><span class="nav-ico">◇</span><small>Plans</small></button>
-        <button class="nav-btn real-only-nav" data-page="kyc"><span class="nav-ico">✓</span><small>KYC</small></button>
-        <button class="nav-btn real-only-nav" data-page="referral"><span class="nav-ico">⤴</span><small>Refer</small></button>
-      </nav>
+      
+<nav class="bottom-nav pro-bottom-nav clean-nav">
+  <button class="nav-btn active" data-page="dashboard">
+    <span class="nav-ico">⌂</span><small>Home</small>
+  </button>
+
+  <button class="nav-btn" data-page="tradepage">
+    <span class="nav-ico">⇅</span><small>Trade</small>
+  </button>
+
+  <button class="nav-btn real-only-nav" data-page="wallet">
+    <span class="nav-ico">▣</span><small>Wallet</small>
+  </button>
+
+  <button class="nav-btn" data-page="analytics">
+    <span class="nav-ico">↗</span><small>PnL</small>
+  </button>
+
+  <button class="nav-btn" data-page="morepage">
+    <span class="nav-ico">☰</span><small>More</small>
+  </button>
+</nav>
+
 
       <section id="dashboard" class="page active-page">
         <div class="ticker-grid" id="tickerGrid"></div>
@@ -211,47 +225,7 @@
             </div>
           </aside>
 
-          <section class="card chart-card pro-trading-panel">
-            <div class="section-head">
-              <div><p class="label mock-trade-screen-title">REAL ACCOUNT - TRADING</p><h2>BTC/USDT</h2></div>
-              <div class="chart-tools"><span class="live-pill">LIVE</span><span class="chart-hint">5m candles</span></div>
-            </div>
-
-            <div class="pro-pair-line">
-              <button class="pair-pill">🟠 BTC/USDT⌄</button>
-              <div><strong id="proPairPrice">$0.00</strong><small id="proPairChange"> +0.00%</small></div>
-            </div>
-
-            <div class="time-tabs pro-time-tabs"><span>1m</span><b>5m</b><span>15m</span><span>1H</span><span>4H</span><span>D</span><span>⌁</span><span>⛶</span></div>
-
-            <div id="crypto_live_chart"></div>
-
-            <div class="chart-stats-row">
-              <div><small>Volume</small><b>125.34</b></div>
-              <div><small>24H High</small><b>$78,900.00</b></div>
-              <div><small>24H Low</small><b>$77,800.00</b></div>
-              <div><small>24H Vol</small><b>1.24B</b></div>
-            </div>
-
-            <div class="chart-bottom-feed">
-              <div class="mini-feed-card">
-                <div class="section-head compact-head">
-                  <div><p class="label">Order Book</p><h3>BTC/USDT Depth</h3></div>
-                  <span class="pill">LIVE</span>
-                </div>
-                <div id="orderBook" class="order-book compact-order-book"></div>
-              </div>
-
-              <div class="mini-feed-card">
-                <div class="section-head compact-head">
-                  <div><p class="label">Recent Fills</p><h3>Trade Feed</h3></div>
-                  <span class="pill">SIM</span>
-                </div>
-                <div id="recentFills" class="recent-fills compact-recent-fills"></div>
-              </div>
-            </div>
-          </section>
-        </div>
+          </div>
 
         <div class="card table-card pro-positions-card">
           <div class="section-head">
@@ -267,7 +241,91 @@
         </div>
       </section>
 
-      <section id="wallet" class="page real-only-page mock-mobile-page">
+      
+<section id="tradepage" class="page">
+  <div class="pro-dashboard-shell trade-only-layout">
+    <section class="card chart-card pro-trading-panel full-trade-panel">
+      <div class="section-head">
+        <div>
+          <p class="label mock-trade-screen-title">REAL ACCOUNT - TRADING</p>
+          <h2>BTC/USDT</h2>
+        </div>
+        <div class="chart-tools">
+          <span class="live-pill">LIVE</span>
+          <span class="chart-hint">5m candles</span>
+        </div>
+      </div>
+
+      <div class="pro-pair-line">
+        <button class="pair-pill">🟠 BTC/USDT⌄</button>
+        <div>
+          <strong id="tradePairPrice">$0.00</strong>
+          <small id="tradePairChange"> +0.00%</small>
+        </div>
+      </div>
+
+      <div class="time-tabs pro-time-tabs">
+        <span>1m</span><b>5m</b><span>15m</span><span>1H</span><span>4H</span><span>D</span>
+      </div>
+
+      <div id="trade_live_chart"></div>
+
+      <div class="chart-bottom-feed">
+        <div class="mini-feed-card">
+          <div class="section-head compact-head">
+            <div><p class="label">Order Book</p><h3>BTC/USDT Depth</h3></div>
+            <span class="pill">LIVE</span>
+          </div>
+          <div id="tradeOrderBook" class="order-book compact-order-book"></div>
+        </div>
+
+        <div class="mini-feed-card">
+          <div class="section-head compact-head">
+            <div><p class="label">Recent Fills</p><h3>Trade Feed</h3></div>
+            <span class="pill">SIM</span>
+          </div>
+          <div id="tradeRecentFills" class="recent-fills compact-recent-fills"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
+
+<section id="morepage" class="page">
+  <div class="more-grid">
+
+    <div class="card more-card real-only-page">
+      <div class="more-icon">✓</div>
+      <h3>KYC Verification</h3>
+      <p>Verify your account</p>
+      <button class="more-open-btn" onclick="document.querySelector('[data-page=kyc]').click()">Open</button>
+    </div>
+
+    <div class="card more-card real-only-page">
+      <div class="more-icon">◇</div>
+      <h3>Plans</h3>
+      <p>Upgrade subscription</p>
+      <button class="more-open-btn" onclick="document.querySelector('[data-page=subscription]').click()">Open</button>
+    </div>
+
+    <div class="card more-card real-only-page">
+      <div class="more-icon">⤴</div>
+      <h3>Referral</h3>
+      <p>Invite & earn rewards</p>
+      <button class="more-open-btn" onclick="document.querySelector('[data-page=referral]').click()">Open</button>
+    </div>
+
+    <div class="card more-card">
+      <div class="more-icon">👤</div>
+      <h3>Profile</h3>
+      <p>Manage your account</p>
+      <button class="more-open-btn">Open</button>
+    </div>
+
+  </div>
+</section>
+
+<section id="wallet" class="page real-only-page mock-mobile-page">
         <div class="wallet-grid">
           <div class="card">
             <p class="label">Wallet</p>
