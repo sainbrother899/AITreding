@@ -346,3 +346,9 @@ Admin PC Layout Fix:
 - Right content full-width.
 - Tables and cards expand properly on PC.
 - Mobile admin compact style remains unchanged.
+
+
+Admin Users View Removed:
+- Removed Users/User Management tab from admin panel.
+- Removed adminUsers panel from admin.html.
+- Other admin features remain unchanged.

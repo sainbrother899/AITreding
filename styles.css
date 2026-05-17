@@ -2337,3 +2337,10 @@ body[data-admin-page="true"] .ghost-btn{
     width:100%!important;
   }
 }
+
+
+/* Removed Admin Users View */
+#adminUsers,
+[data-admin-tab="adminUsers"]{
+  display:none!important;
+}
