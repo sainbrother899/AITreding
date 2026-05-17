@@ -126,3 +126,74 @@ main{position:relative;padding:24px 5vw 96px}.card{background:linear-gradient(18
 @media(max-width:800px){
   .wallet-grid{grid-template-columns:1fr}
 }
+
+
+.admin-layout{
+  display:grid;
+  grid-template-columns:260px 1fr;
+  gap:22px;
+}
+.admin-menu{
+  position:sticky;
+  top:90px;
+  align-self:start;
+}
+.admin-menu h2{margin:8px 0 16px}
+.admin-tab{
+  width:100%;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.035);
+  color:var(--muted);
+  border-radius:14px;
+  padding:12px 14px;
+  cursor:pointer;
+  text-align:left;
+  margin-bottom:9px;
+  font-weight:800;
+}
+.admin-tab.active{
+  background:linear-gradient(135deg,var(--green),#16a34a);
+  color:#00150c;
+  border-color:transparent;
+}
+.admin-panel{display:none}
+.active-admin-panel{display:block}
+.admin-content{min-width:0}
+.status-pill{
+  display:inline-flex;
+  align-items:center;
+  padding:7px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:900;
+  border:1px solid var(--line);
+}
+.status-active{color:var(--green);background:rgba(0,229,155,.1)}
+.status-blocked{color:var(--red);background:rgba(255,72,101,.1)}
+.action-row{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.reject-btn{
+  border:1px solid rgba(255,72,101,.35);
+  background:rgba(255,72,101,.1);
+  color:var(--red);
+  border-radius:12px;
+  padding:9px 12px;
+  cursor:pointer;
+  font-weight:900;
+}
+.approve-btn{
+  border:1px solid rgba(0,229,155,.35);
+  background:rgba(0,229,155,.1);
+  color:var(--green);
+  border-radius:12px;
+  padding:9px 12px;
+  cursor:pointer;
+  font-weight:900;
+}
+@media(max-width:950px){
+  .admin-layout{grid-template-columns:1fr}
+  .admin-menu{position:relative;top:0}
+}

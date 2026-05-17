@@ -30,6 +30,13 @@ const defaultState = {
   freeSignalLimit: 5,
   signal: "BUY",
   note: "Admin + AI engine combined signal.",
+  signalCoin: "BTCUSDT",
+  entryPrice: "",
+  targetPrice: "",
+  stopLoss: "",
+  confidence: 70,
+  riskLevel: "MEDIUM",
+  signalExpiry: "30 minutes",
   trades: [],
   paymentRequests: [],
   depositRequests: [],
@@ -459,16 +466,24 @@ function render() {
 
   if ($("signalBox")) $("signalBox").className = "signal-box " + state.signal.toLowerCase();
   if ($("aiSignalText")) $("aiSignalText").textContent = state.signal === "WAIT" ? "WAIT / NO TRADE" : `${state.signal} BTC NOW`;
-  if ($("signalNote")) $("signalNote").textContent = state.note;
+  if ($("signalNote")) $("signalNote").textContent = `${state.note} | Risk: ${state.riskLevel || "MEDIUM"} | Confidence: ${state.confidence || 70}%`;
 
   if ($("adminSignal")) $("adminSignal").value = state.signal;
   if ($("adminNote")) $("adminNote").value = state.note;
   if ($("adminFreeLimit")) $("adminFreeLimit").value = state.freeSignalLimit;
+  if ($("adminSignalCoin")) $("adminSignalCoin").value = state.signalCoin || "BTCUSDT";
+  if ($("adminEntryPrice")) $("adminEntryPrice").value = state.entryPrice || "";
+  if ($("adminTargetPrice")) $("adminTargetPrice").value = state.targetPrice || "";
+  if ($("adminStopLoss")) $("adminStopLoss").value = state.stopLoss || "";
+  if ($("adminConfidence")) $("adminConfidence").value = state.confidence || 70;
+  if ($("adminRiskLevel")) $("adminRiskLevel").value = state.riskLevel || "MEDIUM";
+  if ($("adminSignalExpiry")) $("adminSignalExpiry").value = state.signalExpiry || "30 minutes";
 
   renderTickers();
   renderTrades();
   renderPayments();
   renderDeposits();
+  renderAdminPanel();
   renderAnalytics();
   renderReferral();
 }
@@ -914,10 +929,11 @@ function renderDeposits() {
         <td>${d.userEmail || d.userId || "-"}</td>
         <td>${money(d.amount)}</td>
         <td>${d.txn}</td>
+        <td>${d.screenshot || "-"}</td>
         <td>${d.status}</td>
-        <td>${d.status === "PENDING" ? `<button class="ghost-btn" onclick="approveDeposit('${d.id}')">Approve</button>` : "-"}</td>
+        <td>${d.status === "PENDING" ? `<div class="action-row"><button class="approve-btn" onclick="approveDeposit('${d.id}')">Approve</button><button class="reject-btn" onclick="rejectDeposit('${d.id}')">Reject</button></div>` : "-"}</td>
       </tr>
-    `).join("") || `<tr><td colspan="5" class="empty">No deposit requests.</td></tr>`;
+    `).join("") || `<tr><td colspan="6" class="empty">No deposit requests.</td></tr>`;
   }
 
   if (userTable) {
@@ -977,9 +993,10 @@ function renderPayments() {
       <td>${p.name}</td>
       <td>${p.mobile}</td>
       <td>${p.txn}</td>
-      <td>${p.status === "PENDING" ? `<button class="ghost-btn" onclick="approvePayment('${p.id}')">Approve</button>` : p.status}</td>
+      <td>${p.status}</td>
+      <td>${p.status === "PENDING" ? `<div class="action-row"><button class="approve-btn" onclick="approvePayment('${p.id}')">Approve</button><button class="reject-btn" onclick="rejectPayment('${p.id}')">Reject</button></div>` : "-"}</td>
     </tr>
-  `).join("") || `<tr><td colspan="5" class="empty">No payment requests.</td></tr>`;
+  `).join("") || `<tr><td colspan="6" class="empty">No payment requests.</td></tr>`;
 }
 
 async function approvePayment(id) {
@@ -1007,6 +1024,13 @@ async function approvePayment(id) {
 
 function saveAdminSettings() {
   state.signal = $("adminSignal")?.value || "BUY";
+  state.signalCoin = $("adminSignalCoin")?.value || "BTCUSDT";
+  state.entryPrice = $("adminEntryPrice")?.value || "";
+  state.targetPrice = $("adminTargetPrice")?.value || "";
+  state.stopLoss = $("adminStopLoss")?.value || "";
+  state.confidence = Math.max(1, Math.min(100, Number($("adminConfidence")?.value || 70)));
+  state.riskLevel = $("adminRiskLevel")?.value || "MEDIUM";
+  state.signalExpiry = $("adminSignalExpiry")?.value || "30 minutes";
   state.note = $("adminNote")?.value.trim() || "Admin signal updated.";
   state.freeSignalLimit = Math.max(1, Number($("adminFreeLimit")?.value || 5));
   saveState();
@@ -1014,6 +1038,159 @@ function saveAdminSettings() {
   showPage(IS_ADMIN_PAGE ? "admin" : "dashboard");
   toast("Admin signal saved.");
 }
+
+
+function switchAdminTab(tabId) {
+  document.querySelectorAll(".admin-tab").forEach(b => b.classList.toggle("active", b.dataset.adminTab === tabId));
+  document.querySelectorAll(".admin-panel").forEach(p => p.classList.remove("active-admin-panel"));
+  $(tabId)?.classList.add("active-admin-panel");
+}
+
+function renderAdminPanel() {
+  if (state.user?.role !== "admin") return;
+
+  const nonAdminUsers = (state.users || []).filter(u => u.role !== "admin");
+  const totalDeposits = (state.depositRequests || [])
+    .filter(d => d.status === "APPROVED")
+    .reduce((a, d) => a + Number(d.amount || 0), 0);
+  const pendingDeposits = (state.depositRequests || []).filter(d => d.status === "PENDING").length;
+
+  if ($("adminTotalUsers")) $("adminTotalUsers").textContent = nonAdminUsers.length;
+  if ($("adminTotalDeposits")) $("adminTotalDeposits").textContent = money(totalDeposits);
+  if ($("adminPendingDeposits")) $("adminPendingDeposits").textContent = pendingDeposits;
+  if ($("adminOpenTrades")) $("adminOpenTrades").textContent = (state.trades || []).length;
+
+  if ($("adminSummaryList")) {
+    $("adminSummaryList").innerHTML = `
+      <p>Pending deposits: <strong>${pendingDeposits}</strong></p>
+      <p>Pending plan requests: <strong>${(state.paymentRequests || []).filter(p => p.status === "PENDING").length}</strong></p>
+      <p>Current signal: <strong>${state.signal} ${state.signalCoin || "BTCUSDT"}</strong></p>
+      <p>Risk: <strong>${state.riskLevel || "MEDIUM"}</strong> | Confidence: <strong>${state.confidence || 70}%</strong></p>
+    `;
+  }
+
+  renderAdminUsers();
+  renderAdminTrades();
+  renderAdminReferrals();
+}
+
+function renderAdminUsers() {
+  const el = $("adminUsersLog");
+  if (!el) return;
+
+  const users = (state.users || []).filter(u => u.role !== "admin");
+  el.innerHTML = users.map(u => `
+    <tr>
+      <td>${u.name || "-"}</td>
+      <td>${u.email || "-"}</td>
+      <td>${u.plan || "Free"}</td>
+      <td>${money(u.realBalance || 0)}</td>
+      <td><span class="status-pill ${u.blocked ? "status-blocked" : "status-active"}">${u.blocked ? "BLOCKED" : "ACTIVE"}</span></td>
+      <td>
+        <div class="action-row">
+          <button class="ghost-btn" onclick="changeUserPlan('${u.id}', 'Pro')">Pro</button>
+          <button class="ghost-btn" onclick="changeUserPlan('${u.id}', 'Elite')">Elite</button>
+          <button class="reject-btn" onclick="toggleUserBlock('${u.id}')">${u.blocked ? "Unblock" : "Block"}</button>
+        </div>
+      </td>
+    </tr>
+  `).join("") || `<tr><td colspan="6" class="empty">No users found.</td></tr>`;
+}
+
+function changeUserPlan(userId, plan) {
+  const user = state.users.find(u => String(u.id) === String(userId));
+  if (!user) return;
+  user.plan = plan;
+  if (String(state.user?.id) === String(userId)) state.user.plan = plan;
+  saveState();
+  render();
+  toast(`User plan changed to ${plan}.`);
+}
+
+function toggleUserBlock(userId) {
+  const user = state.users.find(u => String(u.id) === String(userId));
+  if (!user) return;
+  user.blocked = !user.blocked;
+  saveState();
+  render();
+  toast(user.blocked ? "User blocked." : "User unblocked.");
+}
+
+function renderAdminTrades() {
+  const el = $("adminTradesLog");
+  if (!el) return;
+
+  const allTrades = [...(state.trades || []), ...(state.closedTrades || [])];
+  el.innerHTML = allTrades.map(t => `
+    <tr>
+      <td>${state.user?.email || "local"}</td>
+      <td>${String(t.coin || "").replace("USDT","/USDT")}</td>
+      <td class="${t.side === "BUY" ? "buy-text" : "sell-text"}">${t.side}</td>
+      <td>${money(t.amount || 0)}</td>
+      <td>${money(t.entry || 0)}</td>
+      <td>${money(t.current || 0)}</td>
+      <td class="${Number(t.pnl || 0) >= 0 ? "pnl-plus" : "pnl-minus"}">${money(t.pnl || 0)}</td>
+      <td>${t.status || "OPEN"}</td>
+    </tr>
+  `).join("") || `<tr><td colspan="8" class="empty">No trades found.</td></tr>`;
+}
+
+function renderAdminReferrals() {
+  const el = $("adminReferralLog");
+  if (!el) return;
+
+  el.innerHTML = (state.referrals || []).map((r, i) => `
+    <tr>
+      <td>${r.code || "-"}</td>
+      <td>${r.userEmail || "-"}</td>
+      <td>${rupee(r.bonus || 0)}</td>
+      <td>${r.status || "JOINED"}</td>
+      <td>
+        <div class="action-row">
+          <button class="approve-btn" onclick="setReferralStatus(${i}, 'APPROVED')">Approve</button>
+          <button class="reject-btn" onclick="setReferralStatus(${i}, 'HOLD')">Hold</button>
+        </div>
+      </td>
+    </tr>
+  `).join("") || `<tr><td colspan="5" class="empty">No referrals found.</td></tr>`;
+}
+
+function setReferralStatus(index, status) {
+  if (!state.referrals[index]) return;
+  state.referrals[index].status = status;
+  saveState();
+  render();
+  toast(`Referral ${status}.`);
+}
+
+async function rejectDeposit(id) {
+  const req = (state.depositRequests || []).find(d => String(d.id) === String(id));
+  if (!req) return;
+  req.status = "REJECTED";
+
+  if (supabaseClient) {
+    try { await supabaseClient.from("deposit_requests").update({ status: "REJECTED" }).eq("id", id); } catch {}
+  }
+
+  saveState();
+  render();
+  toast("Deposit rejected.");
+}
+
+async function rejectPayment(id) {
+  const req = (state.paymentRequests || []).find(p => String(p.id) === String(id));
+  if (!req) return;
+  req.status = "REJECTED";
+
+  if (supabaseClient) {
+    try { await supabaseClient.from("payment_requests").update({ status: "REJECTED" }).eq("id", id); } catch {}
+  }
+
+  saveState();
+  render();
+  toast("Plan request rejected.");
+}
+
 
 function copyReferral() {
   const link = location.origin + location.pathname + "?ref=" + (state.user?.referralCode || "");
@@ -1057,6 +1234,7 @@ function bind() {
   if ($("logoutBtn")) $("logoutBtn").addEventListener("click", logout);
 
   document.querySelectorAll(".nav-btn").forEach(b => b.addEventListener("click", () => showPage(b.dataset.page)));
+  document.querySelectorAll(".admin-tab").forEach(b => b.addEventListener("click", () => switchAdminTab(b.dataset.adminTab)));
 
   if ($("demoBtn")) $("demoBtn").addEventListener("click", () => { state.mode = "DEMO"; saveState(); render(); });
   if ($("realBtn")) $("realBtn").addEventListener("click", () => { state.mode = "REAL"; saveState(); render(); toast("Real UI selected. Exchange API not connected."); });
@@ -1121,3 +1299,10 @@ window.addEventListener("load", async () => {
 window.closeTrade = closeTrade;
 
 window.approveDeposit = approveDeposit;
+
+
+window.rejectDeposit = rejectDeposit;
+window.rejectPayment = rejectPayment;
+window.changeUserPlan = changeUserPlan;
+window.toggleUserBlock = toggleUserBlock;
+window.setReferralStatus = setReferralStatus;

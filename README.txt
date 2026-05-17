@@ -98,3 +98,14 @@ Deposit Flow Update:
 - Admin panel now has Deposit Requests approval table.
 - Admin approval adds approved amount to user's Real UI balance through wallet_ledger.
 - Latest SQL includes deposit_requests and wallet_ledger tables.
+
+
+Admin Panel Update:
+- Removed from scope: Admin password, Website name/logo, Maintenance mode.
+- Added admin overview metrics.
+- Added user management with plan change and block/unblock UI.
+- Added deposit management with approve/reject.
+- Added advanced signal management: coin, entry, target, stop loss, confidence, risk, expiry.
+- Added subscription plan approval/rejection.
+- Added trade monitoring table.
+- Added referral management with approve/hold.
