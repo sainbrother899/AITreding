@@ -378,3 +378,11 @@ Managed Trade User Sync Fix:
 - User dashboard auto-refreshes managed trade history every 10 seconds.
 - Closing managed trade reloads remote data and updates history.
 - Fixes issue where admin-managed trade did not show on user dashboard.
+
+
+Managed Trade Cancel Update:
+- Admin can cancel open managed trades.
+- Cancelled trade applies no profit/loss.
+- Cancelled trade is removed from open positions.
+- Cancelled trade does not count in AI/Admin daily trade limit.
+- User history shows status CANCELLED with PnL 0.

@@ -2576,3 +2576,16 @@ body[data-admin-page="true"] .table-card:hover{
 .user-managed-history-card .pill{
   white-space:nowrap;
 }
+
+
+/* Managed trade cancel button */
+.full-width-btn{
+  width:100%;
+  margin-top:10px;
+  min-height:48px;
+}
+.mini-action-btn{
+  padding:8px 12px!important;
+  border-radius:12px!important;
+  font-size:12px!important;
+}

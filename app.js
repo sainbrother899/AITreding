@@ -208,6 +208,12 @@ function aiTradesUsedToday(userId = state.user?.id || "local", mode = state.mode
   return Number(state.aiTradeUsage[aiUsageKey(userId, mode)] || 0);
 }
 
+function decrementAiTradeUsage(userId = state.user?.id || "local", mode = state.mode || "DEMO") {
+  state.aiTradeUsage = state.aiTradeUsage || {};
+  const key = aiUsageKey(userId, mode);
+  state.aiTradeUsage[key] = Math.max(0, Number(state.aiTradeUsage[key] || 0) - 1);
+}
+
 function incrementAiTradeUsage(userId = state.user?.id || "local", mode = state.mode || "DEMO") {
   state.aiTradeUsage = state.aiTradeUsage || {};
   const key = aiUsageKey(userId, mode);
@@ -2328,6 +2334,9 @@ function renderManagedTradesLog() {
   const trades = state.managedTrades || [];
   el.innerHTML = trades.map(t => {
     const cls = Number(t.pnl || 0) >= 0 ? "pnl-plus" : "pnl-minus";
+    const action = t.status === "OPEN"
+      ? `<button class="reject-btn mini-action-btn" onclick="cancelManagedTradeById('${t.id}')">Cancel</button>`
+      : "-";
     return `<tr>
       <td>${t.userEmail || t.userId || "-"}</td>
       <td>${String(t.coin || "").replace("USDT","/USDT")}</td>
@@ -2337,8 +2346,9 @@ function renderManagedTradesLog() {
       <td>${t.close ? money(t.close) : "-"}</td>
       <td class="${cls}">${money(t.pnl || 0)}</td>
       <td>${t.status}</td>
+      <td>${action}</td>
     </tr>`;
-  }).join("") || `<tr><td colspan="8" class="empty">No managed trades.</td></tr>`;
+  }).join("") || `<tr><td colspan="9" class="empty">No managed trades.</td></tr>`;
 }
 
 
@@ -2464,6 +2474,67 @@ async function openManagedTrade() {
   renderManagedTradeAdmin();
   toast(`Managed trade opened for ${opened} user(s).`);
 }
+
+
+async function cancelManagedTradeById(id) {
+  if (state.user?.role !== "admin") return;
+  const t = (state.managedTrades || []).find(x => String(x.id) === String(id));
+  if (!t || t.status !== "OPEN") {
+    toast("Open managed trade not found.");
+    return;
+  }
+
+  t.status = "CANCELLED";
+  t.pnl = 0;
+  t.close = null;
+  t.closedAt = new Date().toLocaleString();
+
+  normalizeAccounts();
+
+  // Remove matching open position from local preview without profit/loss.
+  const openIndex = (state.accounts.REAL.trades || []).findIndex(x => String(x.id) === String(id));
+  if (openIndex >= 0) {
+    const openT = state.accounts.REAL.trades[openIndex];
+    openT.status = "CANCELLED";
+    openT.pnl = 0;
+    openT.closedAt = t.closedAt;
+    state.accounts.REAL.trades.splice(openIndex, 1);
+    state.accounts.REAL.closedTrades = state.accounts.REAL.closedTrades || [];
+    state.accounts.REAL.closedTrades.unshift(openT);
+  }
+
+  // Cancelled trade should not count in AI/Admin daily limit.
+  decrementAiTradeUsage(t.userId || "local", "REAL");
+
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from("managed_trades").update({
+        status: "CANCELLED",
+        pnl: 0,
+        close_price: null,
+        closed_at: t.closedAt
+      }).eq("id", id);
+    } catch (e) {
+      console.warn("Managed trade cancel save failed", e);
+    }
+  }
+
+  saveState();
+  render();
+  renderManagedTradeAdmin();
+  renderUserManagedTrades();
+  toast("Managed trade cancelled. No profit/loss applied.");
+}
+
+async function cancelSelectedManagedTrade() {
+  const id = $("managedTradeSelect")?.value;
+  if (!id) {
+    toast("Select open managed trade to cancel.");
+    return;
+  }
+  await cancelManagedTradeById(id);
+}
+
 
 async function closeManagedTrade() {
   if (state.user?.role !== "admin") return;
@@ -2621,6 +2692,7 @@ function bind() {
   if ($("openMassTradeBtn")) $("openMassTradeBtn").addEventListener("click", openMassTradeForEligibleUsers);
   if ($("openManagedTradeBtn")) $("openManagedTradeBtn").addEventListener("click", openManagedTrade);
   if ($("closeManagedTradeBtn")) $("closeManagedTradeBtn").addEventListener("click", closeManagedTrade);
+  if ($("cancelManagedTradeBtn")) $("cancelManagedTradeBtn").addEventListener("click", cancelSelectedManagedTrade);
   if ($("savePlanBtn")) $("savePlanBtn").addEventListener("click", savePlan);
   if ($("resetPlanFormBtn")) $("resetPlanFormBtn").addEventListener("click", resetPlanForm);
   if ($("submitKycBtn")) $("submitKycBtn").addEventListener("click", submitKyc);
@@ -3029,3 +3101,6 @@ window.addEventListener("load", function(){
     } catch(e) {}
   }, 10000);
 });
+
+window.cancelManagedTradeById = cancelManagedTradeById;
+window.cancelSelectedManagedTrade = cancelSelectedManagedTrade;

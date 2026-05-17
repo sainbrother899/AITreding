@@ -549,6 +549,7 @@
                   <input id="managedClosePrice" type="number" placeholder="Close price"/>
 
                   <button id="closeManagedTradeBtn" class="primary-btn">Close Trade & Update PnL</button>
+                  <button id="cancelManagedTradeBtn" class="reject-btn full-width-btn">Cancel Trade</button>
                   <p class="tiny-warning">Close करते ही PnL user wallet ledger में add/deduct होगा.</p>
                 </div>
               </div>
@@ -559,8 +560,8 @@
                 </div>
                 <div class="table-wrap">
                   <table>
-                    <thead><tr><th>User</th><th>Coin</th><th>Side</th><th>Amount</th><th>Entry</th><th>Close</th><th>PnL</th><th>Status</th></tr></thead>
-                    <tbody id="managedTradesLog"><tr><td colspan="8" class="empty">No managed trades.</td></tr></tbody>
+                    <thead><tr><th>User</th><th>Coin</th><th>Side</th><th>Amount</th><th>Entry</th><th>Close</th><th>PnL</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody id="managedTradesLog"><tr><td colspan="9" class="empty">No managed trades.</td></tr></tbody>
                   </table>
                 </div>
               </div>
