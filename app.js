@@ -1235,6 +1235,10 @@ function switchAdminTab(tabId) {
 
 
 function renderPremiumMetrics() {
+  if ($("mockUserName")) $("mockUserName").textContent = state.user?.name || "Trader";
+  if ($("mockDemoBalance")) $("mockDemoBalance").textContent = money(state.accounts?.DEMO?.balance || state.demoBalance || 10000);
+  if ($("mockRealBalance")) $("mockRealBalance").textContent = money(state.accounts?.REAL?.balance || state.realBalance || 0);
+
   const acc = currentAccount();
   const allTrades = [...(acc.trades || []), ...(acc.closedTrades || [])];
   const pnl = allTrades.reduce((a,t)=>a+Number(t.pnl||0),0);

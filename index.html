@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>AI Trading Pro Pro</title>
+  <title>AI Trading Assistant Pro</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://s3.tradingview.com/tv.js"></script>
   <link rel="stylesheet" href="styles.css"/>
@@ -17,11 +17,18 @@
     <div class="brand">
       <div class="logo">AI</div>
       <div>
-        <h1>AI Trading Pro</h1>
+        <h1>AI Trading Assistant</h1>
         <p>Signals • Real prices • Referrals • PnL analytics</p>
       </div>
     </div>
-    <div id="headerMarketTicker" class="header-market-ticker">
+    <div class="mock-feature-strip">
+        <span>▧ Real Time Signals</span>
+        <span>⚙ AI Powered Engine</span>
+        <span>▣ Secure</span>
+        <span>◌ 24/7 Support</span>
+      </div>
+
+      <div id="headerMarketTicker" class="header-market-ticker">
         <span>BTC <b id="headerBtcPrice">$0</b></span>
         <span id="marketStatusDot">● Market Live</span>
       </div>
@@ -103,6 +110,14 @@
 
         <div class="grid hero-grid">
           <div class="card wallet-card">
+            <div class="mock-welcome-strip">
+              <div>
+                <h2>Hello, <span id="mockUserName">Trader</span></h2>
+                <p>Welcome back to AI Trading Assistant</p>
+              </div>
+              <div class="mock-avatar">A</div>
+            </div>
+
             <div class="account-mode-banner">
               <p class="label">Selected Account</p>
               <h3 id="accountModeTitle">Demo Account</h3>
@@ -112,6 +127,18 @@
             <div id="demoOnlyNotice" class="demo-only-notice">
               Demo Account में सिर्फ Home और PnL sections available हैं. KYC, Deposit, Plans और Referral Real Account में मिलेंगे.
             </div>
+
+            <div class="mock-account-cards">
+              <div class="mock-account demo-card-mini" id="mockDemoMini">
+                <small>Demo Account</small>
+                <strong id="mockDemoBalance">$10,000.00</strong>
+              </div>
+              <div class="mock-account real-card-mini" id="mockRealMini">
+                <small>Real Account</small>
+                <strong id="mockRealBalance">$0.00</strong>
+              </div>
+            </div>
+            <div class="switch-caption">Switch Account</div>
 
             <div class="mode-switch">
               <button id="demoBtn" class="mode-btn active">Demo Account</button>
@@ -214,7 +241,7 @@
 
           <div class="card chart-card">
             <div class="section-head">
-              <div><p class="label">Live Chart</p><h2>BTC/USDT</h2></div>
+              <div><p class="label mock-trade-screen-title">REAL ACCOUNT - TRADING</p><h2>BTC/USDT</h2></div>
               <div class="chart-tools"><span class="live-pill">LIVE</span><span class="chart-hint">5m candles</span></div>
             </div>
             <div id="crypto_live_chart"></div>
@@ -255,7 +282,7 @@
       </section>
 
 
-      <section id="wallet" class="page real-only-page">
+      <section id="wallet" class="page mock-mobile-page real-only-page">
         <div class="wallet-grid">
           <div class="card">
             <p class="label">Wallet</p>
@@ -286,7 +313,7 @@
         </div>
       </section>
 
-      <section id="analytics" class="page">
+      <section id="analytics" class="page mock-mobile-page">
         <div class="analytics-grid">
           <div class="card metric-card"><p>Total Trades</p><h2 id="totalTradesMetric">0</h2></div>
           <div class="card metric-card"><p>Total PnL</p><h2 id="totalPnlMetric">$0.00</h2></div>
@@ -300,13 +327,13 @@
         </div>
       </section>
 
-      <section id="subscription" class="page real-only-page">
+      <section id="subscription" class="page mock-mobile-page real-only-page">
         <div class="section-title"><p class="label">Manual Gateway</p><h2>Subscription Plans</h2><p>Payment UPI/Bank से करें, फिर UTR और screenshot submit करें।</p></div>
         <div class="plans-grid" id="dynamicPlansGrid"></div>
       </section>
 
 
-      <section id="kyc" class="page real-only-page">
+      <section id="kyc" class="page mock-mobile-page real-only-page">
         <div class="wallet-grid">
           <div class="card">
             <p class="label">KYC Verification</p>
@@ -350,7 +377,7 @@
         </div>
       </section>
 
-      <section id="referral" class="page real-only-page">
+      <section id="referral" class="page mock-mobile-page real-only-page">
         <div class="card referral-card">
           <p class="label">Referral System</p>
           <h2>Your Referral Code</h2>
@@ -376,7 +403,7 @@
 
       <div class="payment-box">
         <p><strong>UPI ID:</strong> <span id="depositUpiText">yourupi@bank</span></p>
-        <p><strong>Account Name:</strong> <span id="depositAccountText">AI Trading Pro</span></p>
+        <p><strong>Account Name:</strong> <span id="depositAccountText">AI Trading Assistant</span></p>
         <p><strong>Bank:</strong> <span id="depositBankText">Your Bank Name</span></p>
         <p><strong>Account No:</strong> <span id="depositAccountNoText">000000000000</span></p>
         <p><strong>IFSC:</strong> <span id="depositIfscText">ABCD0000000</span></p>
@@ -404,7 +431,7 @@
       <h2 id="paymentPlanTitle">Subscription</h2>
       <div class="payment-box">
         <p><strong>UPI ID:</strong> yourupi@bank</p>
-        <p><strong>Account Name:</strong> AI Trading Pro</p>
+        <p><strong>Account Name:</strong> AI Trading Assistant</p>
         <p><strong>Bank:</strong> Your Bank Name</p>
         <p><strong>Account No:</strong> 000000000000</p>
         <p><strong>IFSC:</strong> ABCD0000000</p>
