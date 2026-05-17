@@ -410,3 +410,9 @@ User History Closed Only Update:
 - User AI/Admin trade history now shows only CLOSED trades.
 - CANCELLED managed trades are hidden from user history.
 - Admin panel still keeps cancelled trades visible for admin tracking.
+
+
+Managed PnL Count Fix:
+- CLOSED AI/Admin managed trades now count in user's PnL analytics.
+- Total PnL, Total Trades and Win Rate include managed closed trades.
+- Cancelled trades remain hidden and do not count.

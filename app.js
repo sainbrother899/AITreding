@@ -1159,11 +1159,43 @@ function renderRecentFills() {
   el.innerHTML = fills.map(f => `<div class="fill-row ${String(f.side).toLowerCase()}"><span>${f.side}</span><span>${f.coin.replace("USDT","/USDT")}</span><span>${money(f.price)}</span></div>`).join("") || `<p class="muted small">No recent fills yet.</p>`;
 }
 
+
+function currentUserClosedManagedTrades() {
+  const uid = String(state.user?.id || "local");
+  const email = String(state.user?.email || "").toLowerCase();
+
+  return (state.managedTrades || []).filter(t => {
+    const tid = String(t.userId || "");
+    const temail = String(t.userEmail || "").toLowerCase();
+    const belongsToUser = tid === uid || (!!email && temail === email);
+    return belongsToUser && String(t.status || "").toUpperCase() === "CLOSED";
+  }).map(t => ({
+    ...t,
+    amount: Number(t.amount || 0),
+    pnl: Number(t.pnl || 0),
+    source: "ADMIN_MANAGED",
+    status: "CLOSED"
+  }));
+}
+
+function allUserPnlTrades() {
+  normalizeAccounts();
+  const acc = currentAccount ? currentAccount() : state.accounts?.[state.mode || "DEMO"];
+  const manual = [
+    ...((acc?.trades || []).map(t => ({ ...t, status: t.status || "OPEN" }))),
+    ...((acc?.closedTrades || []).map(t => ({ ...t, status: t.status || "CLOSED" })))
+  ];
+
+  // Managed PnL should count only in Real Account analytics.
+  const managed = state.mode === "REAL" ? currentUserClosedManagedTrades() : [];
+  return [...manual, ...managed];
+}
+
+
 function renderAnalytics() {
   if (!$("totalTradesMetric")) return;
 
-  const acc = currentAccount();
-  const allTrades = [...(acc.trades || []), ...(acc.closedTrades || [])];
+  const allTrades = allUserPnlTrades();
   const total = allTrades.length;
   const pnl = allTrades.reduce((a, t) => a + Number(t.pnl || 0), 0);
   const wins = allTrades.filter(t => t.pnl > 0).length;
@@ -1412,7 +1444,11 @@ function realProfitEligible() {
   const liveProfit = realAccountTrades()
     .reduce((a, t) => a + Math.max(0, Number(t.pnl || 0)), 0);
 
-  return Math.max(Number(state.realProfitTotal || 0), liveProfit);
+  const managedProfit = (state.managedTrades || [])
+    .filter(t => String(t.status || "").toUpperCase() === "CLOSED")
+    .reduce((a, t) => a + Math.max(0, Number(t.pnl || 0)), 0);
+
+  return Math.max(Number(state.realProfitTotal || 0), liveProfit + managedProfit);
 }
 
 function withdrawableAmount() {
@@ -1772,8 +1808,7 @@ function renderPremiumMetrics() {
   if ($("mockDemoBalance")) $("mockDemoBalance").textContent = money(state.accounts?.DEMO?.balance || state.demoBalance || 10000);
   if ($("mockRealBalance")) $("mockRealBalance").textContent = money(state.accounts?.REAL?.balance || state.realBalance || 0);
 
-  const acc = currentAccount();
-  const allTrades = [...(acc.trades || []), ...(acc.closedTrades || [])];
+  const allTrades = allUserPnlTrades();
   const pnl = allTrades.reduce((a,t)=>a+Number(t.pnl||0),0);
   const wins = allTrades.filter(t => Number(t.pnl||0) > 0).length;
   const winRate = allTrades.length ? Math.round((wins / allTrades.length) * 100) : 0;
@@ -2135,8 +2170,7 @@ function renderAdminTrades() {
   const el = $("adminTradesLog");
   if (!el) return;
 
-  const acc = currentAccount();
-  const allTrades = [...(acc.trades || []), ...(acc.closedTrades || [])];
+  const allTrades = allUserPnlTrades();
   el.innerHTML = allTrades.map(t => `
     <tr>
       <td>${t.accountType || state.mode}</td>
@@ -3159,3 +3193,24 @@ document.addEventListener("click", function(e){
     safeOpenPageFromButton(btn);
   }
 });
+
+
+function syncManagedPnLIntoMetrics() {
+  try {
+    if (!state.user || state.user.role === "admin") return;
+    const rows = allUserPnlTrades();
+    const total = rows.reduce((a,t)=>a+Number(t.pnl||0),0);
+    const wins = rows.filter(t=>Number(t.pnl||0)>0).length;
+    const winRate = rows.length ? Math.round((wins / rows.length) * 100) : 0;
+
+    if ($("totalTradesMetric")) $("totalTradesMetric").textContent = rows.length;
+    if ($("totalPnlMetric")) {
+      $("totalPnlMetric").textContent = money(total);
+      $("totalPnlMetric").className = total >= 0 ? "pnl-plus" : "pnl-minus";
+    }
+    if ($("winRateMetric")) $("winRateMetric").textContent = winRate + "%";
+    if ($("todayPnlMini")) $("todayPnlMini").textContent = money(total);
+    if ($("winRateMini")) $("winRateMini").textContent = winRate + "%";
+  } catch(e) {}
+}
+setInterval(syncManagedPnLIntoMetrics, 1200);
