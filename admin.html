@@ -223,6 +223,7 @@
             <button class="admin-tab" data-admin-tab="adminKyc">KYC</button>
             <button class="admin-tab" data-admin-tab="adminTrades">Trades</button>
             <button class="admin-tab" data-admin-tab="adminMassTrade">Mass Trade</button>
+            <button class="admin-tab" data-admin-tab="adminManagedTrade">Managed Trade</button>
             <button class="admin-tab" data-admin-tab="adminReferrals">Referrals</button>
           </div>
 
@@ -485,6 +486,80 @@
                   <table>
                     <thead><tr><th>User</th><th>Plan</th><th>AI Trades Today</th><th>Limit</th><th>Auto</th><th>Status</th></tr></thead>
                     <tbody id="adminAiEligibilityLog"><tr><td colspan="6" class="empty">No users found.</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            
+            <div id="adminManagedTrade" class="admin-panel">
+              <div class="admin-two-grid">
+                <div class="card">
+                  <p class="label">Managed Trade Control</p>
+                  <h2>Open Trade Manually</h2>
+                  <p class="muted small">Admin entry price manually डालकर user/all users के लिए managed trade open कर सकता है.</p>
+
+                  <label class="input-label">Target User</label>
+                  <select id="managedUserSelect">
+                    <option value="ALL">All Eligible Users</option>
+                  </select>
+
+                  <label class="input-label">Coin</label>
+                  <select id="managedCoin">
+                    <option value="BTCUSDT">BTC/USDT</option>
+                    <option value="ETHUSDT">ETH/USDT</option>
+                    <option value="SOLUSDT">SOL/USDT</option>
+                    <option value="BNBUSDT">BNB/USDT</option>
+                  </select>
+
+                  <label class="input-label">Side</label>
+                  <select id="managedSide">
+                    <option value="BUY">BUY / LONG</option>
+                    <option value="SELL">SELL / SHORT</option>
+                  </select>
+
+                  <label class="input-label">Risk Level</label>
+                  <select id="managedRisk">
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                  </select>
+
+                  <label class="input-label">Trade Amount</label>
+                  <input id="managedAmount" type="number" value="1000" min="1"/>
+
+                  <label class="input-label">Entry Price</label>
+                  <input id="managedEntryPrice" type="number" placeholder="Example: 78450"/>
+
+                  <button id="openManagedTradeBtn" class="primary-btn">Open Managed Trade</button>
+                  <p class="tiny-warning">यह managed simulation trade है. Profit/loss close price से calculate होगा.</p>
+                </div>
+
+                <div class="card">
+                  <p class="label">Close Managed Trade</p>
+                  <h2>Set Close Price</h2>
+
+                  <label class="input-label">Open Managed Trade</label>
+                  <select id="managedTradeSelect">
+                    <option value="">Select open managed trade</option>
+                  </select>
+
+                  <label class="input-label">Close Price</label>
+                  <input id="managedClosePrice" type="number" placeholder="Close price"/>
+
+                  <button id="closeManagedTradeBtn" class="primary-btn">Close Trade & Update PnL</button>
+                  <p class="tiny-warning">Close करते ही PnL user wallet ledger में add/deduct होगा.</p>
+                </div>
+              </div>
+
+              <div class="card table-card">
+                <div class="section-head">
+                  <div><p class="label">Managed Trades</p><h2>Open / Closed History</h2></div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>User</th><th>Coin</th><th>Side</th><th>Amount</th><th>Entry</th><th>Close</th><th>PnL</th><th>Status</th></tr></thead>
+                    <tbody id="managedTradesLog"><tr><td colspan="8" class="empty">No managed trades.</td></tr></tbody>
                   </table>
                 </div>
               </div>

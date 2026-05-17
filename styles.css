@@ -1896,3 +1896,17 @@ body.demo-mode-active .real-only-nav{display:none!important}
 .auto-trade-toggle{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
 .auto-trade-toggle input{width:18px;height:18px;accent-color:#00e59b;min-height:auto!important}
 .auto-trade-toggle span{margin:0;color:var(--text);font-weight:800}
+
+
+/* ===== MANAGED TRADE CONTROL ===== */
+#adminManagedTrade .admin-two-grid{
+  align-items:start;
+}
+#managedTradesLog .pnl-plus{
+  color:var(--green);
+  font-weight:900;
+}
+#managedTradesLog .pnl-minus{
+  color:var(--red);
+  font-weight:900;
+}

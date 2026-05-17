@@ -222,3 +222,6 @@ on conflict (id) do nothing;
 
 alter table public.subscription_plans add column if not exists ai_trade_limit numeric default 5;
 update public.subscription_plans set ai_trade_limit = 5 where ai_trade_limit is null;
+
+
+-- wallet_ledger type MANAGED_TRADE_PNL stores admin-managed trade profit/loss.

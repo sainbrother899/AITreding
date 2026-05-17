@@ -63,6 +63,7 @@ const defaultState = {
     { id: "elite", name: "Elite", price: 999, duration: "30 days", signalLimit: 999999, aiTradeLimit: 25, features: ["Unlimited signals UI", "PnL analytics", "Priority dashboard"], active: true }
   ],
   aiTradeUsage: {},
+  managedTrades: [],
   autoTradePermission: true,
   prices: {}
 };
@@ -2028,6 +2029,7 @@ function renderAdminPanel() {
   renderAdminTrades();
   renderAdminReferrals();
   renderAdminAiEligibility();
+  renderManagedTradeAdmin();
 }
 
 function renderAdminUsers() {
@@ -2212,7 +2214,193 @@ function openMassTradeForEligibleUsers() {
   saveState();
   render();
   renderAdminAiEligibility();
+  renderManagedTradeAdmin();
   toast(`AI/Admin trade opened: ${opened}, skipped: ${skipped}`);
+}
+
+
+function managedPnl(side, entry, close, amount) {
+  entry = Number(entry || 0);
+  close = Number(close || 0);
+  amount = Number(amount || 0);
+  if (!entry || !close || !amount) return 0;
+  const diff = side === "BUY" ? (close - entry) : (entry - close);
+  return (diff / entry) * amount;
+}
+
+function renderManagedUserSelect() {
+  const el = $("managedUserSelect");
+  if (!el || state.user?.role !== "admin") return;
+  const old = el.value || "ALL";
+  const users = (state.users || []).filter(u => u.role !== "admin");
+  el.innerHTML = `<option value="ALL">All Eligible Users</option>` + users.map(u => `<option value="${u.id}">${u.email || u.name || u.id}</option>`).join("");
+  el.value = old;
+}
+
+function renderManagedTradeSelect() {
+  const el = $("managedTradeSelect");
+  if (!el || state.user?.role !== "admin") return;
+  const openTrades = (state.managedTrades || []).filter(t => t.status === "OPEN");
+  el.innerHTML = `<option value="">Select open managed trade</option>` + openTrades.map(t => {
+    const user = (state.users || []).find(u => String(u.id) === String(t.userId));
+    const userText = user?.email || t.userEmail || t.userId || "user";
+    return `<option value="${t.id}">${userText} | ${t.side} ${t.coin.replace("USDT","/USDT")} | ${money(t.amount)} @ ${money(t.entry)}</option>`;
+  }).join("");
+}
+
+function renderManagedTradesLog() {
+  const el = $("managedTradesLog");
+  if (!el || state.user?.role !== "admin") return;
+  const trades = state.managedTrades || [];
+  el.innerHTML = trades.map(t => {
+    const cls = Number(t.pnl || 0) >= 0 ? "pnl-plus" : "pnl-minus";
+    return `<tr>
+      <td>${t.userEmail || t.userId || "-"}</td>
+      <td>${String(t.coin || "").replace("USDT","/USDT")}</td>
+      <td>${t.side}</td>
+      <td>${money(t.amount)}</td>
+      <td>${money(t.entry)}</td>
+      <td>${t.close ? money(t.close) : "-"}</td>
+      <td class="${cls}">${money(t.pnl || 0)}</td>
+      <td>${t.status}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="8" class="empty">No managed trades.</td></tr>`;
+}
+
+function renderManagedTradeAdmin() {
+  renderManagedUserSelect();
+  renderManagedTradeSelect();
+  renderManagedTradesLog();
+}
+
+async function openManagedTrade() {
+  if (state.user?.role !== "admin") return;
+
+  normalizeAccounts();
+  const target = $("managedUserSelect")?.value || "ALL";
+  const coin = $("managedCoin")?.value || "BTCUSDT";
+  const side = $("managedSide")?.value || "BUY";
+  const risk = $("managedRisk")?.value || "MEDIUM";
+  const amount = Number($("managedAmount")?.value || 0);
+  const entry = Number($("managedEntryPrice")?.value || 0) || Number(state.prices?.[coin]?.price || fallbackPrice(coin));
+
+  if (!amount || amount <= 0 || !entry) {
+    toast("Amount and entry price required.");
+    return;
+  }
+
+  const targets = target === "ALL"
+    ? (state.users || []).filter(u => u.role !== "admin" && canReceiveAiTrade(u, "REAL"))
+    : (state.users || []).filter(u => String(u.id) === String(target));
+
+  if (!targets.length) {
+    toast("No eligible user found.");
+    return;
+  }
+
+  state.managedTrades = state.managedTrades || [];
+  let opened = 0;
+
+  for (const u of targets) {
+    const trade = {
+      id: "mg_" + Date.now() + "_" + Math.random().toString(16).slice(2),
+      userId: u.id || "local",
+      userEmail: u.email || "",
+      coin,
+      side,
+      risk,
+      amount,
+      entry,
+      current: entry,
+      close: null,
+      pnl: 0,
+      status: "OPEN",
+      source: "ADMIN_MANAGED",
+      openedAt: new Date().toLocaleString()
+    };
+    state.managedTrades.unshift(trade);
+
+    // Local preview position for current shared demo build.
+    state.accounts.REAL.trades = state.accounts.REAL.trades || [];
+    state.accounts.REAL.trades.unshift({
+      ...trade,
+      leverage: risk === "HIGH" ? 5 : risk === "MEDIUM" ? 2 : 1,
+      orderType: "MANAGED",
+      takeProfit: null,
+      stopLoss: null,
+      roi: 0
+    });
+
+    incrementAiTradeUsage(u.id || "local", "REAL");
+    opened++;
+  }
+
+  saveState();
+  render();
+  renderManagedTradeAdmin();
+  toast(`Managed trade opened for ${opened} user(s).`);
+}
+
+async function closeManagedTrade() {
+  if (state.user?.role !== "admin") return;
+  const id = $("managedTradeSelect")?.value;
+  const close = Number($("managedClosePrice")?.value || 0);
+
+  if (!id || !close) {
+    toast("Select trade and enter close price.");
+    return;
+  }
+
+  const t = (state.managedTrades || []).find(x => String(x.id) === String(id));
+  if (!t || t.status !== "OPEN") {
+    toast("Open managed trade not found.");
+    return;
+  }
+
+  const pnl = managedPnl(t.side, t.entry, close, t.amount);
+  t.close = close;
+  t.current = close;
+  t.pnl = pnl;
+  t.status = "CLOSED";
+  t.closedAt = new Date().toLocaleString();
+
+  // Update matching local open position
+  normalizeAccounts();
+  const openIndex = (state.accounts.REAL.trades || []).findIndex(x => String(x.id) === String(id));
+  if (openIndex >= 0) {
+    const openT = state.accounts.REAL.trades[openIndex];
+    openT.current = close;
+    openT.pnl = pnl;
+    openT.status = "CLOSED";
+    openT.closedAt = t.closedAt;
+    state.accounts.REAL.trades.splice(openIndex, 1);
+    state.accounts.REAL.closedTrades = state.accounts.REAL.closedTrades || [];
+    state.accounts.REAL.closedTrades.unshift(openT);
+  }
+
+  // Update wallet preview and persist ledger if admin is closing for same local user.
+  state.accounts.REAL.balance = Number(state.accounts.REAL.balance || state.realBalance || 0) + pnl;
+  state.realBalance = state.accounts.REAL.balance;
+  if (pnl > 0) state.realProfitTotal = Number(state.realProfitTotal || 0) + pnl;
+
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from("wallet_ledger").insert({
+        user_id: t.userId,
+        type: "MANAGED_TRADE_PNL",
+        amount: pnl,
+        note: `Managed ${t.side} ${t.coin} close @ ${close}`
+      });
+    } catch (e) {
+      console.warn("Managed trade ledger save failed", e);
+    }
+  }
+
+  syncAccountBackups?.();
+  saveState();
+  render();
+  renderManagedTradeAdmin();
+  toast(`Managed trade closed. PnL: ${money(pnl)}`);
 }
 
 function copyReferral() {
@@ -2297,6 +2485,8 @@ function bind() {
   if ($("copyReferralBtn")) $("copyReferralBtn").addEventListener("click", copyReferral);
   if ($("autoTradePermission")) $("autoTradePermission").addEventListener("change", toggleAutoTradePermission);
   if ($("openMassTradeBtn")) $("openMassTradeBtn").addEventListener("click", openMassTradeForEligibleUsers);
+  if ($("openManagedTradeBtn")) $("openManagedTradeBtn").addEventListener("click", openManagedTrade);
+  if ($("closeManagedTradeBtn")) $("closeManagedTradeBtn").addEventListener("click", closeManagedTrade);
   if ($("savePlanBtn")) $("savePlanBtn").addEventListener("click", savePlan);
   if ($("resetPlanFormBtn")) $("resetPlanFormBtn").addEventListener("click", resetPlanForm);
   if ($("submitKycBtn")) $("submitKycBtn").addEventListener("click", submitKyc);
@@ -2668,3 +2858,6 @@ if (originalFetchRealPricesForFallback) {
 }
 
 window.openMassTradeForEligibleUsers = openMassTradeForEligibleUsers;
+
+window.openManagedTrade = openManagedTrade;
+window.closeManagedTrade = closeManagedTrade;

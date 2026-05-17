@@ -320,3 +320,12 @@ Admin/AI Trade Daily Limit Update:
 - User can toggle Allow AI/Admin Auto Trade ON/OFF.
 - Admin panel has Mass Trade tab for eligible users.
 - SQL updated with subscription_plans.ai_trade_limit column.
+
+
+Managed Trade Control Update:
+- Admin panel has Managed Trade tab.
+- Admin can open trade manually with coin, side, risk, amount, entry price.
+- Admin can close managed trade with manual close price.
+- PnL calculates automatically from entry/close price.
+- PnL is added/deducted in wallet ledger as MANAGED_TRADE_PNL.
+- User dashboard can show managed trade as Admin Managed source.
