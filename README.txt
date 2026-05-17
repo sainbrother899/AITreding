@@ -200,3 +200,9 @@ FINAL REBUILD V2 ZIP:
 - Mobile-first responsive design.
 - Existing working JS IDs preserved.
 - Admin files remain separate.
+
+
+PC Mobile Frame Update:
+- Desktop/PC view now also stays in centered mobile-app width.
+- Dashboard no longer stretches full desktop width.
+- Useful for PC editing/testing while keeping mobile UI look.
