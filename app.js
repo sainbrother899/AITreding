@@ -698,18 +698,27 @@ function currentOpenPnl(mode = state.mode) {
   return (acc.trades || []).reduce((a, t) => a + Number(t.pnl || 0), 0);
 }
 
+
+function realWalletDisplayTotal(includePending = true) {
+  // Final display formula:
+  // Approved Deposit + Real Profit/Loss - Approved Withdrawal - Pending Withdrawal
+  // This fixes total wallet not changing while withdrawable was changing.
+  const deposits = typeof approvedDepositTotal === "function" ? approvedDepositTotal() : Number(state.accounts?.REAL?.balance || state.realBalance || 0);
+  const profit = typeof realProfitEligible === "function" ? realProfitEligible() : 0;
+  const approvedW = typeof approvedWithdrawalTotal === "function" ? approvedWithdrawalTotal() : 0;
+  const pendingW = includePending && typeof pendingWithdrawalTotal === "function" ? pendingWithdrawalTotal() : 0;
+  return Math.max(0, Number(deposits || 0) + Number(profit || 0) - Number(approvedW || 0) - Number(pendingW || 0));
+}
+
 function accountEquity(mode = state.mode) {
   normalizeAccounts();
   const key = mode === "REAL" ? "REAL" : "DEMO";
-  const rawEquity = Number(state.accounts[key].balance || 0) + currentOpenPnl(key);
 
-  // For Real Account, pending withdrawals are reserved/locked,
-  // so total wallet equity shown to user should reduce immediately.
-  if (key === "REAL" && typeof pendingWithdrawalTotal === "function") {
-    return Math.max(0, rawEquity - pendingWithdrawalTotal());
+  if (key === "REAL" && typeof realWalletDisplayTotal === "function") {
+    return realWalletDisplayTotal(true);
   }
 
-  return rawEquity;
+  return Number(state.accounts[key].balance || 0) + currentOpenPnl(key);
 }
 
 function syncAccountBackups() {
@@ -2247,7 +2256,7 @@ function updateFullRedesignUI(){
     if (typeof currentAccount === "function") {
       const acc = currentAccount();
       if (document.getElementById("mockDemoBalance")) document.getElementById("mockDemoBalance").textContent = money(state.accounts?.DEMO?.balance || state.demoBalance || 10000);
-      if (document.getElementById("mockRealBalance")) document.getElementById("mockRealBalance").textContent = money(state.accounts?.REAL?.balance || state.realBalance || 0);
+      if (document.getElementById("mockRealBalance")) document.getElementById("mockRealBalance").textContent = money(accountEquity("REAL"));
     }
     if (document.getElementById("mockUserName")) document.getElementById("mockUserName").textContent = state.user?.name || "Trader";
     const btc = state.prices?.BTCUSDT || {price:0,change:0};
@@ -2396,3 +2405,24 @@ function liveWalletEquityTick(){
   }catch(e){}
 }
 setInterval(liveWalletEquityTick, 1200);
+
+
+function syncRealBalanceFromDisplayFormula(){
+  try{
+    if (typeof realWalletDisplayTotal !== "function") return;
+    normalizeAccounts();
+    // Raw balance excludes pending reserve, display equity includes pending reserve.
+    const rawTotal = realWalletDisplayTotal(false);
+    state.accounts.REAL.balance = rawTotal;
+    state.realBalance = rawTotal;
+  }catch(e){}
+}
+
+setInterval(() => {
+  try{
+    syncRealBalanceFromDisplayFormula();
+    if (document.getElementById("walletBalance")) document.getElementById("walletBalance").textContent = money(accountEquity(state.mode));
+    if (document.getElementById("walletPageBalance")) document.getElementById("walletPageBalance").textContent = money(accountEquity("REAL"));
+    if (document.getElementById("mockRealBalance")) document.getElementById("mockRealBalance").textContent = money(accountEquity("REAL"));
+  }catch(e){}
+}, 1200);

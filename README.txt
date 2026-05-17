@@ -288,3 +288,11 @@ Wallet Ledger Persist Fix:
 - Approved withdrawal saves negative ledger entry.
 - Refresh now recalculates Real balance from wallet_ledger.
 - Wallet should no longer reset after page refresh.
+
+
+Total Wallet Balance Fix:
+- Fixed Real Wallet Equity display.
+- Total wallet now uses the same stable calculation source:
+  Approved Deposit + Profit/Loss - Approved Withdrawal - Pending Withdrawal.
+- Withdrawable amount calculation was not touched.
+- This specifically fixes total balance staying same while withdrawal/eligible amounts changed.
