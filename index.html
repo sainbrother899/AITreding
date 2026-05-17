@@ -32,7 +32,8 @@
       <span id="marketStatusDot">● Market Live</span>
     </div>
 
-    <div class="auth-actions">
+    <button id="topMoreMenuBtn" class="top-more-btn" data-page="morepage">⋯</button>
+      <div class="auth-actions">
       <span id="userBadge" class="pill profile-pill"><i id="userAvatar">U</i><span id="userBadgeText">Guest</span><em id="userVipBadge">FREE</em></span>
       <button id="logoutBtn" class="ghost-btn hidden">Logout</button>
     </div>
@@ -105,8 +106,8 @@
     <span class="nav-ico">↗</span><small>PnL</small>
   </button>
 
-  <button class="nav-btn" data-page="morepage">
-    <span class="nav-ico">☰</span><small>More</small>
+  <button class="nav-btn" data-page="aiHistory">
+    <span class="nav-ico">≡</span><small>History</small>
   </button>
 </nav>
 
@@ -162,6 +163,7 @@
                 <span>AI/Admin Trades Today</span>
                 <strong><b id="aiTradeUsedText">0</b>/<b id="aiTradeLimitText">5</b></strong>
               </div>
+
               <label class="auto-trade-toggle">
                 <input id="autoTradePermission" type="checkbox" checked/>
                 <span>Allow AI/Admin Auto Trade</span>
@@ -340,7 +342,52 @@
   </div>
 </section>
 
-<section id="wallet" class="page real-only-page mock-mobile-page">
+      <section id="aiHistory" class="page">
+        <div class="history-page-shell">
+          <div class="card table-card user-managed-history-card">
+            <div class="section-head">
+              <div>
+                <p class="label">AI/Admin Trades</p>
+                <h2>Managed Trade History</h2>
+                <p class="muted small">Admin side से लगाई गई trades, cancelled trades और profit/loss यहाँ दिखेगा.</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Coin</th><th>Side</th><th>Amount</th><th>Entry</th><th>Close</th><th>PnL</th><th>Status</th></tr>
+                </thead>
+                <tbody id="userManagedTradesLog">
+                  <tr><td colspan="7" class="empty">No AI/Admin trades yet.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card table-card user-manual-history-card">
+            <div class="section-head">
+              <div>
+                <p class="label">Manual Trades</p>
+                <h2>Your Manual Trade History</h2>
+                <p class="muted small">User side से manually लगाई गई open/closed trades यहाँ दिखेंगी.</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Coin</th><th>Side</th><th>Amount</th><th>Entry</th><th>Current/Close</th><th>PnL</th><th>Status</th></tr>
+                </thead>
+                <tbody id="userManualTradesLog">
+                  <tr><td colspan="7" class="empty">No manual trades yet.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <section id="wallet" class="page real-only-page mock-mobile-page">
         <div class="wallet-grid">
           <div class="card">
             <p class="label">Wallet</p>

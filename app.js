@@ -876,6 +876,7 @@ function render() {
   renderWithdrawals();
   renderWithdrawalEligibility();
   renderUserManagedTrades();
+  renderUserManualTrades();
   renderAdminPanel();
   renderPlans();
   renderKyc();
@@ -2352,6 +2353,34 @@ function renderManagedTradesLog() {
 }
 
 
+
+function renderUserManualTrades() {
+  const el = $("userManualTradesLog");
+  if (!el) return;
+
+  normalizeAccounts();
+  const acc = currentAccount ? currentAccount() : state.accounts?.[state.mode || "DEMO"];
+  const rows = [
+    ...((acc?.trades || []).map(t => ({ ...t, status: t.status || "OPEN" }))),
+    ...((acc?.closedTrades || []).map(t => ({ ...t, status: t.status || "CLOSED" })))
+  ].filter(t => (t.source || "USER") === "USER" || (t.source || "USER") === "MANUAL" || !t.source);
+
+  el.innerHTML = rows.map(t => {
+    if (typeof updateTradePnl === "function" && t.status === "OPEN") updateTradePnl(t);
+    const cls = Number(t.pnl || 0) >= 0 ? "pnl-plus" : "pnl-minus";
+    const currentOrClose = t.status === "CLOSED" ? (t.current || t.close || t.entry) : (t.current || t.entry);
+    return `<tr>
+      <td>${String(t.coin || "").replace("USDT","/USDT")}</td>
+      <td>${t.side || "-"}</td>
+      <td>${money(t.amount || 0)}</td>
+      <td>${money(t.entry || 0)}</td>
+      <td>${money(currentOrClose || 0)}</td>
+      <td class="${cls}">${money(t.pnl || 0)}</td>
+      <td>${t.status || "OPEN"}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="7" class="empty">No manual trades yet.</td></tr>`;
+}
+
 function renderUserManagedTrades() {
   const el = $("userManagedTradesLog");
   if (!el) return;
@@ -3096,6 +3125,7 @@ window.addEventListener("load", function(){
       if (state.user && state.user.role !== "admin" && supabaseClient) {
         await loadRemoteData();
         renderUserManagedTrades();
+        renderUserManualTrades();
         if (typeof render === "function") render();
       }
     } catch(e) {}

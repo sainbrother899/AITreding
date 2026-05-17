@@ -386,3 +386,15 @@ Managed Trade Cancel Update:
 - Cancelled trade is removed from open positions.
 - Cancelled trade does not count in AI/Admin daily trade limit.
 - User history shows status CANCELLED with PnL 0.
+
+
+User AI History Button Update:
+- Added View AI/Admin Trade History button on user dashboard.
+- Added separate aiHistory page.
+- Managed/cancelled/closed admin trades show there.
+
+
+History Nav + Top More Update:
+- Bottom nav More replaced with History.
+- Top header has 3-dot More button.
+- History page now includes AI/Admin Trade History and User Manual Trade History.

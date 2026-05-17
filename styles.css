@@ -2589,3 +2589,83 @@ body[data-admin-page="true"] .table-card:hover{
   border-radius:12px!important;
   font-size:12px!important;
 }
+
+
+/* ===== USER AI HISTORY BUTTON ===== */
+.history-open-btn{
+  width:100%;
+  min-height:44px;
+  border:1px solid rgba(0,229,155,.26);
+  border-radius:14px;
+  background:linear-gradient(135deg,rgba(0,229,155,.14),rgba(43,135,255,.10));
+  color:#00e59b;
+  font-weight:900;
+  cursor:pointer;
+}
+#aiHistory .user-managed-history-card{
+  max-width:430px!important;
+  margin:0 auto!important;
+}
+#aiHistory .section-head{
+  align-items:flex-start;
+}
+@media(min-width:901px){
+  #aiHistory{
+    width:430px!important;
+    max-width:430px!important;
+    margin:0 auto!important;
+  }
+}
+
+
+/* ===== TOP MORE + HISTORY NAV UPDATE ===== */
+.top-more-btn{
+  width:42px;
+  height:42px;
+  border-radius:50%;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,.045);
+  color:var(--text);
+  font-size:24px;
+  font-weight:900;
+  line-height:1;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+  margin-left:auto;
+}
+.top-more-btn:hover{
+  border-color:rgba(0,229,155,.28);
+  color:var(--green);
+}
+.history-page-shell{
+  display:grid;
+  gap:16px;
+  width:430px;
+  max-width:430px;
+  margin:0 auto;
+}
+#aiHistory .user-managed-history-card,
+#aiHistory .user-manual-history-card{
+  width:430px!important;
+  max-width:430px!important;
+  margin:0 auto!important;
+}
+#userManualTradesLog .pnl-plus,
+#userManagedTradesLog .pnl-plus{
+  color:var(--green);
+  font-weight:900;
+}
+#userManualTradesLog .pnl-minus,
+#userManagedTradesLog .pnl-minus{
+  color:var(--red);
+  font-weight:900;
+}
+@media(max-width:520px){
+  .history-page-shell,
+  #aiHistory .user-managed-history-card,
+  #aiHistory .user-manual-history-card{
+    width:100%!important;
+    max-width:100%!important;
+  }
+}
