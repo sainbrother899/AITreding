@@ -114,3 +114,12 @@ Admin Panel Update:
 Fixed:
 - admin.html now includes the new full admin dashboard layout.
 - If changes are not visible, hard refresh browser with Ctrl + F5.
+
+
+Plans + KYC Update:
+- Admin Plan Editor added: create/edit/hide/delete plans.
+- User subscription page now shows plans from admin-created plan list.
+- User KYC page added.
+- Admin KYC approval/rejection added.
+- Latest SQL includes subscription_plans and kyc_requests.
+- Still not included: admin password change, website name/logo edit, maintenance mode.

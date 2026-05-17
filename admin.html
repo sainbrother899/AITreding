@@ -147,10 +147,51 @@
 
       <section id="subscription" class="page">
         <div class="section-title"><p class="label">Manual Gateway</p><h2>Subscription Plans</h2><p>Payment UPI/Bank से करें, फिर UTR और screenshot submit करें।</p></div>
-        <div class="plans-grid">
-          <div class="card plan-card"><h3>Free</h3><p class="price">₹0</p><ul><li>5 signals/day</li><li>Demo dashboard</li><li>Live prices</li></ul><button class="ghost-full">Current</button></div>
-          <div class="card plan-card featured"><span class="tag">Popular</span><h3>Pro</h3><p class="price">₹499/mo</p><ul><li>50 signals/day</li><li>Advanced AI indicator</li><li>Referral bonus tracking</li></ul><button class="primary-btn plan-btn" data-plan="Pro">Pay Manually</button></div>
-          <div class="card plan-card"><h3>Elite</h3><p class="price">₹999/mo</p><ul><li>Unlimited signals UI</li><li>PnL analytics</li><li>Priority dashboard</li></ul><button class="primary-btn plan-btn" data-plan="Elite">Pay Manually</button></div>
+        <div class="plans-grid" id="dynamicPlansGrid"></div>
+      </section>
+
+
+      <section id="kyc" class="page">
+        <div class="wallet-grid">
+          <div class="card">
+            <p class="label">KYC Verification</p>
+            <h2>Submit KYC</h2>
+            <p class="muted small">Admin approval के बाद आपका account verified दिखेगा.</p>
+
+            <label class="input-label">Full Name</label>
+            <input id="kycName" placeholder="As per document"/>
+
+            <label class="input-label">Mobile Number</label>
+            <input id="kycMobile" placeholder="Mobile number"/>
+
+            <label class="input-label">Document Type</label>
+            <select id="kycDocType">
+              <option value="AADHAAR">Aadhaar</option>
+              <option value="PAN">PAN</option>
+              <option value="PASSPORT">Passport</option>
+              <option value="OTHER">Other</option>
+            </select>
+
+            <label class="input-label">Document Number</label>
+            <input id="kycDocNumber" placeholder="Document number"/>
+
+            <label class="input-label">Document Front Image</label>
+            <input id="kycFrontFile" type="file" accept="image/*"/>
+
+            <label class="input-label">Selfie Image</label>
+            <input id="kycSelfieFile" type="file" accept="image/*"/>
+
+            <button id="submitKycBtn" class="primary-btn">Submit KYC</button>
+            <p class="tiny-warning">Static version में image filename store होगा. Production में Supabase Storage चाहिए.</p>
+          </div>
+
+          <div class="card">
+            <p class="label">KYC Status</p>
+            <h2 id="kycStatusTitle">Not Submitted</h2>
+            <div id="kycStatusBox" class="kyc-status-box">
+              <p>No KYC submitted yet.</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -177,6 +218,8 @@
             <button class="admin-tab" data-admin-tab="adminDeposits">Deposits</button>
             <button class="admin-tab" data-admin-tab="adminSignals">Signals</button>
             <button class="admin-tab" data-admin-tab="adminPlans">Plans</button>
+            <button class="admin-tab" data-admin-tab="adminPlanEditor">Plan Editor</button>
+            <button class="admin-tab" data-admin-tab="adminKyc">KYC</button>
             <button class="admin-tab" data-admin-tab="adminTrades">Trades</button>
             <button class="admin-tab" data-admin-tab="adminReferrals">Referrals</button>
           </div>
@@ -306,6 +349,63 @@
                 </div>
               </div>
             </div>
+
+
+            <div id="adminPlanEditor" class="admin-panel">
+              <div class="admin-two-grid">
+                <div class="card">
+                  <p class="label">Plan Editor</p>
+                  <h2>Create / Edit Plan</h2>
+
+                  <input id="planEditId" type="hidden"/>
+
+                  <label class="input-label">Plan Name</label>
+                  <input id="planNameInput" placeholder="Example: Pro"/>
+
+                  <label class="input-label">Price</label>
+                  <input id="planPriceInput" type="number" placeholder="499"/>
+
+                  <label class="input-label">Duration</label>
+                  <input id="planDurationInput" placeholder="30 days"/>
+
+                  <label class="input-label">Signal Limit</label>
+                  <input id="planSignalLimitInput" type="number" placeholder="50"/>
+
+                  <label class="input-label">Features</label>
+                  <textarea id="planFeaturesInput" placeholder="One feature per line"></textarea>
+
+                  <button id="savePlanBtn" class="primary-btn">Save Plan</button>
+                  <button id="resetPlanFormBtn" class="ghost-full">Reset Form</button>
+                </div>
+
+                <div class="card table-card">
+                  <div class="section-head">
+                    <div><p class="label">Active Plans</p><h2>Manage Plans</h2></div>
+                  </div>
+                  <div class="table-wrap">
+                    <table>
+                      <thead><tr><th>Name</th><th>Price</th><th>Signals</th><th>Status</th><th>Action</th></tr></thead>
+                      <tbody id="adminPlansEditorLog"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="adminKyc" class="admin-panel">
+              <div class="card table-card">
+                <div class="section-head">
+                  <div><p class="label">KYC Management</p><h2>User KYC Requests</h2></div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>User</th><th>Name</th><th>Doc Type</th><th>Doc No.</th><th>Files</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody id="adminKycLog"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
 
             <div id="adminTrades" class="admin-panel">
               <div class="card table-card">

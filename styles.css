@@ -197,3 +197,46 @@ main{position:relative;padding:24px 5vw 96px}.card{background:linear-gradient(18
   .admin-layout{grid-template-columns:1fr}
   .admin-menu{position:relative;top:0}
 }
+
+
+textarea{
+  width:100%;
+  min-height:110px;
+  border:1px solid var(--line);
+  background:#060b16;
+  color:var(--text);
+  border-radius:14px;
+  padding:14px;
+  font-size:15px;
+  outline:none;
+  resize:vertical;
+}
+.admin-two-grid{
+  display:grid;
+  grid-template-columns:380px 1fr;
+  gap:22px;
+}
+.kyc-status-box{
+  margin-top:18px;
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:16px;
+  background:rgba(255,255,255,.035);
+  line-height:1.8;
+}
+.kyc-pending{color:var(--amber)}
+.kyc-approved{color:var(--green)}
+.kyc-rejected{color:var(--red)}
+.plan-feature-list{
+  color:var(--muted);
+  line-height:1.8;
+  padding-left:18px;
+}
+.plan-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+@media(max-width:950px){
+  .admin-two-grid{grid-template-columns:1fr}
+}

@@ -44,6 +44,12 @@ const defaultState = {
   recentFills: [],
   selectedPaymentPlan: "Pro",
   referrals: [],
+  kycRequests: [],
+  plans: [
+    { id: "free", name: "Free", price: 0, duration: "Lifetime", signalLimit: 5, features: ["5 signals/day", "Demo dashboard", "Live prices"], active: true },
+    { id: "pro", name: "Pro", price: 499, duration: "30 days", signalLimit: 50, features: ["50 signals/day", "Advanced AI indicator", "Referral bonus tracking"], active: true },
+    { id: "elite", name: "Elite", price: 999, duration: "30 days", signalLimit: 999999, features: ["Unlimited signals UI", "PnL analytics", "Priority dashboard"], active: true }
+  ],
   prices: {}
 };
 
@@ -99,6 +105,11 @@ function getPlan() {
 
 function signalLimit() {
   const p = getPlan();
+  const plan = (state.plans || []).find(x => x.name === p && x.active !== false);
+  if (plan) {
+    if (Number(plan.signalLimit) >= 999999) return "∞";
+    return Number(plan.signalLimit || state.freeSignalLimit || 5);
+  }
   if (p === "Elite") return "∞";
   if (p === "Pro") return 50;
   return Number(state.freeSignalLimit || 5);
@@ -371,6 +382,52 @@ async function loadRemoteData() {
   }
 
   try {
+    const { data: remotePlans } = await supabaseClient
+      .from("subscription_plans")
+      .select("*")
+      .order("price", { ascending: true });
+
+    if (remotePlans && remotePlans.length) {
+      state.plans = remotePlans.map(p => ({
+        id: String(p.id),
+        name: p.name,
+        price: Number(p.price || 0),
+        duration: p.duration || "30 days",
+        signalLimit: Number(p.signal_limit || 5),
+        features: Array.isArray(p.features) ? p.features : String(p.features || "").split("\n").filter(Boolean),
+        active: p.active !== false
+      }));
+    }
+  } catch (e) {
+    console.warn("Plans fetch failed", e);
+  }
+
+  try {
+    const { data: kycRows } = await supabaseClient
+      .from("kyc_requests")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (kycRows) {
+      state.kycRequests = kycRows.map(k => ({
+        id: String(k.id),
+        userId: k.user_id,
+        userEmail: k.user_email || "",
+        name: k.name,
+        mobile: k.mobile,
+        docType: k.doc_type,
+        docNumber: k.doc_number,
+        frontFile: k.front_file || "",
+        selfieFile: k.selfie_file || "",
+        status: k.status || "PENDING",
+        date: k.created_at ? new Date(k.created_at).toLocaleString() : ""
+      }));
+    }
+  } catch (e) {
+    console.warn("KYC fetch failed", e);
+  }
+
+  try {
     const { data: refs } = await supabaseClient.from("referrals").select("*");
     if (refs) {
       state.referrals = refs.map(r => ({
@@ -484,6 +541,8 @@ function render() {
   renderPayments();
   renderDeposits();
   renderAdminPanel();
+  renderPlans();
+  renderKyc();
   renderAnalytics();
   renderReferral();
 }
@@ -1046,6 +1105,261 @@ function switchAdminTab(tabId) {
   $(tabId)?.classList.add("active-admin-panel");
 }
 
+
+function renderPlans() {
+  const grid = $("dynamicPlansGrid");
+  if (grid) {
+    const plans = (state.plans || []).filter(p => p.active !== false);
+    grid.innerHTML = plans.map(p => `
+      <div class="card plan-card ${p.name === "Pro" ? "featured" : ""}">
+        ${p.name === "Pro" ? `<span class="tag">Popular</span>` : ""}
+        <h3>${p.name}</h3>
+        <p class="price">${rupee(p.price || 0)}</p>
+        <p class="muted small">${p.duration || "30 days"} • ${Number(p.signalLimit) >= 999999 ? "Unlimited" : p.signalLimit} signals</p>
+        <ul class="plan-feature-list">
+          ${(p.features || []).map(f => `<li>${f}</li>`).join("")}
+        </ul>
+        ${Number(p.price || 0) === 0 ? `<button class="ghost-full">Current / Free</button>` : `<button class="primary-btn plan-btn" onclick="openPaymentModal('${p.name}')">Pay Manually</button>`}
+      </div>
+    `).join("");
+  }
+
+  renderPlanEditor();
+}
+
+function renderPlanEditor() {
+  const el = $("adminPlansEditorLog");
+  if (!el) return;
+
+  el.innerHTML = (state.plans || []).map(p => `
+    <tr>
+      <td>${p.name}</td>
+      <td>${rupee(p.price || 0)}</td>
+      <td>${Number(p.signalLimit) >= 999999 ? "∞" : p.signalLimit}</td>
+      <td>${p.active === false ? "Hidden" : "Active"}</td>
+      <td>
+        <div class="plan-actions">
+          <button class="ghost-btn" onclick="editPlan('${p.id}')">Edit</button>
+          <button class="reject-btn" onclick="togglePlan('${p.id}')">${p.active === false ? "Show" : "Hide"}</button>
+          <button class="reject-btn" onclick="deletePlan('${p.id}')">Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join("") || `<tr><td colspan="5" class="empty">No plans created.</td></tr>`;
+}
+
+function resetPlanForm() {
+  if ($("planEditId")) $("planEditId").value = "";
+  if ($("planNameInput")) $("planNameInput").value = "";
+  if ($("planPriceInput")) $("planPriceInput").value = "";
+  if ($("planDurationInput")) $("planDurationInput").value = "";
+  if ($("planSignalLimitInput")) $("planSignalLimitInput").value = "";
+  if ($("planFeaturesInput")) $("planFeaturesInput").value = "";
+}
+
+async function savePlan() {
+  const editId = $("planEditId")?.value || "";
+  const name = $("planNameInput")?.value.trim();
+  const price = Number($("planPriceInput")?.value || 0);
+  const duration = $("planDurationInput")?.value.trim() || "30 days";
+  const signalLimit = Number($("planSignalLimitInput")?.value || 5);
+  const features = ($("planFeaturesInput")?.value || "").split("\n").map(x => x.trim()).filter(Boolean);
+
+  if (!name) {
+    toast("Plan name required.");
+    return;
+  }
+
+  let plan = editId ? (state.plans || []).find(p => String(p.id) === String(editId)) : null;
+  if (!plan) {
+    plan = { id: "plan_" + Date.now(), active: true };
+    state.plans.push(plan);
+  }
+
+  plan.name = name;
+  plan.price = price;
+  plan.duration = duration;
+  plan.signalLimit = signalLimit;
+  plan.features = features;
+  if (plan.active === undefined) plan.active = true;
+
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from("subscription_plans").upsert({
+        id: plan.id,
+        name: plan.name,
+        price: plan.price,
+        duration: plan.duration,
+        signal_limit: plan.signalLimit,
+        features: plan.features,
+        active: plan.active
+      });
+    } catch (e) {
+      console.warn("Plan save failed", e);
+    }
+  }
+
+  saveState();
+  resetPlanForm();
+  render();
+  toast("Plan saved.");
+}
+
+function editPlan(id) {
+  const p = (state.plans || []).find(x => String(x.id) === String(id));
+  if (!p) return;
+  if ($("planEditId")) $("planEditId").value = p.id;
+  if ($("planNameInput")) $("planNameInput").value = p.name || "";
+  if ($("planPriceInput")) $("planPriceInput").value = p.price || 0;
+  if ($("planDurationInput")) $("planDurationInput").value = p.duration || "";
+  if ($("planSignalLimitInput")) $("planSignalLimitInput").value = p.signalLimit || 5;
+  if ($("planFeaturesInput")) $("planFeaturesInput").value = (p.features || []).join("\n");
+  switchAdminTab("adminPlanEditor");
+}
+
+async function togglePlan(id) {
+  const p = (state.plans || []).find(x => String(x.id) === String(id));
+  if (!p) return;
+  p.active = p.active === false ? true : false;
+  if (supabaseClient) {
+    try { await supabaseClient.from("subscription_plans").update({ active: p.active }).eq("id", id); } catch {}
+  }
+  saveState();
+  render();
+}
+
+async function deletePlan(id) {
+  state.plans = (state.plans || []).filter(p => String(p.id) !== String(id));
+  if (supabaseClient) {
+    try { await supabaseClient.from("subscription_plans").delete().eq("id", id); } catch {}
+  }
+  saveState();
+  render();
+  toast("Plan deleted.");
+}
+
+async function submitKyc() {
+  const name = $("kycName")?.value.trim();
+  const mobile = $("kycMobile")?.value.trim();
+  const docType = $("kycDocType")?.value;
+  const docNumber = $("kycDocNumber")?.value.trim();
+  const front = $("kycFrontFile")?.files[0];
+  const selfie = $("kycSelfieFile")?.files[0];
+
+  if (!name || !mobile || !docNumber) {
+    toast("KYC name, mobile and document number required.");
+    return;
+  }
+
+  let id = "kyc_" + Date.now();
+  const req = {
+    id,
+    userId: state.user?.id || "local",
+    userEmail: state.user?.email || "",
+    name,
+    mobile,
+    docType,
+    docNumber,
+    frontFile: front ? front.name : "Not uploaded",
+    selfieFile: selfie ? selfie.name : "Not uploaded",
+    status: "PENDING",
+    date: new Date().toLocaleString()
+  };
+
+  if (supabaseClient && state.user?.id) {
+    try {
+      const { data, error } = await supabaseClient.from("kyc_requests").insert({
+        user_id: req.userId,
+        user_email: req.userEmail,
+        name: req.name,
+        mobile: req.mobile,
+        doc_type: req.docType,
+        doc_number: req.docNumber,
+        front_file: req.frontFile,
+        selfie_file: req.selfieFile,
+        status: "PENDING"
+      }).select().single();
+
+      if (error) {
+        toast(error.message || "KYC save failed.");
+        return;
+      }
+      req.id = String(data.id);
+    } catch (e) {
+      toast("KYC save failed. Run latest SQL.");
+      return;
+    }
+  }
+
+  state.kycRequests = (state.kycRequests || []).filter(k => String(k.userId) !== String(req.userId));
+  state.kycRequests.unshift(req);
+  saveState();
+  render();
+  toast("KYC submitted for approval.");
+}
+
+function renderKyc() {
+  const myKyc = (state.kycRequests || []).find(k => String(k.userId) === String(state.user?.id));
+  if ($("kycStatusTitle")) {
+    $("kycStatusTitle").textContent = myKyc ? myKyc.status : "Not Submitted";
+    $("kycStatusTitle").className = myKyc ? ("kyc-" + String(myKyc.status).toLowerCase()) : "";
+  }
+  if ($("kycStatusBox")) {
+    $("kycStatusBox").innerHTML = myKyc ? `
+      <p><strong>Status:</strong> ${myKyc.status}</p>
+      <p><strong>Name:</strong> ${myKyc.name}</p>
+      <p><strong>Document:</strong> ${myKyc.docType} - ${myKyc.docNumber}</p>
+      <p><strong>Files:</strong> ${myKyc.frontFile}, ${myKyc.selfieFile}</p>
+      <p><strong>Date:</strong> ${myKyc.date || "-"}</p>
+    ` : `<p>No KYC submitted yet.</p>`;
+  }
+  renderAdminKyc();
+}
+
+function renderAdminKyc() {
+  const el = $("adminKycLog");
+  if (!el) return;
+
+  el.innerHTML = (state.kycRequests || []).map(k => `
+    <tr>
+      <td>${k.userEmail || k.userId}</td>
+      <td>${k.name}</td>
+      <td>${k.docType}</td>
+      <td>${k.docNumber}</td>
+      <td><small>${k.frontFile}<br>${k.selfieFile}</small></td>
+      <td>${k.status}</td>
+      <td>
+        ${k.status === "PENDING" ? `<div class="action-row"><button class="approve-btn" onclick="approveKyc('${k.id}')">Approve</button><button class="reject-btn" onclick="rejectKyc('${k.id}')">Reject</button></div>` : "-"}
+      </td>
+    </tr>
+  `).join("") || `<tr><td colspan="7" class="empty">No KYC requests.</td></tr>`;
+}
+
+async function approveKyc(id) {
+  const k = (state.kycRequests || []).find(x => String(x.id) === String(id));
+  if (!k) return;
+  k.status = "APPROVED";
+  if (supabaseClient) {
+    try { await supabaseClient.from("kyc_requests").update({ status: "APPROVED" }).eq("id", id); } catch {}
+  }
+  saveState();
+  render();
+  toast("KYC approved.");
+}
+
+async function rejectKyc(id) {
+  const k = (state.kycRequests || []).find(x => String(x.id) === String(id));
+  if (!k) return;
+  k.status = "REJECTED";
+  if (supabaseClient) {
+    try { await supabaseClient.from("kyc_requests").update({ status: "REJECTED" }).eq("id", id); } catch {}
+  }
+  saveState();
+  render();
+  toast("KYC rejected.");
+}
+
+
 function renderAdminPanel() {
   if (state.user?.role !== "admin") return;
 
@@ -1257,6 +1571,9 @@ function bind() {
   if ($("closeDepositModal")) $("closeDepositModal").addEventListener("click", closeDepositModal);
   if ($("submitDepositRequest")) $("submitDepositRequest").addEventListener("click", submitDepositRequest);
   if ($("copyReferralBtn")) $("copyReferralBtn").addEventListener("click", copyReferral);
+  if ($("savePlanBtn")) $("savePlanBtn").addEventListener("click", savePlan);
+  if ($("resetPlanFormBtn")) $("resetPlanFormBtn").addEventListener("click", resetPlanForm);
+  if ($("submitKycBtn")) $("submitKycBtn").addEventListener("click", submitKyc);
 }
 
 window.addEventListener("load", async () => {
@@ -1306,3 +1623,10 @@ window.rejectPayment = rejectPayment;
 window.changeUserPlan = changeUserPlan;
 window.toggleUserBlock = toggleUserBlock;
 window.setReferralStatus = setReferralStatus;
+
+
+window.editPlan = editPlan;
+window.togglePlan = togglePlan;
+window.deletePlan = deletePlan;
+window.approveKyc = approveKyc;
+window.rejectKyc = rejectKyc;
