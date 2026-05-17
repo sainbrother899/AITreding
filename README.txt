@@ -227,3 +227,13 @@ Fast Chart Fix:
 - Added stable loader.
 - Improved chart container height and border.
 - Reduced TradingView side toolbar for cleaner mobile look.
+
+
+Withdrawal Flow Update:
+- User wallet now has Withdraw button.
+- User can submit withdrawal amount + UPI/Bank details.
+- User withdrawal history added.
+- Admin panel has Withdrawal Management tab.
+- Admin can approve/reject withdrawal requests.
+- Approved withdrawal creates wallet_ledger negative entry.
+- Latest SQL includes withdrawal_requests table and policies.

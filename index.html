@@ -335,7 +335,10 @@
             <p class="label">Wallet</p>
             <h2>Deposit Balance</h2>
             <div class="wallet-big" id="walletPageBalance">$0.00</div>
-            <button id="openDepositBtn2" class="primary-btn">Deposit Now</button>
+            <div class="wallet-action-grid">
+              <button id="openDepositBtn2" class="primary-btn">Deposit Now</button>
+              <button id="openWithdrawBtn" class="withdraw-btn">Withdraw</button>
+            </div>
             <p class="tiny-warning">Deposit approval के बाद amount आपके Real Account balance में add होगा.</p>
           </div>
 
@@ -348,6 +351,17 @@
               </table>
             </div>
           </div>
+        
+          <div class="card table-card">
+            <div class="section-head"><div><p class="label">Withdrawal Requests</p><h2>Your Withdrawal History</h2></div></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Amount</th><th>Method</th><th>Account / UPI</th><th>Status</th><th>Date</th></tr></thead>
+                <tbody id="userWithdrawalLog"><tr><td colspan="5" class="empty">No withdrawal requests yet.</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       </section>
 
@@ -428,6 +442,37 @@
       <p class="tiny-warning">Approval के बाद amount आपके Real balance में add होगा.</p>
     </div>
   </div>
+
+
+  <div id="withdrawModal" class="modal-backdrop">
+    <div class="modal-card">
+      <button id="closeWithdrawModal" class="modal-close">×</button>
+      <p class="label">Withdrawal Request</p>
+      <h2>Withdraw Funds</h2>
+
+      <label class="input-label">Withdrawal Amount</label>
+      <input id="withdrawAmount" type="number" min="1" placeholder="Enter amount"/>
+
+      <label class="input-label">Withdrawal Method</label>
+      <select id="withdrawMethod">
+        <option value="UPI">UPI</option>
+        <option value="BANK">Bank Transfer</option>
+      </select>
+
+      <label class="input-label">UPI ID / Bank Account Number</label>
+      <input id="withdrawAccount" placeholder="UPI ID or account number"/>
+
+      <label class="input-label">Account Holder Name</label>
+      <input id="withdrawName" placeholder="Account holder name"/>
+
+      <label class="input-label">IFSC Optional</label>
+      <input id="withdrawIfsc" placeholder="IFSC for bank withdrawal"/>
+
+      <button id="submitWithdrawRequest" class="primary-btn">Submit Withdrawal Request</button>
+      <p class="tiny-warning">Approval के बाद amount आपके Real Account balance से deduct होगा.</p>
+    </div>
+  </div>
+
 
   <div id="paymentModal" class="modal-backdrop">
     <div class="modal-card">

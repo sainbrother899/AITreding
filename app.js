@@ -46,6 +46,7 @@ const defaultState = {
   trades: [],
   paymentRequests: [],
   depositRequests: [],
+  withdrawalRequests: [],
   closedTrades: [],
   recentFills: [],
   selectedPaymentPlan: "Pro",
@@ -461,6 +462,30 @@ async function loadRemoteData() {
   }
 
   try {
+    const { data: withdrawals } = await supabaseClient
+      .from("withdrawal_requests")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (withdrawals) {
+      state.withdrawalRequests = withdrawals.map(w => ({
+        id: String(w.id),
+        userId: w.user_id,
+        userEmail: w.user_email || "",
+        amount: Number(w.amount || 0),
+        method: w.method || "UPI",
+        account: w.account || "",
+        name: w.name || "",
+        ifsc: w.ifsc || "",
+        status: w.status || "PENDING",
+        date: w.created_at ? new Date(w.created_at).toLocaleString() : ""
+      }));
+    }
+  } catch (e) {
+    console.warn("Withdrawal fetch failed", e);
+  }
+
+  try {
     const { data: remotePlans } = await supabaseClient
       .from("subscription_plans")
       .select("*")
@@ -660,6 +685,7 @@ function render() {
   renderTrades();
   renderPayments();
   renderDeposits();
+  renderWithdrawals();
   renderAdminPanel();
   renderPlans();
   renderKyc();
@@ -1102,6 +1128,169 @@ async function submitDepositRequest() {
 
   toast("Deposit request submitted for admin approval.");
 }
+
+
+function openWithdrawModal() {
+  $("withdrawModal")?.classList.add("show");
+}
+
+function closeWithdrawModal() {
+  $("withdrawModal")?.classList.remove("show");
+}
+
+async function submitWithdrawRequest() {
+  const amount = Number($("withdrawAmount")?.value || 0);
+  const method = $("withdrawMethod")?.value || "UPI";
+  const account = $("withdrawAccount")?.value.trim();
+  const name = $("withdrawName")?.value.trim();
+  const ifsc = $("withdrawIfsc")?.value.trim();
+
+  normalizeAccounts();
+  const realBalance = Number(state.accounts?.REAL?.balance || state.realBalance || 0);
+
+  if (!amount || amount <= 0 || !account || !name) {
+    toast("Amount, account/UPI and name required.");
+    return;
+  }
+
+  if (amount > realBalance) {
+    toast("Insufficient Real Account balance.");
+    return;
+  }
+
+  let remoteId = "w_" + Date.now();
+
+  if (supabaseClient && state.user?.id) {
+    try {
+      const { data, error } = await supabaseClient
+        .from("withdrawal_requests")
+        .insert({
+          user_id: state.user.id,
+          user_email: state.user.email || "",
+          amount,
+          method,
+          account,
+          name,
+          ifsc,
+          status: "PENDING"
+        })
+        .select()
+        .single();
+
+      if (error) {
+        toast(error.message || "Withdrawal save failed.");
+        return;
+      }
+
+      remoteId = String(data.id);
+    } catch (e) {
+      toast("Withdrawal request save failed. Run latest SQL.");
+      return;
+    }
+  }
+
+  state.withdrawalRequests.unshift({
+    id: remoteId,
+    userId: state.user?.id || "local",
+    userEmail: state.user?.email || "",
+    amount,
+    method,
+    account,
+    name,
+    ifsc,
+    status: "PENDING",
+    date: new Date().toLocaleString()
+  });
+
+  saveState();
+  render();
+  closeWithdrawModal();
+
+  if ($("withdrawAmount")) $("withdrawAmount").value = "";
+  if ($("withdrawAccount")) $("withdrawAccount").value = "";
+  if ($("withdrawName")) $("withdrawName").value = "";
+  if ($("withdrawIfsc")) $("withdrawIfsc").value = "";
+
+  toast("Withdrawal request submitted for approval.");
+}
+
+function renderWithdrawals() {
+  const adminTable = $("withdrawalRequestsLog");
+  const userTable = $("userWithdrawalLog");
+
+  if (adminTable && state.user?.role === "admin") {
+    adminTable.innerHTML = (state.withdrawalRequests || []).map(w => `
+      <tr>
+        <td>${w.userEmail || w.userId || "-"}</td>
+        <td>${money(w.amount)}</td>
+        <td>${w.method}</td>
+        <td>${w.account}</td>
+        <td>${w.name}</td>
+        <td>${w.status}</td>
+        <td>${w.status === "PENDING" ? `<div class="action-row"><button class="approve-btn" onclick="approveWithdrawal('${w.id}')">Approve</button><button class="reject-btn" onclick="rejectWithdrawal('${w.id}')">Reject</button></div>` : "-"}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="7" class="empty">No withdrawal requests.</td></tr>`;
+  }
+
+  if (userTable) {
+    const myWithdrawals = (state.withdrawalRequests || []).filter(w => String(w.userId) === String(state.user?.id));
+    userTable.innerHTML = myWithdrawals.map(w => `
+      <tr>
+        <td>${money(w.amount)}</td>
+        <td>${w.method}</td>
+        <td>${w.account}</td>
+        <td>${w.status}</td>
+        <td>${w.date || "-"}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="5" class="empty">No withdrawal requests yet.</td></tr>`;
+  }
+}
+
+async function approveWithdrawal(id) {
+  const req = (state.withdrawalRequests || []).find(w => String(w.id) === String(id));
+  if (!req) return;
+
+  normalizeAccounts();
+  const amount = Number(req.amount || 0);
+
+  // For the logged-in user/admin local preview, deduct from REAL account ledger state
+  state.accounts.REAL.balance = Math.max(0, Number(state.accounts.REAL.balance || state.realBalance || 0) - amount);
+  state.realBalance = state.accounts.REAL.balance;
+  req.status = "APPROVED";
+
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from("withdrawal_requests").update({ status: "APPROVED" }).eq("id", id);
+      await supabaseClient.from("wallet_ledger").insert({
+        user_id: req.userId,
+        type: "WITHDRAWAL",
+        amount: -Math.abs(amount),
+        note: "Manual withdrawal approved"
+      });
+    } catch (e) {
+      console.warn("Withdrawal approve remote update failed", e);
+    }
+  }
+
+  saveState();
+  render();
+  toast("Withdrawal approved.");
+}
+
+async function rejectWithdrawal(id) {
+  const req = (state.withdrawalRequests || []).find(w => String(w.id) === String(id));
+  if (!req) return;
+  req.status = "REJECTED";
+
+  if (supabaseClient) {
+    try { await supabaseClient.from("withdrawal_requests").update({ status: "REJECTED" }).eq("id", id); } catch {}
+  }
+
+  saveState();
+  render();
+  toast("Withdrawal rejected.");
+}
+
 
 function renderDeposits() {
   const adminTable = $("depositRequestsLog");
@@ -1733,6 +1922,7 @@ function bind() {
   if ($("saveAdminBtn")) $("saveAdminBtn").addEventListener("click", saveAdminSettings);
   if ($("clearPaymentsBtn")) $("clearPaymentsBtn").addEventListener("click", () => { state.paymentRequests = []; saveState(); render(); });
   if ($("clearDepositsBtn")) $("clearDepositsBtn").addEventListener("click", () => { state.depositRequests = []; saveState(); render(); });
+  if ($("clearWithdrawalsBtn")) $("clearWithdrawalsBtn").addEventListener("click", () => { state.withdrawalRequests = []; saveState(); render(); });
 
   document.querySelectorAll(".plan-btn").forEach(b => b.addEventListener("click", () => openPaymentModal(b.dataset.plan)));
 
@@ -1742,6 +1932,9 @@ function bind() {
   if ($("openDepositBtn2")) $("openDepositBtn2").addEventListener("click", openDepositModal);
   if ($("closeDepositModal")) $("closeDepositModal").addEventListener("click", closeDepositModal);
   if ($("submitDepositRequest")) $("submitDepositRequest").addEventListener("click", submitDepositRequest);
+  if ($("openWithdrawBtn")) $("openWithdrawBtn").addEventListener("click", openWithdrawModal);
+  if ($("closeWithdrawModal")) $("closeWithdrawModal").addEventListener("click", closeWithdrawModal);
+  if ($("submitWithdrawRequest")) $("submitWithdrawRequest").addEventListener("click", submitWithdrawRequest);
   if ($("copyReferralBtn")) $("copyReferralBtn").addEventListener("click", copyReferral);
   if ($("savePlanBtn")) $("savePlanBtn").addEventListener("click", savePlan);
   if ($("resetPlanFormBtn")) $("resetPlanFormBtn").addEventListener("click", resetPlanForm);
@@ -1952,3 +2145,6 @@ window.addEventListener("load", function() {
     fastLoadTradingView(fastChartSymbol(), false);
   }, 700);
 });
+
+window.approveWithdrawal = approveWithdrawal;
+window.rejectWithdrawal = rejectWithdrawal;

@@ -216,6 +216,7 @@
             <button class="admin-tab active" data-admin-tab="adminOverview">Overview</button>
             <button class="admin-tab" data-admin-tab="adminUsers">Users</button>
             <button class="admin-tab" data-admin-tab="adminDeposits">Deposits</button>
+            <button class="admin-tab" data-admin-tab="adminWithdrawals">Withdrawals</button>
             <button class="admin-tab" data-admin-tab="adminSignals">Signals</button>
             <button class="admin-tab" data-admin-tab="adminPlans">Plans</button>
             <button class="admin-tab" data-admin-tab="adminPlanEditor">Plan Editor</button>
@@ -263,6 +264,22 @@
                   <table>
                     <thead><tr><th>User</th><th>Amount</th><th>UTR</th><th>Screenshot</th><th>Status</th><th>Action</th></tr></thead>
                     <tbody id="depositRequestsLog"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+
+            <div id="adminWithdrawals" class="admin-panel">
+              <div class="card table-card">
+                <div class="section-head">
+                  <div><p class="label">Withdrawal Management</p><h2>Withdrawal Requests</h2></div>
+                  <button id="clearWithdrawalsBtn" class="ghost-btn">Clear</button>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Account / UPI</th><th>Name</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody id="withdrawalRequestsLog"><tr><td colspan="7" class="empty">No withdrawal requests.</td></tr></tbody>
                   </table>
                 </div>
               </div>

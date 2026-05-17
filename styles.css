@@ -1795,3 +1795,30 @@ body.demo-mode-active .real-only-nav{display:none!important}
     min-height:320px!important;
   }
 }
+
+
+/* ===== WITHDRAWAL FLOW UI ===== */
+.wallet-action-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:14px;
+}
+.withdraw-btn{
+  width:100%;
+  border:1px solid rgba(255,194,71,.35);
+  border-radius:16px;
+  padding:14px 18px;
+  margin-top:14px;
+  background:rgba(255,194,71,.10);
+  color:#ffc247;
+  font-weight:900;
+  cursor:pointer;
+}
+.wallet-action-grid .primary-btn,
+.wallet-action-grid .withdraw-btn{
+  margin-top:0!important;
+}
+@media(max-width:520px){
+  .wallet-action-grid{grid-template-columns:1fr}
+}
