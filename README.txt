@@ -219,3 +219,11 @@ Auto Pair Chart Update:
 - Trade page pair selector now changes TradingView chart automatically.
 - BTC/ETH/SOL/BNB selection updates chart symbol.
 - Pair title and selected price text also update.
+
+
+Fast Chart Fix:
+- Removed heavy repeated chart reload.
+- Chart now reloads only on pair change.
+- Added stable loader.
+- Improved chart container height and border.
+- Reduced TradingView side toolbar for cleaner mobile look.
