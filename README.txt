@@ -130,3 +130,11 @@ User/Admin Separation Fix:
 - Admin panel remains only in admin.html.
 - User dashboard keeps only user-facing items:
   plans, KYC, deposit status, signal details, wallet, trades, referrals.
+
+
+Separate Session Fix:
+- User session now saves in ai_trading_user_session_v1.
+- Admin session now saves in ai_trading_admin_session_v1.
+- Admin login will not logout user dashboard.
+- User login will not logout admin dashboard.
+- Use index.html for user and admin.html for admin in separate tabs/windows.

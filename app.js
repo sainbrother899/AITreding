@@ -7,6 +7,8 @@ if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY && window.supabase) {
 }
 
 const STORAGE_KEY = "ai_trading_final_v4";
+const USER_SESSION_KEY = "ai_trading_user_session_v1";
+const ADMIN_SESSION_KEY = "ai_trading_admin_session_v1";
 
 const defaultAdmin = {
   id: "admin-local",
@@ -68,6 +70,27 @@ function loadState() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function getSessionKey() {
+  return IS_ADMIN_PAGE ? ADMIN_SESSION_KEY : USER_SESSION_KEY;
+}
+
+function saveCurrentSession() {
+  if (state.user) localStorage.setItem(getSessionKey(), JSON.stringify(state.user));
+}
+
+function loadCurrentSession() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(getSessionKey()));
+    return saved || null;
+  } catch {
+    return null;
+  }
+}
+
+function clearCurrentSession() {
+  localStorage.removeItem(getSessionKey());
 }
 
 function $(id) { return document.getElementById(id); }
@@ -182,6 +205,7 @@ async function register() {
   await saveProfileToSupabase(user);
 
   state.user = { ...user, password: undefined };
+  saveCurrentSession();
   saveState();
   showApp();
   toast("Account created.");
@@ -210,6 +234,7 @@ async function login() {
 
     state.user = { ...localUser, password: undefined };
     if (typeof localUser.realBalance === "number") state.realBalance = localUser.realBalance;
+    saveCurrentSession();
     saveState();
     await loadRemoteData();
     showApp();
@@ -258,6 +283,7 @@ async function login() {
 
     if (!state.users.some(u => u.id === user.id)) state.users.push({ ...user, password: "" });
     state.user = user;
+    saveCurrentSession();
     saveState();
     await loadRemoteData();
     showApp();
@@ -285,6 +311,7 @@ function guestLogin() {
     state.users.push(user);
   }
   state.user = { ...user, password: undefined };
+  saveCurrentSession();
   saveState();
   showApp();
   toast("Demo user started.");
@@ -295,6 +322,7 @@ async function logout() {
     try { await supabaseClient.auth.signOut(); } catch {}
   }
   state.user = null;
+  clearCurrentSession();
   saveState();
   $("authPage")?.classList.remove("hidden");
   $("appPage")?.classList.add("hidden");
@@ -1584,6 +1612,10 @@ window.addEventListener("load", async () => {
   bind();
   initReferralFromUrl();
 
+  // Load separate session for user page and admin page.
+  // This prevents admin login from logging out user, and user login from logging out admin.
+  state.user = loadCurrentSession();
+
   if (supabaseClient && !IS_ADMIN_PAGE) {
     try {
       const { data } = await supabaseClient.auth.getSession();
@@ -1599,14 +1631,19 @@ window.addEventListener("load", async () => {
           referralCode: makeReferralCode(authUser.email),
           referredBy: ""
         };
+        saveCurrentSession();
       }
     } catch {}
   }
 
   if (state.user) {
-    if (IS_ADMIN_PAGE && state.user.role !== "admin") await logout();
-    else if (!IS_ADMIN_PAGE && state.user.role === "admin") await logout();
-    else {
+    if (IS_ADMIN_PAGE && state.user.role !== "admin") {
+      clearCurrentSession();
+      state.user = null;
+    } else if (!IS_ADMIN_PAGE && state.user.role === "admin") {
+      clearCurrentSession();
+      state.user = null;
+    } else {
       await loadRemoteData();
       showApp();
     }
