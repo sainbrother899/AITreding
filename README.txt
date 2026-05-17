@@ -441,3 +441,11 @@ AI Limit Skip Users Fix:
 - Applies to Mass Trade and Managed Trade.
 - Admin eligibility preview now shows Used, Limit, Left and Status.
 - No SQL required.
+
+
+AI Mass Trade Close Update:
+- Added Close AI Mass Trade controls in admin Mass Trade tab.
+- Admin can close selected mass trade or all open mass trades using close price.
+- Mass trade PnL is calculated and saved to managed_trades + wallet_ledger.
+- User history will show closed AI Mass trades as CLOSED.
+- No new SQL needed if managed_trades table already exists.

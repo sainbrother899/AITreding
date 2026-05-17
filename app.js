@@ -2274,6 +2274,139 @@ function renderAdminAiEligibility() {
   }).join("") || `<tr><td colspan="6" class="empty">No users found.</td></tr>`;
 }
 
+
+function massTradePnl(side, entry, close, amount) {
+  entry = Number(entry || 0);
+  close = Number(close || 0);
+  amount = Number(amount || 0);
+  if (!entry || !close || !amount) return 0;
+  const diff = side === "BUY" ? close - entry : entry - close;
+  return (diff / entry) * amount;
+}
+
+function renderMassTradeSelect() {
+  const el = $("massCloseTradeSelect");
+  if (!el || state.user?.role !== "admin") return;
+  const open = (state.managedTrades || []).filter(t => t.source === "ADMIN_MASS" && t.status === "OPEN");
+  el.innerHTML = `<option value="ALL">All Open AI Mass Trades</option>` + open.map(t => {
+    return `<option value="${t.id}">${t.userEmail || t.userId || "user"} | ${t.side} ${String(t.coin).replace("USDT","/USDT")} | ${money(t.amount)} @ ${money(t.entry)}</option>`;
+  }).join("");
+}
+
+function renderMassTradesLog() {
+  const el = $("massTradesLog");
+  if (!el || state.user?.role !== "admin") return;
+  const rows = (state.managedTrades || []).filter(t => t.source === "ADMIN_MASS");
+  el.innerHTML = rows.map(t => {
+    const cls = Number(t.pnl || 0) >= 0 ? "pnl-plus" : "pnl-minus";
+    const action = t.status === "OPEN" ? `<button class="approve-btn mini-action-btn" onclick="closeMassTradeById('${t.id}')">Close</button>` : "-";
+    return `<tr>
+      <td>${t.userEmail || t.userId || "-"}</td>
+      <td>${String(t.coin || "").replace("USDT","/USDT")}</td>
+      <td>${t.side}</td>
+      <td>${money(t.amount || 0)}</td>
+      <td>${money(t.entry || 0)}</td>
+      <td>${t.close ? money(t.close) : "-"}</td>
+      <td class="${cls}">${money(t.pnl || 0)}</td>
+      <td>${t.status}</td>
+      <td>${action}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="9" class="empty">No mass trades.</td></tr>`;
+}
+
+function renderMassTradeAdmin() {
+  renderMassTradeSelect();
+  renderMassTradesLog();
+}
+
+async function closeMassTradeById(id, closePriceOverride = null) {
+  if (state.user?.role !== "admin") return;
+  const closePrice = Number(closePriceOverride || $("massClosePrice")?.value || 0);
+  if (!closePrice) {
+    toast("Close price required.");
+    return;
+  }
+
+  const t = (state.managedTrades || []).find(x => String(x.id) === String(id));
+  if (!t || t.status !== "OPEN" || t.source !== "ADMIN_MASS") {
+    toast("Open mass trade not found.");
+    return;
+  }
+
+  const pnl = massTradePnl(t.side, t.entry, closePrice, t.amount);
+  t.close = closePrice;
+  t.current = closePrice;
+  t.pnl = pnl;
+  t.status = "CLOSED";
+  t.closedAt = new Date().toLocaleString();
+
+  normalizeAccounts();
+  const openIndex = (state.accounts.REAL.trades || []).findIndex(x => String(x.id) === String(id));
+  if (openIndex >= 0) {
+    const openT = state.accounts.REAL.trades[openIndex];
+    openT.current = closePrice;
+    openT.pnl = pnl;
+    openT.status = "CLOSED";
+    openT.closedAt = t.closedAt;
+    state.accounts.REAL.trades.splice(openIndex, 1);
+    state.accounts.REAL.closedTrades = state.accounts.REAL.closedTrades || [];
+    state.accounts.REAL.closedTrades.unshift(openT);
+  }
+
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from("managed_trades").update({
+        close_price: closePrice,
+        pnl,
+        status: "CLOSED",
+        closed_at: t.closedAt
+      }).eq("id", id);
+
+      await supabaseClient.from("wallet_ledger").insert({
+        user_id: t.userId,
+        type: "MASS_TRADE_PNL",
+        amount: pnl,
+        note: `Mass ${t.side} ${t.coin} close @ ${closePrice}`
+      });
+    } catch(e) {
+      console.warn("Mass trade close save failed", e);
+    }
+  }
+
+  saveState();
+  render();
+  renderMassTradeAdmin();
+  renderUserManagedTrades?.();
+  toast(`Mass trade closed. PnL: ${money(pnl)}`);
+}
+
+async function closeSelectedMassTrade() {
+  const id = $("massCloseTradeSelect")?.value;
+  if (!id || id === "ALL") {
+    await closeAllMassTrades();
+    return;
+  }
+  await closeMassTradeById(id);
+}
+
+async function closeAllMassTrades() {
+  if (state.user?.role !== "admin") return;
+  const closePrice = Number($("massClosePrice")?.value || 0);
+  if (!closePrice) {
+    toast("Close price required.");
+    return;
+  }
+  const open = (state.managedTrades || []).filter(t => t.source === "ADMIN_MASS" && t.status === "OPEN");
+  if (!open.length) {
+    toast("No open mass trades found.");
+    return;
+  }
+  for (const t of open) {
+    await closeMassTradeById(t.id, closePrice);
+  }
+  toast(`Closed ${open.length} mass trade(s).`);
+}
+
 function openMassTradeForEligibleUsers() {
   if (state.user?.role !== "admin") return;
   normalizeAccounts();
@@ -2300,6 +2433,38 @@ function openMassTradeForEligibleUsers() {
 
     state.accounts.REAL.trades = state.accounts.REAL.trades || [];
     state.accounts.REAL.trades.unshift(trade);
+
+    state.managedTrades = state.managedTrades || [];
+    state.managedTrades.unshift({
+      ...trade,
+      userId: u.id || "local",
+      userEmail: u.email || "",
+      entry: trade.entry,
+      close: null,
+      source: "ADMIN_MASS",
+      status: "OPEN"
+    });
+
+    if (supabaseClient) {
+      try {
+        supabaseClient.from("managed_trades").insert({
+          id: trade.id,
+          user_id: u.id || "local",
+          user_email: u.email || "",
+          coin: trade.coin,
+          side: trade.side,
+          risk: trade.risk,
+          amount: trade.amount,
+          entry_price: trade.entry,
+          close_price: null,
+          pnl: 0,
+          status: "OPEN",
+          source: "ADMIN_MASS",
+          opened_at: trade.openedAt
+        });
+      } catch(e) { console.warn("Mass trade save failed", e); }
+    }
+
     finalIncrementAiUsage(u.id || u.email || "local", "REAL");
     opened++;
   });
@@ -2756,6 +2921,8 @@ function bind() {
   if ($("copyReferralBtn")) $("copyReferralBtn").addEventListener("click", copyReferral);
   if ($("autoTradePermission")) $("autoTradePermission").addEventListener("change", toggleAutoTradePermission);
   if ($("openMassTradeBtn")) $("openMassTradeBtn").addEventListener("click", openMassTradeForEligibleUsers);
+  if ($("closeSelectedMassTradeBtn")) $("closeSelectedMassTradeBtn").addEventListener("click", closeSelectedMassTrade);
+  if ($("closeAllMassTradeBtn")) $("closeAllMassTradeBtn").addEventListener("click", closeAllMassTrades);
   if ($("openManagedTradeBtn")) $("openManagedTradeBtn").addEventListener("click", openManagedTrade);
   if ($("closeManagedTradeBtn")) $("closeManagedTradeBtn").addEventListener("click", closeManagedTrade);
   if ($("cancelManagedTradeBtn")) $("cancelManagedTradeBtn").addEventListener("click", cancelSelectedManagedTrade);
@@ -3439,6 +3606,7 @@ function finalRenderAdminAiEligibilityTable() {
 setInterval(() => {
   finalRenderAiTradeUsage();
   finalRenderAdminAiEligibilityTable();
+  renderMassTradeAdmin();
 }, 1000);
 window.addEventListener("load", () => setTimeout(() => {
   finalRenderAiTradeUsage();
@@ -3493,3 +3661,7 @@ function finalEligibleUsersForAiTrade(target = "ALL") {
 
   return { eligible, skipped };
 }
+
+window.closeMassTradeById = closeMassTradeById;
+window.closeSelectedMassTrade = closeSelectedMassTrade;
+window.closeAllMassTrades = closeAllMassTrades;

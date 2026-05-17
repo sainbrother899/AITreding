@@ -479,6 +479,27 @@
                 <p class="tiny-warning">Eligible = Auto Trade ON + plan daily AI/Admin limit available.</p>
               </div>
 
+              
+              <div class="card">
+                <p class="label">Close AI Mass Trade</p>
+                <h2>Close Open Mass Trades</h2>
+
+                <label class="input-label">Open Mass Trade</label>
+                <select id="massCloseTradeSelect">
+                  <option value="ALL">All Open AI Mass Trades</option>
+                </select>
+
+                <label class="input-label">Close Price</label>
+                <input id="massClosePrice" type="number" placeholder="Enter close price"/>
+
+                <div class="trade-actions">
+                  <button id="closeSelectedMassTradeBtn" class="primary-btn">Close Selected</button>
+                  <button id="closeAllMassTradeBtn" class="sell-btn">Close All Open</button>
+                </div>
+                <p class="tiny-warning">Close होते ही PnL calculate होकर user history और wallet ledger में save होगा.</p>
+              </div>
+
+
               <div class="card table-card">
                 <div class="section-head">
                   <div><p class="label">AI/Admin Trade Limit</p><h2>User Eligibility Preview</h2></div>
@@ -565,6 +586,19 @@
                   </table>
                 </div>
               </div>
+
+              <div class="card table-card">
+                <div class="section-head">
+                  <div><p class="label">AI Mass Trades</p><h2>Open / Closed Mass Trade History</h2></div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>User</th><th>Coin</th><th>Side</th><th>Amount</th><th>Entry</th><th>Close</th><th>PnL</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody id="massTradesLog"><tr><td colspan="9" class="empty">No mass trades.</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+
             </div>
 
             <div id="adminReferrals" class="admin-panel">
