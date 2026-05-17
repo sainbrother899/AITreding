@@ -265,3 +265,28 @@ textarea{
 @media(max-width:520px){
   .signal-details{grid-template-columns:1fr}
 }
+
+
+.account-mode-banner{
+  border:1px solid rgba(79,140,255,.32);
+  background:linear-gradient(135deg,rgba(79,140,255,.11),rgba(0,229,155,.06));
+  border-radius:20px;
+  padding:15px;
+  margin-bottom:14px;
+}
+.account-mode-banner h3{
+  margin:5px 0;
+  font-size:22px;
+}
+.account-mode-banner p:last-child{
+  color:var(--muted);
+  font-size:13px;
+}
+.mode-switch{
+  display:grid !important;
+  grid-template-columns:1fr 1fr;
+}
+.mode-btn{
+  text-align:center;
+  font-weight:900;
+}

@@ -30,6 +30,10 @@ const defaultState = {
   realBalance: 0,
   signalsUsed: 0,
   freeSignalLimit: 5,
+  accounts: {
+    DEMO: { balance: 10000, signalsUsed: 0, trades: [], closedTrades: [], recentFills: [] },
+    REAL: { balance: 0, signalsUsed: 0, trades: [], closedTrades: [], recentFills: [] }
+  },
   signal: "BUY",
   note: "Admin + AI engine combined signal.",
   signalCoin: "BTCUSDT",
@@ -56,6 +60,7 @@ const defaultState = {
 };
 
 let state = loadState();
+normalizeAccounts();
 
 function loadState() {
   try {
@@ -69,6 +74,9 @@ function loadState() {
 }
 
 function saveState() {
+  normalizeAccounts();
+  state.demoBalance = state.accounts.DEMO.balance;
+  state.realBalance = state.accounts.REAL.balance;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
@@ -125,6 +133,45 @@ function getCurrentUserFull() {
 function getPlan() {
   return getCurrentUserFull()?.plan || state.user?.plan || "Free";
 }
+
+function normalizeAccounts() {
+  if (!state.accounts) {
+    state.accounts = {
+      DEMO: { balance: Number(state.demoBalance || 10000), signalsUsed: 0, trades: [], closedTrades: [], recentFills: [] },
+      REAL: { balance: Number(state.realBalance || 0), signalsUsed: 0, trades: [], closedTrades: [], recentFills: [] }
+    };
+  }
+
+  if (!state.accounts.DEMO) state.accounts.DEMO = { balance: 10000, signalsUsed: 0, trades: [], closedTrades: [], recentFills: [] };
+  if (!state.accounts.REAL) state.accounts.REAL = { balance: 0, signalsUsed: 0, trades: [], closedTrades: [], recentFills: [] };
+
+  for (const key of ["DEMO", "REAL"]) {
+    state.accounts[key].balance = Number(state.accounts[key].balance || 0);
+    state.accounts[key].signalsUsed = Number(state.accounts[key].signalsUsed || 0);
+    state.accounts[key].trades = state.accounts[key].trades || [];
+    state.accounts[key].closedTrades = state.accounts[key].closedTrades || [];
+    state.accounts[key].recentFills = state.accounts[key].recentFills || [];
+  }
+
+  // One-time migration from older build fields into DEMO account, only if account has no trades.
+  if ((state.trades || []).length && state.accounts.DEMO.trades.length === 0) {
+    state.accounts.DEMO.trades = state.trades;
+  }
+  if ((state.closedTrades || []).length && state.accounts.DEMO.closedTrades.length === 0) {
+    state.accounts.DEMO.closedTrades = state.closedTrades;
+  }
+}
+
+function currentAccount() {
+  normalizeAccounts();
+  return state.accounts[state.mode === "REAL" ? "REAL" : "DEMO"];
+}
+
+function accountLabel() {
+  return state.mode === "REAL" ? "Real Account" : "Demo Account";
+}
+
+
 
 function signalLimit() {
   const p = getPlan();
@@ -233,7 +280,11 @@ async function login() {
     }
 
     state.user = { ...localUser, password: undefined };
-    if (typeof localUser.realBalance === "number") state.realBalance = localUser.realBalance;
+    if (typeof localUser.realBalance === "number") {
+      normalizeAccounts();
+      state.accounts.REAL.balance = localUser.realBalance;
+      state.realBalance = localUser.realBalance;
+    }
     saveCurrentSession();
     saveState();
     await loadRemoteData();
@@ -492,6 +543,8 @@ async function loadRemoteData() {
         const depositTotal = ledgerRows
           .filter(x => x.type === "DEPOSIT")
           .reduce((a, x) => a + Number(x.amount || 0), 0);
+        normalizeAccounts();
+        state.accounts.REAL.balance = depositTotal;
         state.realBalance = depositTotal;
       }
     }
@@ -540,12 +593,17 @@ function showPage(page) {
 function render() {
   if (!state.user) return;
 
-  if ($("walletBalance")) $("walletBalance").textContent = money(state.mode === "DEMO" ? state.demoBalance : state.realBalance);
-  if ($("walletPageBalance")) $("walletPageBalance").textContent = money(state.realBalance);
+  const acc = currentAccount();
+  if ($("walletBalance")) $("walletBalance").textContent = money(acc.balance);
+  if ($("walletPageBalance")) $("walletPageBalance").textContent = money(state.accounts.REAL.balance);
+  if ($("accountModeTitle")) $("accountModeTitle").textContent = accountLabel();
+  if ($("accountModeText")) $("accountModeText").textContent = state.mode === "REAL"
+    ? "Real account balance, real-account signals and real-account positions only."
+    : "Demo account balance, demo signals and demo positions only.";
   $("demoBtn")?.classList.toggle("active", state.mode === "DEMO");
   $("realBtn")?.classList.toggle("active", state.mode === "REAL");
 
-  if ($("signalCounter")) $("signalCounter").textContent = state.signalsUsed;
+  if ($("signalCounter")) $("signalCounter").textContent = currentAccount().signalsUsed;
   if ($("signalLimitText")) $("signalLimitText").textContent = signalLimit();
   if ($("planText")) $("planText").textContent = getPlan();
 
@@ -640,7 +698,7 @@ function runIndicatorEngine() {
 }
 
 function placeTrade(side) {
-  if (state.signalsUsed >= numericSignalLimit()) {
+  if (currentAccount().signalsUsed >= numericSignalLimit()) {
     toast("Signal limit complete. Upgrade plan.");
     showPage("subscription");
     return;
@@ -652,7 +710,8 @@ function placeTrade(side) {
   const leverage = Number($("leverageSelect")?.value || 1);
   const tp = Number($("takeProfitInput")?.value || 0);
   const sl = Number($("stopLossInput")?.value || 0);
-  const bal = state.mode === "DEMO" ? state.demoBalance : state.realBalance;
+  const acc = currentAccount();
+  const bal = acc.balance;
 
   if (!amount || amount <= 0 || amount > bal) {
     toast("Invalid amount or insufficient balance.");
@@ -661,10 +720,8 @@ function placeTrade(side) {
 
   const entry = state.prices[coin]?.price || fallbackPrice(coin);
 
-  if (state.mode === "DEMO") state.demoBalance -= amount;
-  else state.realBalance -= amount;
-
-  state.signalsUsed++;
+  acc.balance -= amount;
+  acc.signalsUsed++;
 
   const trade = {
     id: "t_" + Date.now(),
@@ -683,10 +740,10 @@ function placeTrade(side) {
     openedAt: new Date().toLocaleString()
   };
 
-  state.trades.unshift(trade);
-  state.recentFills = state.recentFills || [];
-  state.recentFills.unshift({ side, coin, price: entry, amount, time: new Date().toLocaleTimeString() });
-  state.recentFills = state.recentFills.slice(0, 8);
+  acc.trades.unshift(trade);
+  acc.recentFills = acc.recentFills || [];
+  acc.recentFills.unshift({ side, coin, price: entry, amount, time: new Date().toLocaleTimeString() });
+  acc.recentFills = acc.recentFills.slice(0, 8);
 
   saveTradeToSupabase(trade);
   saveState();
@@ -708,27 +765,27 @@ function fallbackPrice(coin) {
 }
 
 function closeTrade(id) {
-  const index = state.trades.findIndex(t => t.id === id);
+  const acc = currentAccount();
+  const index = acc.trades.findIndex(t => t.id === id);
   if (index === -1) return;
 
-  const trade = state.trades[index];
+  const trade = acc.trades[index];
   updateTradePnl(trade);
 
   const refund = Number(trade.amount || 0) + Number(trade.pnl || 0);
 
-  if (state.mode === "DEMO") state.demoBalance += refund;
-  else state.realBalance += refund;
+  acc.balance += refund;
 
   trade.status = "CLOSED";
   trade.closedAt = new Date().toLocaleString();
 
-  state.closedTrades = state.closedTrades || [];
-  state.closedTrades.unshift({ ...trade });
+  acc.closedTrades = acc.closedTrades || [];
+  acc.closedTrades.unshift({ ...trade });
 
-  state.recentFills = state.recentFills || [];
-  state.recentFills.unshift({ side: "CLOSE", coin: trade.coin, price: trade.current, amount: trade.amount, time: new Date().toLocaleTimeString() });
+  acc.recentFills = acc.recentFills || [];
+  acc.recentFills.unshift({ side: "CLOSE", coin: trade.coin, price: trade.current, amount: trade.amount, time: new Date().toLocaleTimeString() });
 
-  state.trades.splice(index, 1);
+  acc.trades.splice(index, 1);
   saveState();
   render();
   toast(`Position closed. PnL: ${money(trade.pnl)}`);
@@ -776,9 +833,10 @@ function renderTrades() {
   const table = $("activeTradesLog");
   if (!table) return;
 
-  state.trades.forEach(updateTradePnl);
+  const acc = currentAccount();
+  acc.trades.forEach(updateTradePnl);
 
-  const rows = state.trades.map(t => `
+  const rows = acc.trades.map(t => `
     <tr>
       <td>${t.coin.replace("USDT","/USDT")}</td>
       <td class="${t.side === "BUY" ? "buy-text" : "sell-text"}">${t.side}</td>
@@ -816,14 +874,15 @@ function renderOrderBook() {
 function renderRecentFills() {
   const el = $("recentFills");
   if (!el) return;
-  const fills = state.recentFills || [];
+  const fills = currentAccount().recentFills || [];
   el.innerHTML = fills.map(f => `<div class="fill-row ${String(f.side).toLowerCase()}"><span>${f.side}</span><span>${f.coin.replace("USDT","/USDT")}</span><span>${money(f.price)}</span></div>`).join("") || `<p class="muted small">No recent fills yet.</p>`;
 }
 
 function renderAnalytics() {
   if (!$("totalTradesMetric")) return;
 
-  const allTrades = [...(state.trades || []), ...(state.closedTrades || [])];
+  const acc = currentAccount();
+  const allTrades = [...(acc.trades || []), ...(acc.closedTrades || [])];
   const total = allTrades.length;
   const pnl = allTrades.reduce((a, t) => a + Number(t.pnl || 0), 0);
   const wins = allTrades.filter(t => t.pnl > 0).length;
@@ -1047,7 +1106,9 @@ async function approveDeposit(id) {
   req.status = "APPROVED";
 
   if (String(state.user?.id) === String(req.userId)) {
-    state.realBalance += Number(req.amount || 0);
+    normalizeAccounts();
+    state.accounts.REAL.balance += Number(req.amount || 0);
+    state.realBalance = state.accounts.REAL.balance;
   }
 
   // Store approved amount into local user record if available
@@ -1404,7 +1465,8 @@ function renderAdminPanel() {
   if ($("adminTotalUsers")) $("adminTotalUsers").textContent = nonAdminUsers.length;
   if ($("adminTotalDeposits")) $("adminTotalDeposits").textContent = money(totalDeposits);
   if ($("adminPendingDeposits")) $("adminPendingDeposits").textContent = pendingDeposits;
-  if ($("adminOpenTrades")) $("adminOpenTrades").textContent = (state.trades || []).length;
+  if ($("adminOpenTrades")) $("adminOpenTrades").textContent =
+    ((state.accounts?.DEMO?.trades || []).length + (state.accounts?.REAL?.trades || []).length);
 
   if ($("adminSummaryList")) {
     $("adminSummaryList").innerHTML = `
@@ -1466,10 +1528,11 @@ function renderAdminTrades() {
   const el = $("adminTradesLog");
   if (!el) return;
 
-  const allTrades = [...(state.trades || []), ...(state.closedTrades || [])];
+  const acc = currentAccount();
+  const allTrades = [...(acc.trades || []), ...(acc.closedTrades || [])];
   el.innerHTML = allTrades.map(t => `
     <tr>
-      <td>${state.user?.email || "local"}</td>
+      <td>${t.accountType || state.mode}</td>
       <td>${String(t.coin || "").replace("USDT","/USDT")}</td>
       <td class="${t.side === "BUY" ? "buy-text" : "sell-text"}">${t.side}</td>
       <td>${money(t.amount || 0)}</td>
@@ -1582,13 +1645,13 @@ function bind() {
   document.querySelectorAll(".nav-btn").forEach(b => b.addEventListener("click", () => showPage(b.dataset.page)));
   document.querySelectorAll(".admin-tab").forEach(b => b.addEventListener("click", () => switchAdminTab(b.dataset.adminTab)));
 
-  if ($("demoBtn")) $("demoBtn").addEventListener("click", () => { state.mode = "DEMO"; saveState(); render(); });
-  if ($("realBtn")) $("realBtn").addEventListener("click", () => { state.mode = "REAL"; saveState(); render(); toast("Real UI selected. Exchange API not connected."); });
+  if ($("demoBtn")) $("demoBtn").addEventListener("click", () => { state.mode = "DEMO"; saveState(); render(); toast("Demo Account selected."); });
+  if ($("realBtn")) $("realBtn").addEventListener("click", () => { state.mode = "REAL"; saveState(); render(); toast("Real Account selected. Exchange API not connected."); });
 
   if ($("executeTradeBtn")) $("executeTradeBtn").addEventListener("click", executeTrade);
   if ($("buyTradeBtn")) $("buyTradeBtn").addEventListener("click", () => placeTrade("BUY"));
   if ($("sellTradeBtn")) $("sellTradeBtn").addEventListener("click", () => placeTrade("SELL"));
-  if ($("clearTradesBtn")) $("clearTradesBtn").addEventListener("click", () => { state.trades = []; state.closedTrades = []; saveState(); render(); });
+  if ($("clearTradesBtn")) $("clearTradesBtn").addEventListener("click", () => { const acc = currentAccount(); acc.trades = []; acc.closedTrades = []; acc.recentFills = []; saveState(); render(); });
 
   if ($("saveAdminBtn")) $("saveAdminBtn").addEventListener("click", saveAdminSettings);
   if ($("clearPaymentsBtn")) $("clearPaymentsBtn").addEventListener("click", () => { state.paymentRequests = []; saveState(); render(); });

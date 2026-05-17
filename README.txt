@@ -143,3 +143,12 @@ Separate Session Fix:
 User Side Text Cleanup:
 - Removed admin/admin.html wording from user login page and dashboard.
 - Admin access still remains in admin.html, but user side does not mention it.
+
+
+Demo/Real Account Separation Update:
+- Demo Account and Real Account are now fully separated.
+- Demo balance, signals, open positions, closed trades and recent fills are separate.
+- Real balance, signals, open positions, closed trades and recent fills are separate.
+- Using demo signals will not reduce real account signals.
+- Using real signals will not reduce demo account signals.
+- Switching account mode shows only that account's data.
