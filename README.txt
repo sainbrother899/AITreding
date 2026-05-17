@@ -109,3 +109,8 @@ Admin Panel Update:
 - Added subscription plan approval/rejection.
 - Added trade monitoring table.
 - Added referral management with approve/hold.
+
+
+Fixed:
+- admin.html now includes the new full admin dashboard layout.
+- If changes are not visible, hard refresh browser with Ctrl + F5.
