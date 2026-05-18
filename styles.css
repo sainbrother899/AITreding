@@ -5234,134 +5234,26 @@ body[data-active-page="more"] #more{
 }
 
 
-/* ===== WALLET CLEAN UPDATE ===== */
-.wallet-clean-summary{
-  margin:12px auto!important;
-  padding:16px!important;
-}
-.wallet-summary-head{
-  display:flex!important;
-  align-items:flex-start!important;
-  justify-content:space-between!important;
-  gap:12px!important;
-  margin-bottom:14px!important;
-}
-.wallet-summary-head h2{
-  margin:4px 0!important;
-  font-size:28px!important;
-  line-height:1!important;
-  color:#f4f7ff!important;
-}
-.wallet-summary-head span{
-  color:#9fb2d0!important;
-  font-size:13px!important;
-}
-.wallet-summary-head > b{
-  white-space:nowrap!important;
-  font-size:16px!important;
-  padding:7px 10px!important;
-  border-radius:999px!important;
-  background:rgba(255,255,255,.055)!important;
-}
-.wallet-breakdown-grid{
-  display:grid!important;
-  grid-template-columns:repeat(2,minmax(0,1fr))!important;
-  gap:10px!important;
-  margin-bottom:12px!important;
-}
-.wallet-breakdown-grid div{
-  border:1px solid rgba(255,255,255,.08)!important;
-  background:rgba(255,255,255,.035)!important;
+/* ===== WALLET SAFE MINIMAL FIX ===== */
+.wallet-safe-available-note{
+  border:1px solid rgba(0,231,168,.20)!important;
+  background:rgba(0,231,168,.065)!important;
   border-radius:14px!important;
-  padding:10px!important;
+  padding:11px!important;
+  margin:12px 0!important;
 }
-.wallet-breakdown-grid span{
-  display:block!important;
-  color:#9fb2d0!important;
-  font-size:11px!important;
-  margin-bottom:5px!important;
-}
-.wallet-breakdown-grid b{
-  color:#f4f7ff!important;
-  font-size:13px!important;
-}
-.wallet-withdrawable-box{
-  border:1px solid rgba(0,231,168,.25)!important;
-  background:rgba(0,231,168,.07)!important;
-  border-radius:16px!important;
-  padding:12px!important;
-}
-.wallet-withdrawable-box span{
+.wallet-safe-available-note span{
   display:block!important;
   color:#9fb2d0!important;
   font-size:12px!important;
+  margin-bottom:4px!important;
 }
-.wallet-withdrawable-box b{
+.wallet-safe-available-note b{
   display:block!important;
-  margin:4px 0!important;
   color:#00e7a8!important;
-  font-size:22px!important;
+  font-size:20px!important;
 }
-.wallet-withdrawable-box small{
-  display:block!important;
-  color:#b8c7dc!important;
-  line-height:1.35!important;
-}
-.wallet-history-card-box{
-  margin:12px auto!important;
-  padding:14px!important;
-}
-.wallet-history-cards{
-  display:grid!important;
-  gap:10px!important;
-}
-.wallet-history-card{
-  border:1px solid rgba(255,255,255,.08)!important;
-  background:rgba(255,255,255,.035)!important;
-  border-radius:14px!important;
-  padding:12px!important;
-}
-.wallet-history-card .wh-top{
-  display:flex!important;
-  align-items:center!important;
-  justify-content:space-between!important;
-  gap:10px!important;
-  margin-bottom:8px!important;
-}
-.wallet-history-card .wh-top b{
-  color:#f4f7ff!important;
-  font-size:16px!important;
-}
-.wallet-history-card .wh-top span{
-  font-size:11px!important;
-  font-weight:950!important;
-  border-radius:999px!important;
-  padding:5px 8px!important;
-}
-.wallet-history-card .wh-top span.pending{
-  color:#f8bd7a!important;
-  background:rgba(248,189,122,.12)!important;
-}
-.wallet-history-card .wh-top span.approved{
-  color:#00e7a8!important;
-  background:rgba(0,231,168,.12)!important;
-}
-.wallet-history-card .wh-top span.rejected{
-  color:#ff456b!important;
-  background:rgba(255,69,107,.12)!important;
-}
-.wallet-history-card p{
-  color:#9fb2d0!important;
-  margin:0 0 6px!important;
-  font-size:13px!important;
-}
-.wallet-history-card p strong{
-  color:#f4f7ff!important;
-}
-.wallet-history-card small{
-  color:#7486a3!important;
-}
-.wallet-withdraw-available-note{
+.wallet-modal-available-note{
   border:1px solid rgba(0,231,168,.22)!important;
   background:rgba(0,231,168,.075)!important;
   color:#00e7a8!important;
@@ -5370,26 +5262,10 @@ body[data-active-page="more"] #more{
   font-weight:900!important;
   margin:8px 0 10px!important;
 }
-.wallet-file-note{
+.wallet-safe-file-note{
   display:block!important;
   margin-top:6px!important;
   color:#9fb2d0!important;
   font-size:12px!important;
-  line-height:1.35!important;
 }
-
-/* Keep old wallet tables usable but less dominant on mobile */
-@media(max-width:700px){
-  #wallet table{
-    display:none!important;
-  }
-  #wallet .table-wrap:has(table){
-    display:none!important;
-  }
-}
-
-@media(min-width:900px){
-  body.pc-same-mobile .wallet-breakdown-grid{
-    grid-template-columns:repeat(2,minmax(0,1fr))!important;
-  }
-}
+/* Do not hide existing wallet tables; keep original history working. */

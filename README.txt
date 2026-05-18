@@ -631,14 +631,17 @@ PC Same As Mobile Layout:
 - JS syntax check: OK
 
 
-Wallet Clean Update:
-- Added Wallet Overview card with Real Wallet Equity = balance + open PnL.
-- Added clear withdrawable breakdown: Real Balance, Open PnL, Approved Deposit, Trade Volume, Profit Balance, Pending Withdrawal.
-- Added Available for Withdrawal box.
-- Added mobile card-style Deposit and Withdrawal history.
-- Fixed table colspan dynamically.
-- Withdrawal modal now shows available withdrawal amount when modal exists.
-- File upload field gets a clear admin-review note.
-- Mobile layout preserved.
+Wallet Safe Minimal Fix:
+- Built from the last stable mobile/PC same-as-mobile base, not the broken Wallet Clean Update.
+- No duplicate Wallet Overview card added.
+- Existing wallet card remains.
+- walletPageBalance now shows Real Wallet + Open PnL.
+- Withdrawal history colspan fixed to 5 columns and account/UPI column included.
+- Adds only a small Available for Withdrawal note in existing wallet card.
+- Adds withdrawal modal available amount note if modal exists.
+- Adds deposit screenshot note only.
+- Existing deposit/withdrawal history tables remain working.
 - No SQL required.
+- Patched balance line: True
+- Patched withdrawal log: True
 - JS syntax check: OK
