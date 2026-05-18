@@ -7535,3 +7535,312 @@ function restoreManualHistoryBackup(mode = state.mode) {
     if (pmOpen()) applyPaymentMethods();
   }, 30000);
 })();
+
+
+
+
+
+/* ===== USER MY PAYMENT METHODS CLEAN FINAL ===== */
+(function(){
+  const MAX_UPI = 2;
+  const MAX_BANK = 2;
+  const WARNING = "YOUR PAYMENT METHOD NAME SHOULD MATCH KYC NAME. DON'T USE OTHER ACCOUNT. IF YOU USE OTHER ACCOUNT, YOUR ACCOUNT MAY BE SUSPENDED.";
+  let selectedType = (localStorage.getItem("user_pm_clean_type") || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI";
+  let isRendering = false;
+
+  function supa(){
+    try {
+      if (window.supabaseClient) return window.supabaseClient;
+      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
+    } catch(e){}
+    return null;
+  }
+
+  function u(){ return state?.user || {}; }
+  function uid(){ return String(u().id || u().email || "local"); }
+  function userEmail(){ return String(u().email || ""); }
+  function kycName(){ return u().kycName || u().kyc_name || u().name || u().full_name || u().email?.split("@")[0] || "User"; }
+  function kycApproved(){ return String(u().kycStatus || u().kyc_status || "").toUpperCase() === "APPROVED"; }
+
+  function page(){ return document.getElementById("paymentMethodsPage"); }
+  function isActive(){
+    const p = page();
+    return !!(p && p.classList.contains("active-page") && getComputedStyle(p).display !== "none");
+  }
+  function root(){
+    const p = page();
+    return document.getElementById("paymentMethodsPageContent") || p?.querySelector(".menu-real-content") || p;
+  }
+
+  function allMethods(){
+    const list = state?.userPayoutMethods || state?.payoutMethods || [];
+    const id = uid();
+    return (list || []).filter(m => {
+      const mid = String(m.userId || m.user_id || "");
+      return !mid || mid === id;
+    });
+  }
+
+  function typeOf(m){ return String(m.type || m.method || m.method_type || "").toUpperCase(); }
+  function count(type){ return allMethods().filter(m => typeOf(m) === String(type).toUpperCase()).length; }
+  function canAdd(type){
+    type = String(type || selectedType).toUpperCase();
+    return type === "BANK" ? count("BANK") < MAX_BANK : count("UPI") < MAX_UPI;
+  }
+  function limitText(type){
+    type = String(type || selectedType).toUpperCase();
+    return type === "BANK" ? `You can add only ${MAX_BANK} bank accounts.` : `You can add only ${MAX_UPI} UPI IDs.`;
+  }
+  function setType(t){
+    selectedType = String(t || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI";
+    localStorage.setItem("user_pm_clean_type", selectedType);
+  }
+
+  function mask(m){
+    const t = typeOf(m);
+    if (t === "UPI") return m.upi || m.upi_id || "-";
+    const acc = String(m.accountNumber || m.account_number || "");
+    return `${m.bankName || m.bank_name || "Bank"} ${acc ? "****" + acc.slice(-4) : ""}`;
+  }
+
+  function statusBadge(s){
+    s = String(s || "PENDING").toUpperCase();
+    const cls = s === "APPROVED" ? "approved" : (s === "REJECTED" ? "rejected" : "pending");
+    return `<em class="user-pm-status ${cls}">${s}</em>`;
+  }
+
+  function renderHtml(){
+    const approved = kycApproved();
+    const ok = approved && canAdd(selectedType);
+    const list = allMethods();
+
+    return `
+      <div class="user-pm-warning">${WARNING}</div>
+
+      ${approved ? "" : `
+        <div class="card user-pm-kyc-block">
+          <b>KYC Approval Required</b>
+          <span>Please complete approved KYC before adding a payment method.</span>
+        </div>
+      `}
+
+      <form id="userPaymentMethodCleanForm" class="card menu-real-form user-pm-form ${approved ? "" : "disabled"}">
+        <label>Method Type
+          <select id="userPmType" name="type" ${approved ? "" : "disabled"}>
+            <option value="UPI" ${selectedType === "UPI" ? "selected" : ""}>UPI</option>
+            <option value="BANK" ${selectedType === "BANK" ? "selected" : ""}>Bank Account</option>
+          </select>
+        </label>
+
+        <label class="user-pm-upi-field">UPI ID
+          <input name="upi" placeholder="example@upi" ${approved ? "" : "disabled"}>
+        </label>
+
+        <label>Account Holder Name / KYC Name
+          <input name="holderName" value="${kycName()}" readonly>
+        </label>
+
+        <div class="user-pm-bank-fields">
+          <label>Bank Name
+            <input name="bankName" placeholder="Bank name" ${approved ? "" : "disabled"}>
+          </label>
+          <label>Account Number
+            <input name="accountNumber" placeholder="Account number" ${approved ? "" : "disabled"}>
+          </label>
+          <label>IFSC Code
+            <input name="ifsc" placeholder="IFSC code" ${approved ? "" : "disabled"}>
+          </label>
+        </div>
+
+        <div class="user-pm-limit">
+          ${ok ? `<span>Limit: UPI ${count("UPI")}/${MAX_UPI} • Bank ${count("BANK")}/${MAX_BANK}</span>` : `<b>${approved ? limitText(selectedType) : "KYC approval required"}</b>`}
+        </div>
+
+        <button type="submit" ${ok ? "" : "disabled"}>${ok ? "Add Method for Admin Approval" : (approved ? limitText(selectedType) : "KYC Approval Required")}</button>
+      </form>
+
+      <div class="menu-real-section-title">Saved Methods</div>
+      <div class="menu-real-methods user-pm-methods">
+        ${list.length ? list.map(m => `
+          <div class="card menu-real-method-card user-pm-method-card">
+            <div>
+              <span>${typeOf(m) || "METHOD"}</span>
+              <b>${mask(m)}</b>
+              <small>${m.holderName || m.holder_name || kycName()}</small>
+            </div>
+            ${statusBadge(m.status || "PENDING")}
+          </div>
+        `).join("") : `<div class="card menu-real-empty">No payment method added yet.</div>`}
+      </div>
+    `;
+  }
+
+  function applyTypeView(){
+    const p = page();
+    if (!p) return;
+    const select = document.getElementById("userPmType");
+    if (select && select.value !== selectedType) select.value = selectedType;
+
+    p.classList.toggle("user-pm-bank-selected", selectedType === "BANK");
+    p.querySelectorAll(".user-pm-bank-fields").forEach(el => el.style.setProperty("display", selectedType === "BANK" ? "grid" : "none", "important"));
+    p.querySelectorAll(".user-pm-upi-field").forEach(el => el.style.setProperty("display", selectedType === "BANK" ? "none" : "grid", "important"));
+  }
+
+  function bind(){
+    const select = document.getElementById("userPmType");
+    const form = document.getElementById("userPaymentMethodCleanForm");
+
+    if (select && select.dataset.cleanBound !== "1") {
+      select.dataset.cleanBound = "1";
+      select.addEventListener("change", function(){
+        setType(select.value);
+        render();
+      }, true);
+    }
+
+    if (form && form.dataset.cleanBound !== "1") {
+      form.dataset.cleanBound = "1";
+      form.addEventListener("submit", submit, true);
+    }
+  }
+
+  async function submit(e){
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+
+    if (!kycApproved()) {
+      alert("Please complete approved KYC before adding payment method.");
+      return;
+    }
+    if (!canAdd(selectedType)) {
+      alert(limitText(selectedType));
+      render();
+      return;
+    }
+
+    const form = e.target;
+    const fd = new FormData(form);
+
+    const method = {
+      id: "pm_" + Date.now(),
+      userId: uid(),
+      userEmail: userEmail(),
+      type: selectedType,
+      upi: selectedType === "UPI" ? String(fd.get("upi") || "").trim() : "",
+      holderName: kycName(),
+      kycName: kycName(),
+      bankName: selectedType === "BANK" ? String(fd.get("bankName") || "").trim() : "",
+      accountNumber: selectedType === "BANK" ? String(fd.get("accountNumber") || "").trim() : "",
+      ifsc: selectedType === "BANK" ? String(fd.get("ifsc") || "").trim() : "",
+      status: "PENDING",
+      createdAt: new Date().toLocaleString()
+    };
+
+    if (selectedType === "UPI" && !method.upi) {
+      alert("Please enter UPI ID.");
+      return;
+    }
+    if (selectedType === "BANK" && (!method.bankName || !method.accountNumber || !method.ifsc)) {
+      alert("Please enter complete bank details.");
+      return;
+    }
+
+    state.userPayoutMethods ||= state.payoutMethods || [];
+    state.userPayoutMethods.unshift(method);
+    state.payoutMethods = state.userPayoutMethods;
+
+    try { saveState?.(); } catch(err){}
+    try { saveSession?.(); } catch(err){}
+
+    const client = supa();
+    if (client) {
+      try {
+        const res = await client.from("user_payout_methods").upsert({
+          id: method.id,
+          user_id: method.userId,
+          method_type: method.type,
+          holder_name: method.holderName,
+          kyc_name_snapshot: method.kycName,
+          upi_id: method.upi,
+          bank_name: method.bankName,
+          account_number: method.accountNumber,
+          ifsc: method.ifsc,
+          status: "PENDING",
+          name_match: true,
+          created_at_text: method.createdAt
+        }, { onConflict: "id" });
+        if (res.error) console.warn("Payout DB save failed", res.error);
+      } catch(err) {
+        console.warn("Payout DB save failed", err);
+      }
+    }
+
+    render();
+  }
+
+  function render(){
+    if (!isActive() || isRendering) return;
+    const r = root();
+    if (!r) return;
+
+    isRendering = true;
+    try {
+      r.innerHTML = renderHtml();
+      bind();
+      applyTypeView();
+    } finally {
+      isRendering = false;
+    }
+  }
+
+  function patchOldUserPaymentCode(){
+    if (window.__userPaymentCleanPatched) return;
+    window.__userPaymentCleanPatched = true;
+
+    // Stop old user payment renderer from resetting the page after our clean form is mounted.
+    if (typeof window.applyPaymentKycAdminApproval === "function") {
+      const old = window.applyPaymentKycAdminApproval;
+      window.applyPaymentKycAdminApproval = function(){
+        if (isActive() && document.getElementById("userPaymentMethodCleanForm")) {
+          applyTypeView();
+          return;
+        }
+        const result = old.apply(this, arguments);
+        setTimeout(render, 100);
+        return result;
+      };
+    }
+
+    if (typeof window.openRealMenuPage === "function") {
+      const oldOpen = window.openRealMenuPage;
+      window.openRealMenuPage = function(type){
+        const result = oldOpen.apply(this, arguments);
+        if (type === "paymentMethods") {
+          setTimeout(render, 80);
+          setTimeout(render, 400);
+        }
+        return result;
+      };
+    }
+  }
+
+  document.addEventListener("click", function(e){
+    const txt = (e.target?.textContent || "").toLowerCase();
+    if (txt.includes("payment method") || txt.includes("payment methods")) {
+      setTimeout(render, 100);
+      setTimeout(render, 500);
+    }
+  }, true);
+
+  window.renderUserPaymentMethodsClean = render;
+
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(patchOldUserPaymentCode, 500);
+    setTimeout(render, 900);
+  });
+  window.addEventListener("load", () => {
+    setTimeout(patchOldUserPaymentCode, 600);
+    setTimeout(render, 1000);
+  });
+})();

@@ -933,3 +933,27 @@ Clean Logic Locked Base:
 - Payment Methods: stable UPI/BANK selection, one warning only, max 2 UPI + 2 Bank.
 - Removed old patch markers: [{"marker": "ADMIN KYC STABLE RENDERER FIX", "js": 1, "css": 1}, {"marker": "KYC APPROVE REJECT LOCK FIX", "js": 1, "css": 1}, {"marker": "PAYMENT METHOD NO BLINK ONE WARNING FIX", "js": 1, "css": 1}]
 - JS syntax check: OK
+
+
+My Payment Methods Final Stable Fix:
+- Checked ZIP and added a standalone stable renderer for My Payment Methods only.
+- Does not touch chart/trade/home/wallet/P&L/history.
+- Payment Methods page is rendered once as stable form, preventing old renderer from resetting UPI/BANK.
+- Bank/UPI selection stays stable.
+- Warning appears once.
+- Max 2 UPI IDs and max 2 Bank Accounts.
+- KYC-approved name is locked as holder name.
+- Saves method locally and attempts DB upsert into user_payout_methods.
+- JS syntax check: OK
+
+
+User My Payment Methods Clean Final:
+- User-side My Payment Methods page now has its own clean stable renderer.
+- This directly replaces the old user payment method content when that page opens.
+- Admin code is not the focus here; Trade/Chart/Home/Wallet/P&L/History untouched.
+- Bank/UPI select stable.
+- Warning only once.
+- Max 2 UPI IDs and max 2 Bank Accounts.
+- KYC name locked in holder field.
+- Saves locally and tries DB upsert into user_payout_methods.
+- JS syntax check: OK
