@@ -6497,3 +6497,180 @@ function restoreManualHistoryBackup(mode = state.mode) {
   window.addEventListener("load", () => setTimeout(apsBind, 900));
   setInterval(apsBind, 2500);
 })();
+
+
+/* ===== KYC DOCUMENT UPLOAD FIX ===== */
+(function(){
+  function kdUser(){ return state?.user || {}; }
+  function kdSave(){
+    try { saveState?.(); } catch(e){}
+    try { saveSession?.(); } catch(e){}
+    try {
+      localStorage.setItem("ai_kyc_docs_v1_" + (kdUser().id || kdUser().email || "local"), JSON.stringify({
+        kycDocuments: kdUser().kycDocuments || {},
+        kycStatus: kdUser().kycStatus || "PENDING",
+        kycSubmittedAt: kdUser().kycSubmittedAt || ""
+      }));
+    } catch(e){}
+  }
+  function kdLoad(){
+    try {
+      const raw = localStorage.getItem("ai_kyc_docs_v1_" + (kdUser().id || kdUser().email || "local"));
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      state.user.kycDocuments ||= d.kycDocuments || {};
+      if (d.kycStatus && !state.user.kycStatus) state.user.kycStatus = d.kycStatus;
+      if (d.kycSubmittedAt && !state.user.kycSubmittedAt) state.user.kycSubmittedAt = d.kycSubmittedAt;
+    } catch(e){}
+  }
+
+  function fileToDataUrl(file){
+    return new Promise((resolve, reject) => {
+      if (!file) return resolve("");
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function docLabel(key){
+    return {
+      idFront:"ID / PAN / Aadhaar Front",
+      idBack:"ID / Aadhaar Back",
+      selfie:"Selfie Verification",
+      addressProof:"Address Proof"
+    }[key] || key;
+  }
+
+  function kdDocsHtml(){
+    const docs = kdUser().kycDocuments || {};
+    const keys = ["idFront","idBack","selfie","addressProof"];
+    return `
+      <div id="kycDocumentUploadBlock" class="kyc-doc-upload-block">
+        <div class="kyc-doc-title">
+          <h3>Upload KYC Documents</h3>
+          <p>Admin verification ke liye clear images upload karein.</p>
+        </div>
+
+        <label class="kyc-doc-field">ID / PAN / Aadhaar Front
+          <input type="file" name="idFront" accept="image/*,.pdf">
+        </label>
+
+        <label class="kyc-doc-field">ID / Aadhaar Back
+          <input type="file" name="idBack" accept="image/*,.pdf">
+        </label>
+
+        <label class="kyc-doc-field">Selfie Verification
+          <input type="file" name="selfie" accept="image/*" capture="user">
+        </label>
+
+        <label class="kyc-doc-field">Address Proof Optional
+          <input type="file" name="addressProof" accept="image/*,.pdf">
+        </label>
+
+        <div class="kyc-doc-preview-list">
+          ${keys.map(k => `
+            <div class="kyc-doc-preview ${docs[k] ? "uploaded" : ""}">
+              <span>${docLabel(k)}</span>
+              <b>${docs[k] ? "Uploaded" : "Not uploaded"}</b>
+            </div>
+          `).join("")}
+        </div>
+
+        <small class="kyc-doc-note">
+          अभी यह local/browser save flow है. Real production में documents को Supabase Storage या secure server storage में upload करना होगा.
+        </small>
+      </div>
+    `;
+  }
+
+  function kdInjectDocs(){
+    kdLoad();
+    const page = document.getElementById("kycPage");
+    if (!page || !page.classList.contains("active-page")) return;
+
+    const form = page.querySelector("#realKycForm, #menuKycForm");
+    if (!form || form.querySelector("#kycDocumentUploadBlock")) return;
+
+    const submit = form.querySelector("button[type='submit'], button");
+    const wrap = document.createElement("div");
+    wrap.innerHTML = kdDocsHtml();
+    const block = wrap.firstElementChild;
+
+    if (submit) submit.insertAdjacentElement("beforebegin", block);
+    else form.appendChild(block);
+
+    const btn = form.querySelector("button[type='submit'], button");
+    if (btn) btn.textContent = "Submit KYC Documents for Approval";
+  }
+
+  async function kdHandleSubmit(form){
+    const fd = new FormData(form);
+    state.user.kycStatus = "PENDING";
+    state.user.kycName = fd.get("kycName") || state.user.kycName || state.user.name || "";
+    state.user.kycId = fd.get("kycId") || state.user.kycId || "";
+    state.user.kycDob = fd.get("kycDob") || state.user.kycDob || "";
+    state.user.kycAddress = fd.get("kycAddress") || state.user.kycAddress || "";
+    state.user.kycSubmittedAt = new Date().toLocaleString();
+    state.user.kycDocuments ||= {};
+
+    const fileKeys = ["idFront","idBack","selfie","addressProof"];
+    for (const key of fileKeys) {
+      const file = fd.get(key);
+      if (file && file.name) {
+        state.user.kycDocuments[key] = {
+          name: file.name,
+          type: file.type || "",
+          size: file.size || 0,
+          dataUrl: await fileToDataUrl(file),
+          uploadedAt: new Date().toLocaleString()
+        };
+      }
+    }
+
+    kdSave();
+  }
+
+  function kdBind(){
+    kdInjectDocs();
+
+    document.addEventListener("submit", async function(e){
+      const form = e.target;
+      if (!form || (form.id !== "realKycForm" && form.id !== "menuKycForm")) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      const btn = form.querySelector("button[type='submit'], button");
+      const old = btn ? btn.textContent : "";
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Uploading KYC...";
+      }
+
+      try {
+        await kdHandleSubmit(form);
+        alert("KYC documents submitted. Status: Pending admin approval.");
+        if (typeof openRealMenuPage === "function") openRealMenuPage("kyc");
+        else if (typeof openMenuFullPage === "function") openMenuFullPage("kyc");
+        setTimeout(kdInjectDocs, 500);
+      } catch(err) {
+        console.error(err);
+        alert("KYC upload failed. Please try again.");
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = old || "Submit KYC Documents for Approval";
+        }
+      }
+    }, true);
+  }
+
+  window.injectKycDocumentUpload = kdInjectDocs;
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(kdBind, 900));
+  window.addEventListener("load", () => setTimeout(kdBind, 1100));
+  setInterval(kdInjectDocs, 1500);
+})();

@@ -795,3 +795,18 @@ Admin Payment Stable Page Fix:
 - User-side design untouched.
 - No SQL required.
 - JS syntax check: OK
+
+
+KYC Document Upload Fix:
+- Added document upload fields to KYC page:
+  - ID/PAN/Aadhaar front
+  - ID/Aadhaar back
+  - Selfie verification
+  - Address proof optional
+- KYC submit now saves text details + selected documents in local/browser state.
+- Uploaded document status shows as Uploaded / Not uploaded.
+- KYC status becomes PENDING after submission.
+- This is local UI/browser storage for testing. Production needs Supabase Storage/DB or secure backend storage.
+- User/admin design untouched except KYC upload block.
+- No SQL required for this local test version.
+- JS syntax check: OK
