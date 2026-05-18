@@ -6515,8 +6515,8 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
 
 
 
-/* ===== ADMIN KYC EXISTING TABLE NO FLICKER FIX ===== */
-.ek-kyc-status{
+/* ===== ADMIN KYC STABLE RENDERER FIX ===== */
+.akstable-status{
   display:inline-flex!important;
   align-items:center!important;
   justify-content:center!important;
@@ -6525,10 +6525,10 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
   font-size:11px!important;
   font-weight:900!important;
 }
-.ek-kyc-status.pending{color:#f8bd7a!important;background:rgba(248,189,122,.12)!important;}
-.ek-kyc-status.approved{color:#00e7a8!important;background:rgba(0,231,168,.12)!important;}
-.ek-kyc-status.rejected{color:#ff456b!important;background:rgba(255,69,107,.12)!important;}
-.ek-kyc-action{
+.akstable-status.pending{color:#f8bd7a!important;background:rgba(248,189,122,.12)!important;}
+.akstable-status.approved{color:#00e7a8!important;background:rgba(0,231,168,.12)!important;}
+.akstable-status.rejected{color:#ff456b!important;background:rgba(255,69,107,.12)!important;}
+.akstable-action{
   border:0!important;
   border-radius:10px!important;
   padding:7px 10px!important;
@@ -6536,9 +6536,9 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
   font-weight:850!important;
   cursor:pointer!important;
 }
-.ek-kyc-action.approve{background:#00e7a8!important;color:#06101e!important;}
-.ek-kyc-action.reject{background:#ff456b!important;color:#fff!important;}
-.ek-kyc-grid-row{
+.akstable-action.approve{background:#00e7a8!important;color:#06101e!important;}
+.akstable-action.reject{background:#ff456b!important;color:#fff!important;}
+.akstable-grid-row{
   display:grid!important;
   grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1.25fr!important;
   gap:12px!important;
@@ -6547,8 +6547,7 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
   border-top:1px solid rgba(255,255,255,.06)!important;
   color:#cdd8ed!important;
 }
-.ek-kyc-empty{
+.akstable-empty{
   padding:18px 22px!important;
   color:#9fb2d0!important;
 }
-.ek-kyc-empty.error{color:#ff8da1!important;}

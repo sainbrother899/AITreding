@@ -853,12 +853,10 @@ Admin KYC Existing Table Bind Fix:
 - JS syntax check: OK
 
 
-Admin KYC Existing Table No Flicker Fix:
-- Removed previous interval-based KYC table bind block that caused hide/unhide flicker.
-- KYC DB rows now load on KYC tab click and update only when content changes.
-- No repeated loading row.
-- Slow safety refresh every 30 seconds only, with no DOM rewrite unless data changed.
-- Design locked: no sidebar/header/layout changes.
-- Removed old JS block: 1
-- Removed old CSS block: 1
+Admin KYC Stable Renderer Fix:
+- Root cause fixed: old adminRenderAllSafe interval called adminRenderKycSafe every 1.2s and emptied/re-rendered the table.
+- Now adminRenderKycSafe is overridden to render DB-cache rows.
+- Same HTML is not rewritten every second, so blinking should stop.
+- No new page, no overlay, no sidebar/header/layout design changes.
+- KYC rows still load from Supabase DB and approve/reject updates DB.
 - JS syntax check: OK
