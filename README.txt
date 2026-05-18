@@ -535,3 +535,22 @@ Referral 500 DB Final Fix:
 - Referrer gets fixed 500 automatically after referred user's first approved deposit.
 - No referral approval needed.
 - Run the new SQL for profiles referral_code/referred_by columns.
+
+
+Referral 500 Wallet Hard Fix:
+- Removed old 5%/50 logic conflicts.
+- Referral bonus is fixed 500, not 50.
+- Bonus goes to referrer's wallet_ledger as REFERRAL_BONUS +500.
+- Bonus is paid after referred user's first approved deposit.
+- No separate referral approval.
+- Run the SQL if profiles.referral_code/referred_by columns are missing.
+- JS syntax check: OK
+
+
+Referral First Deposit 10% Update:
+- Referral bonus = referred user's first approved deposit amount ka 10%.
+- Bonus automatic wallet_ledger me add hoga; referral approval nahi chahiye.
+- Sirf first approved deposit par bonus milega; next deposits par nahi.
+- Example: first deposit ₹100000 => referrer bonus ₹10000.
+- SQL same referral_code/referred_by columns use karta hai.
+- JS syntax check: OK

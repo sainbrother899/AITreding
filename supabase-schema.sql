@@ -287,3 +287,6 @@ alter table public.referrals add column if not exists status text default 'PAID'
 create index if not exists idx_profiles_referral_code on public.profiles(referral_code);
 create index if not exists idx_profiles_referred_by on public.profiles(referred_by);
 create index if not exists idx_referrals_user_id_bonus on public.referrals(user_id, bonus_amount, status);
+
+
+create index if not exists idx_referrals_user_percent on public.referrals(user_id, percent, status);
