@@ -3791,3 +3791,293 @@ body[data-admin-page="true"] #adminUsers.active-admin-panel{
 body[data-admin-page="true"] #adminUsers:not(.active-admin-panel){
   display:none!important;
 }
+
+
+/* ===== PREMIUM MOBILE UI POLISH ===== */
+:root{
+  --premium-bg:#050b16;
+  --premium-card:#0a1322;
+  --premium-card2:#0d1829;
+  --premium-border:rgba(124,166,255,.18);
+  --premium-text:#f3f7ff;
+  --premium-muted:#9fb2d0;
+  --premium-green:#00e7a8;
+  --premium-red:#ff456b;
+  --premium-yellow:#ffc947;
+}
+
+body[data-premium-ui="true"]{
+  background:
+    radial-gradient(circle at 18% 18%, rgba(0,231,168,.12), transparent 28%),
+    radial-gradient(circle at 84% 42%, rgba(255,45,105,.18), transparent 30%),
+    linear-gradient(180deg,#041715 0%, #070919 55%, #120b26 100%)!important;
+  color:var(--premium-text)!important;
+  padding-bottom:110px!important;
+}
+
+body[data-premium-ui="true"] .card,
+body[data-premium-ui="true"] .ticker-card,
+body[data-premium-ui="true"] .plan-card{
+  background:linear-gradient(180deg,rgba(13,24,41,.94),rgba(7,13,25,.96))!important;
+  border:1px solid var(--premium-border)!important;
+  box-shadow:0 14px 38px rgba(0,0,0,.26), inset 0 0 0 1px rgba(255,255,255,.02)!important;
+  border-radius:24px!important;
+}
+
+body[data-premium-ui="true"] .label{
+  letter-spacing:.12em!important;
+  color:var(--premium-muted)!important;
+}
+
+body[data-premium-ui="true"] h1,
+body[data-premium-ui="true"] h2{
+  letter-spacing:-.04em!important;
+}
+
+.premium-ticker-grid{
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:10px!important;
+  margin:10px 0 14px!important;
+}
+.premium-ticker-card{
+  display:grid!important;
+  grid-template-columns:32px 1fr auto!important;
+  align-items:center!important;
+  gap:8px!important;
+  padding:12px!important;
+  border-radius:18px!important;
+  background:rgba(13,24,41,.88)!important;
+  border:1px solid rgba(124,166,255,.14)!important;
+  min-width:0!important;
+}
+.premium-ticker-card .ticker-icon{
+  width:30px;height:30px;border-radius:50%;
+  display:grid;place-items:center;
+  background:linear-gradient(135deg,#ff9d2e,#8b5cf6);
+  color:white;font-weight:900;
+}
+.premium-ticker-card b{
+  display:block!important;
+  font-size:13px!important;
+  white-space:nowrap!important;
+}
+.premium-ticker-card span{
+  display:block!important;
+  color:var(--premium-text)!important;
+  font-size:12px!important;
+  white-space:nowrap!important;
+}
+.premium-ticker-card em{
+  font-size:12px!important;
+  font-style:normal!important;
+  white-space:nowrap!important;
+}
+.premium-ticker-card em.pos{color:var(--premium-green)!important;}
+.premium-ticker-card em.neg{color:var(--premium-red)!important;}
+
+.premium-account-mode-card{
+  margin-top:14px!important;
+}
+.premium-card-head{
+  display:flex!important;
+  justify-content:space-between!important;
+  align-items:flex-start!important;
+  gap:10px!important;
+  margin-bottom:12px!important;
+}
+.premium-card-head h2{
+  margin:2px 0 0!important;
+  font-size:22px!important;
+}
+#premiumActiveModeBadge{
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:7px 10px;border-radius:999px;
+  color:var(--premium-green);background:rgba(0,231,168,.12);
+  border:1px solid rgba(0,231,168,.26);
+  font-size:12px;font-weight:900;
+}
+.premium-account-grid{
+  display:grid!important;
+  grid-template-columns:1fr 1fr!important;
+  gap:10px!important;
+}
+.premium-account-mini{
+  text-align:left!important;
+  border:1px solid rgba(124,166,255,.14)!important;
+  background:rgba(255,255,255,.04)!important;
+  color:var(--premium-text)!important;
+  border-radius:18px!important;
+  padding:14px!important;
+  cursor:pointer!important;
+}
+.premium-account-mini.active{
+  border-color:rgba(0,231,168,.7)!important;
+  box-shadow:0 0 0 2px rgba(0,231,168,.08), 0 0 28px rgba(0,231,168,.18)!important;
+  background:linear-gradient(135deg,rgba(0,231,168,.18),rgba(0,231,168,.04))!important;
+}
+.premium-account-mini span{
+  display:block;color:var(--premium-muted);font-size:12px;margin-bottom:6px;
+}
+.premium-account-mini b{
+  color:var(--premium-text);font-size:17px;
+}
+.premium-hide-old-switch{
+  display:none!important;
+}
+
+.premium-ai-progress{
+  height:8px!important;
+  border-radius:999px!important;
+  background:rgba(255,255,255,.08)!important;
+  overflow:hidden!important;
+  margin-top:12px!important;
+}
+.premium-ai-progress span{
+  display:block;height:100%;width:0%;
+  background:linear-gradient(90deg,var(--premium-green),#3b82f6);
+  border-radius:999px;
+}
+
+body[data-premium-ui="true"] .bottom-nav,
+body[data-premium-ui="true"] .mobile-nav,
+body[data-premium-ui="true"] nav.bottom{
+  bottom:10px!important;
+  left:12px!important;
+  right:12px!important;
+  width:auto!important;
+  border-radius:28px!important;
+  background:rgba(7,13,25,.96)!important;
+  backdrop-filter:blur(18px)!important;
+  border:1px solid rgba(124,166,255,.16)!important;
+  box-shadow:0 18px 45px rgba(0,0,0,.45)!important;
+}
+
+body[data-premium-ui="true"] .active-page{
+  padding-bottom:125px!important;
+}
+
+body[data-premium-ui="true"] .table-wrap{
+  border-radius:18px!important;
+}
+.premium-mobile-card-list{
+  display:none;
+}
+.premium-empty-card,
+.premium-history-card{
+  border:1px solid rgba(124,166,255,.14);
+  background:rgba(13,24,41,.8);
+  border-radius:18px;
+  padding:13px;
+  margin:10px 0;
+}
+.premium-history-card > div{
+  display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;
+}
+.premium-history-card b{
+  color:var(--premium-text);
+}
+.premium-history-card span{
+  padding:5px 9px;border-radius:999px;background:rgba(255,255,255,.07);
+  color:var(--premium-green);font-size:12px;font-weight:900;
+}
+.premium-history-card span.sell{color:var(--premium-red);}
+.premium-history-card span.buy{color:var(--premium-green);}
+.premium-history-card p{
+  display:flex;justify-content:space-between;gap:10px;
+  color:var(--premium-muted);margin:7px 0;font-size:13px;
+}
+.premium-history-card strong{
+  color:var(--premium-text);text-align:right;
+}
+
+.premium-pnl-dashboard{
+  margin-top:14px!important;
+}
+.premium-pnl-grid{
+  display:grid;grid-template-columns:1.4fr 1fr;gap:12px;
+}
+.premium-pnl-grid > div{
+  border:1px solid rgba(124,166,255,.14);
+  background:rgba(255,255,255,.035);
+  border-radius:18px;
+  padding:14px;
+}
+.premium-pnl-grid span{
+  display:block;color:var(--premium-muted);font-size:12px;margin-bottom:8px;
+}
+.premium-pnl-grid b{
+  display:block;color:var(--premium-green);font-size:22px;margin-bottom:10px;
+}
+.mini-chart{
+  display:flex;align-items:end;gap:7px;height:70px;
+}
+.mini-chart i{
+  flex:1;border-radius:8px 8px 0 0;background:linear-gradient(180deg,var(--premium-green),rgba(0,231,168,.2));
+}
+.mini-chart i:nth-child(1){height:30%}.mini-chart i:nth-child(2){height:55%}.mini-chart i:nth-child(3){height:45%}.mini-chart i:nth-child(4){height:70%}.mini-chart i:nth-child(5){height:90%}
+
+body[data-premium-ui="true"] #userAutoAdminTradeToggle,
+body[data-premium-ui="true"] input[type="checkbox"]{
+  accent-color:var(--premium-green)!important;
+}
+
+body[data-premium-ui="true"] #chartContainer,
+body[data-premium-ui="true"] #tradingViewChart,
+body[data-premium-ui="true"] #crypto_live_chart{
+  overflow:hidden!important;
+  border-radius:22px!important;
+}
+
+@media(max-width:700px){
+  body[data-premium-ui="true"]{
+    font-size:15px!important;
+  }
+  .premium-ticker-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+  }
+  .premium-ticker-card{
+    grid-template-columns:26px 1fr!important;
+    padding:10px!important;
+  }
+  .premium-ticker-card em{
+    grid-column:2;
+  }
+  .premium-account-grid{
+    grid-template-columns:1fr 1fr!important;
+  }
+  body[data-premium-ui="true"] .table-wrap{
+    display:none!important;
+  }
+  .premium-mobile-card-list{
+    display:block!important;
+  }
+  .premium-pnl-grid{
+    grid-template-columns:1fr!important;
+  }
+  body[data-premium-ui="true"] .card{
+    border-radius:22px!important;
+    margin-left:0!important;
+    margin-right:0!important;
+  }
+  body[data-premium-ui="true"] h1{
+    font-size:32px!important;
+  }
+  body[data-premium-ui="true"] h2{
+    font-size:28px!important;
+  }
+  body[data-premium-ui="true"] .wallet-note,
+  body[data-premium-ui="true"] .muted{
+    line-height:1.45!important;
+  }
+}
+
+@media(max-width:420px){
+  .premium-account-grid{
+    grid-template-columns:1fr!important;
+  }
+  .premium-card-head{
+    flex-direction:column!important;
+  }
+}

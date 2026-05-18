@@ -235,3 +235,17 @@ Admin Users Menu Exact Fix:
 - Alias bridge supports old/new Users panel element IDs.
 - Verification: has_in_menu=True, has_top_wrong=False, has_panel=True
 - JS syntax check: OK
+
+
+Premium Mobile UI Polish:
+- Home ticker converted to clean coin cards.
+- Account mode redesigned: clickable Demo/Real cards, duplicate old switch hidden.
+- AI trades today gets progress bar.
+- Wallet/history tables get mobile card layout to remove horizontal scrollbars.
+- Wallet note shortened.
+- PnL page gets performance overview card and mini trend chart.
+- Bottom navigation safe padding/overlap fix.
+- Global premium dark card polish.
+- Logic/Supabase/Admin functionality untouched.
+- No SQL required.
+- JS syntax check: OK
