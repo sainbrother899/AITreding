@@ -4619,84 +4619,92 @@ function restoreManualHistoryBackup(mode = state.mode) {
 
 
 
-/* ===== CHART CSS CONFLICT CLEANUP FINAL ===== */
+
+
+
+/* ===== CHART IMPORTANT OVERRIDE FIX ===== */
 (function(){
-  function chartCleanHeight(){
+  function chartFinalHeight(){
     const vv = window.visualViewport;
     const vh = vv?.height || window.innerHeight || document.documentElement.clientHeight || 720;
     const vw = window.innerWidth || document.documentElement.clientWidth || 390;
 
-    // Balanced responsive height. No fixed px-only layout.
-    if (vw <= 380) return Math.round(Math.max(430, Math.min(vh * 0.62, 560)));
+    if (vw <= 380) return Math.round(Math.max(430, Math.min(vh * 0.64, 560)));
     if (vw <= 480) return Math.round(Math.max(460, Math.min(vh * 0.66, 610)));
     if (vw <= 768) return Math.round(Math.max(500, Math.min(vh * 0.68, 660)));
     return Math.round(Math.max(540, Math.min(vh * 0.70, 720)));
   }
 
-  function applyChartCssConflictCleanup(){
+  function imp(el, prop, value){
+    if (!el) return;
+    el.style.setProperty(prop, value, "important");
+  }
+
+  function applyChartImportantOverride(){
     try {
-      const tradePage = document.getElementById("tradepage") || document.getElementById("trade");
-      if (!tradePage) return;
+      const page = document.getElementById("tradepage") || document.getElementById("trade");
+      if (!page) return;
 
-      const h = chartCleanHeight();
-      const charts = [
-        document.getElementById("crypto_live_chart"),
-        document.getElementById("tradingViewChart"),
-        document.getElementById("chartContainer")
-      ].filter(Boolean);
+      const h = chartFinalHeight();
+      const hpx = h + "px";
 
-      tradePage.querySelectorAll("iframe[src*='tradingview'], iframe[src*='widgetembed']").forEach(frame => {
-        if (!charts.includes(frame)) charts.push(frame);
+      const host =
+        document.getElementById("crypto_live_chart") ||
+        document.getElementById("tradingViewChart") ||
+        document.getElementById("chartContainer");
+
+      if (!host) return;
+
+      const iframe = host.querySelector("iframe") || page.querySelector("iframe[src*='tradingview'], iframe[src*='widgetembed']");
+      const card = host.closest(".card") || host.closest(".chart-card") || host.closest(".exact-chart-card") || host.parentElement;
+
+      if (card) {
+        card.classList.add("chart-important-card");
+        card.style.setProperty("--chart-final-height", hpx);
+        imp(card, "height", "auto");
+        imp(card, "min-height", "auto");
+        imp(card, "max-height", "none");
+        imp(card, "overflow", "visible");
+        imp(card, "padding", "6px");
+      }
+
+      host.classList.add("chart-important-host");
+      host.style.setProperty("--chart-final-height", hpx);
+      imp(host, "width", "100%");
+      imp(host, "height", hpx);
+      imp(host, "min-height", hpx);
+      imp(host, "max-height", "none");
+      imp(host, "overflow", "visible");
+      imp(host, "display", "block");
+
+      if (iframe) {
+        iframe.classList.add("chart-important-frame");
+        iframe.style.setProperty("--chart-final-height", hpx);
+        imp(iframe, "width", "100%");
+        imp(iframe, "height", hpx);
+        imp(iframe, "min-height", hpx);
+        imp(iframe, "max-height", "none");
+        imp(iframe, "display", "block");
+        imp(iframe, "border", "0");
+      }
+
+      // Remove duplicate rows outside the chart.
+      page.querySelectorAll(".pro-pair-line,.pro-time-tabs,.real-tv-chart-head,.chart-hint").forEach(el => {
+        imp(el, "display", "none");
       });
 
-      charts.forEach(el => {
-        const host = el.tagName === "IFRAME" ? (el.parentElement || el) : el;
-        const iframe = el.tagName === "IFRAME" ? el : el.querySelector("iframe");
-        const card = host.closest(".card") || host.closest(".chart-card") || host.closest(".exact-chart-card") || host.parentElement;
-
-        if (card) {
-          card.classList.add("chart-clean-card");
-          card.style.setProperty("--chart-clean-height", h + "px");
-          card.style.height = "auto";
-          card.style.minHeight = "auto";
-          card.style.maxHeight = "none";
-          card.style.overflow = "visible";
-        }
-
-        host.classList.add("chart-clean-host");
-        host.style.setProperty("--chart-clean-height", h + "px");
-        host.style.height = h + "px";
-        host.style.minHeight = h + "px";
-        host.style.maxHeight = "none";
-        host.style.overflow = "visible";
-
-        if (iframe) {
-          iframe.classList.add("chart-clean-frame");
-          iframe.style.width = "100%";
-          iframe.style.height = h + "px";
-          iframe.style.minHeight = h + "px";
-          iframe.style.maxHeight = "none";
-          iframe.style.display = "block";
-          iframe.style.border = "0";
-        }
-      });
-
-      // Remove duplicate chart controls outside iframe/chart.
-      tradePage.querySelectorAll(".pro-pair-line,.pro-time-tabs,.real-tv-chart-head,.chart-hint").forEach(el => {
-        el.style.display = "none";
-      });
-
-      document.body.classList.add("chart-css-conflict-cleaned");
+      document.body.classList.add("chart-important-override-ready");
     } catch(e) {
-      console.warn("Chart CSS conflict cleanup skipped", e);
+      console.warn("Chart important override skipped", e);
     }
   }
 
-  window.applyChartCssConflictCleanup = applyChartCssConflictCleanup;
+  window.applyChartImportantOverride = applyChartImportantOverride;
 
-  document.addEventListener("DOMContentLoaded", () => setTimeout(applyChartCssConflictCleanup, 600));
-  window.addEventListener("load", () => setTimeout(applyChartCssConflictCleanup, 800));
-  window.addEventListener("resize", () => setTimeout(applyChartCssConflictCleanup, 150));
-  window.visualViewport?.addEventListener("resize", () => setTimeout(applyChartCssConflictCleanup, 150));
-  setInterval(applyChartCssConflictCleanup, 3000);
+  document.addEventListener("DOMContentLoaded", () => setTimeout(applyChartImportantOverride, 500));
+  window.addEventListener("load", () => setTimeout(applyChartImportantOverride, 700));
+  window.addEventListener("resize", () => setTimeout(applyChartImportantOverride, 150));
+  window.visualViewport?.addEventListener("resize", () => setTimeout(applyChartImportantOverride, 150));
+
+  setInterval(applyChartImportantOverride, 1500);
 })();

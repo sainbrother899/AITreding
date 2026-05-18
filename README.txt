@@ -605,3 +605,15 @@ Chart CSS Conflict Cleanup Final:
 - Order Ticket / Order Book / Trade Feed untouched.
 - No SQL required.
 - Diagnostics: {"removed_blocks": ["TRADINGVIEW FULL FIT FINAL"], "remaining_crypto_live_chart_mentions": 21, "remaining_520px_mentions": 21, "remaining_330px_mentions": 10, "remaining_360px_mentions": 7, "syntax": "OK"}
+
+
+Chart Important Override Fix:
+- Previous fix did not apply because older !important chart heights were still winning.
+- Removed earlier chart sizing blocks and added a stronger final override.
+- Final CSS no longer depends on body[data-active-page="trade"].
+- JS uses style.setProperty(..., "important") to override old CSS !important.
+- #crypto_live_chart, its iframe, and parent card now receive the same final responsive height.
+- Duplicate outer timeframe/live price rows remain hidden.
+- Order Ticket / Order Book / Trade Feed untouched.
+- No SQL required.
+- Diagnostics: {"syntax": "OK", "styles_crypto_mentions": 23, "app_has_important_fix": true, "css_has_important_fix": true}
