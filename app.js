@@ -1630,7 +1630,8 @@ async function approveWithdrawal(id) {
   if (u) u.realBalance = Math.max(0, Number(u.realBalance || 0) - amount);
 
   req.status = "APPROVED";
-  await refApplyFirstDeposit10PercentBonus(req);
+  await simpleApplyReferralBonusOnApprovedDeposit(req);
+  
   
   req.approvedAt = new Date().toLocaleString();
 
@@ -1708,195 +1709,190 @@ function renderDeposits() {
 
 
 
-/* ===== REFERRAL FIRST DEPOSIT 10 PERCENT AUTO BONUS ===== */
-const REFERRAL_FIRST_DEPOSIT_PERCENT = 10;
 
-function refClean(v) {
-  return String(v || "").trim();
+/* ===== SIMPLE WORKING REFERRAL 10% FIRST DEPOSIT ===== */
+const SIMPLE_REF_PERCENT = 10;
+
+function simpleRefClean(v){ return String(v || "").trim(); }
+function simpleRefLower(v){ return simpleRefClean(v).toLowerCase(); }
+function simpleRefAmount(v){ return Number(String(v || 0).replace(/,/g,"")) || 0; }
+
+function simpleMakeCode(user){
+  const base = simpleRefLower(user?.email || user?.id || ("u"+Date.now()));
+  return (base.replace(/[^a-z0-9]/g,"").slice(0,8) || "ref") + String(Math.floor(1000 + Math.random()*9000));
 }
 
-function refLower(v) {
-  return refClean(v).toLowerCase();
+function simpleGetUrlRef(){
+  try {
+    return new URLSearchParams(location.search).get("ref") || "";
+  } catch(e){ return ""; }
 }
 
-function refMakeCode(user) {
-  const raw = refLower(user?.email || user?.id || ("u" + Date.now()));
-  return raw.replace(/[^a-z0-9]/g, "").slice(0, 10) || ("ref" + Date.now());
+function simpleCurrentReferralInput(){
+  return simpleRefClean(
+    document.getElementById("regReferral")?.value ||
+    document.getElementById("referralInput")?.value ||
+    simpleGetUrlRef()
+  );
 }
 
-function refLocalUserByIdOrEmail(id, email) {
-  const uid = refClean(id);
-  const em = refLower(email);
-  return (state.users || []).find(u =>
-    refClean(u.id) === uid || (!!em && refLower(u.email) === em)
-  ) || null;
-}
-
-async function refEnsureCurrentUserCode() {
-  if (!state.user) return;
-  const code = state.user.referralCode || state.user.referral_code || refMakeCode(state.user);
-  state.user.referralCode = code;
+async function simpleEnsureUserReferralFields(){
+  if(!state.user) return;
+  const code = state.user.referral_code || state.user.referralCode || simpleMakeCode(state.user);
   state.user.referral_code = code;
+  state.user.referralCode = code;
 
-  const u = refLocalUserByIdOrEmail(state.user.id, state.user.email);
-  if (u) {
-    u.referralCode = code;
+  const usedRef = state.user.referred_by || state.user.referredBy || simpleCurrentReferralInput();
+  if(usedRef){
+    state.user.referred_by = usedRef;
+    state.user.referredBy = usedRef;
+  }
+
+  state.users = state.users || [];
+  let u = state.users.find(x => String(x.id) === String(state.user.id) || simpleRefLower(x.email) === simpleRefLower(state.user.email));
+  if(u){
     u.referral_code = code;
+    u.referralCode = code;
+    if(usedRef){
+      u.referred_by = usedRef;
+      u.referredBy = usedRef;
+    }
   }
 
-  if (supabaseClient && state.user.id) {
-    try {
-      await supabaseClient.from("profiles").update({ referral_code: code }).eq("id", state.user.id);
-    } catch(e) {
-      console.warn("referral_code save failed", e);
+  if(supabaseClient && state.user.id){
+    try{
+      await supabaseClient.from("profiles").upsert({
+        id: state.user.id,
+        email: state.user.email || "",
+        name: state.user.name || "",
+        role: state.user.role || "user",
+        referral_code: code,
+        referred_by: usedRef || null
+      }, { onConflict: "id" });
+    }catch(e){
+      console.warn("profile referral upsert failed", e);
     }
   }
 
   saveState?.();
 }
 
-async function refSaveReferredByForCurrentUser(code) {
-  code = refClean(code);
-  if (!code || !state.user) return;
-
-  state.user.referredBy = code;
-  state.user.referred_by = code;
-
-  const u = refLocalUserByIdOrEmail(state.user.id, state.user.email);
-  if (u) {
-    u.referredBy = code;
-    u.referred_by = code;
-  }
-
-  if (supabaseClient && state.user.id) {
-    try {
-      await supabaseClient.from("profiles").update({ referred_by: code }).eq("id", state.user.id);
-    } catch(e) {
-      console.warn("referred_by save failed", e);
-    }
-  }
-
-  saveState?.();
-}
-
-async function refGetReferredBy(userId, userEmail) {
-  const local = refLocalUserByIdOrEmail(userId, userEmail);
-  let code = refClean(local?.referredBy || local?.referred_by || local?.referralCodeUsed || local?.referral_code_used);
-
-  if (!code && supabaseClient && userId) {
-    try {
-      const { data } = await supabaseClient
-        .from("profiles")
-        .select("referred_by")
-        .eq("id", userId)
-        .maybeSingle();
-      code = refClean(data?.referred_by);
-    } catch(e) {}
-  }
-
-  return code;
-}
-
-async function refFindReferrer(code) {
-  code = refClean(code);
-  if (!code) return null;
+async function simpleFindReferrer(code){
+  code = simpleRefClean(code);
+  if(!code) return null;
 
   const local = (state.users || []).find(u =>
-    refLower(u.referralCode || u.referral_code) === refLower(code) ||
-    refLower(u.id) === refLower(code) ||
-    refLower(u.email) === refLower(code)
+    simpleRefLower(u.referral_code || u.referralCode) === simpleRefLower(code) ||
+    simpleRefLower(u.email) === simpleRefLower(code) ||
+    String(u.id) === String(code)
   );
-  if (local) return local;
+  if(local) return local;
 
-  if (supabaseClient) {
-    try {
-      const { data } = await supabaseClient
-        .from("profiles")
+  if(supabaseClient){
+    try{
+      const { data } = await supabaseClient.from("profiles")
         .select("id,email,referral_code")
         .eq("referral_code", code)
         .maybeSingle();
-      if (data?.id) return { id: data.id, email: data.email, referral_code: data.referral_code };
-    } catch(e) {}
+      if(data?.id) return data;
+    }catch(e){}
 
-    try {
-      const { data } = await supabaseClient
-        .from("profiles")
+    try{
+      const { data } = await supabaseClient.from("profiles")
         .select("id,email,referral_code")
         .eq("email", code)
         .maybeSingle();
-      if (data?.id) return { id: data.id, email: data.email, referral_code: data.referral_code };
-    } catch(e) {}
+      if(data?.id) return data;
+    }catch(e){}
   }
 
   return null;
 }
 
-async function refFirstDepositBonusAlreadyPaid(userId, userEmail) {
-  const uid = refClean(userId);
-  const em = refLower(userEmail);
+async function simpleGetReferredBy(userId, userEmail){
+  let referredBy = "";
 
-  if ((state.referrals || []).some(r => {
-    const paid = String(r.status || "").toUpperCase() === "PAID";
-    const sameUser = (uid && refClean(r.userId || r.user_id) === uid) || (em && refLower(r.userEmail || r.user_email) === em);
-    const firstDeposit = Number(r.percent || 0) === REFERRAL_FIRST_DEPOSIT_PERCENT || String(r.type || "").toUpperCase() === "FIRST_DEPOSIT_BONUS";
-    return paid && sameUser && firstDeposit;
-  })) return true;
+  const local = (state.users || []).find(u => 
+    String(u.id) === String(userId) || simpleRefLower(u.email) === simpleRefLower(userEmail)
+  );
+  referredBy = simpleRefClean(local?.referred_by || local?.referredBy);
 
-  if (supabaseClient) {
-    try {
-      if (uid) {
-        const { data } = await supabaseClient
-          .from("referrals")
+  if(!referredBy && supabaseClient && userId){
+    try{
+      const { data } = await supabaseClient.from("profiles")
+        .select("referred_by")
+        .eq("id", userId)
+        .maybeSingle();
+      referredBy = simpleRefClean(data?.referred_by);
+    }catch(e){}
+  }
+
+  return referredBy;
+}
+
+async function simpleReferralAlreadyPaid(userId, userEmail){
+  const email = simpleRefLower(userEmail);
+  const uid = simpleRefClean(userId);
+
+  if((state.referrals || []).some(r => 
+    String(r.status || "").toUpperCase() === "PAID" &&
+    Number(r.percent || 0) === SIMPLE_REF_PERCENT &&
+    ((uid && String(r.user_id || r.userId) === uid) || (email && simpleRefLower(r.user_email || r.userEmail) === email))
+  )) return true;
+
+  if(supabaseClient){
+    try{
+      if(uid){
+        const { data } = await supabaseClient.from("referrals")
           .select("id")
           .eq("user_id", uid)
+          .eq("percent", SIMPLE_REF_PERCENT)
           .eq("status", "PAID")
-          .eq("percent", REFERRAL_FIRST_DEPOSIT_PERCENT)
           .limit(1);
-        if (data && data.length) return true;
+        if(data && data.length) return true;
       }
-      if (em) {
-        const { data } = await supabaseClient
-          .from("referrals")
+      if(email){
+        const { data } = await supabaseClient.from("referrals")
           .select("id")
-          .eq("user_email", em)
+          .eq("user_email", email)
+          .eq("percent", SIMPLE_REF_PERCENT)
           .eq("status", "PAID")
-          .eq("percent", REFERRAL_FIRST_DEPOSIT_PERCENT)
           .limit(1);
-        if (data && data.length) return true;
+        if(data && data.length) return true;
       }
-    } catch(e) {}
+    }catch(e){}
   }
 
   return false;
 }
 
-async function refApplyFirstDeposit10PercentBonus(dep) {
-  if (!dep || String(dep.status || "").toUpperCase() !== "APPROVED") return;
+async function simpleApplyReferralBonusOnApprovedDeposit(dep){
+  if(!dep || String(dep.status || "").toUpperCase() !== "APPROVED") return;
 
-  const userId = refClean(dep.userId || dep.user_id);
-  const userEmail = refClean(dep.userEmail || dep.user_email);
-  const depositId = refClean(dep.id || dep.depositId || dep.deposit_id || ("dep_" + Date.now()));
-  const depositAmount = Number(String(dep.amount || dep.depositAmount || dep.deposit_amount || 0).replace(/,/g, ""));
-  if (!depositAmount || depositAmount <= 0) return;
+  const userId = simpleRefClean(dep.userId || dep.user_id);
+  const userEmail = simpleRefClean(dep.userEmail || dep.user_email);
+  const amount = simpleRefAmount(dep.amount || dep.depositAmount || dep.deposit_amount);
+  const depositId = simpleRefClean(dep.id || dep.depositId || dep.deposit_id || ("dep_"+Date.now()));
+  if(!amount) return;
 
-  const referredBy = await refGetReferredBy(userId, userEmail);
-  if (!referredBy) {
-    console.warn("No referred_by found for deposit user", { userId, userEmail });
+  const referredBy = await simpleGetReferredBy(userId, userEmail);
+  if(!referredBy){
+    console.warn("Referral bonus skipped: referred_by missing", {userId,userEmail});
     return;
   }
 
-  const referrer = await refFindReferrer(referredBy);
-  if (!referrer?.id) {
-    console.warn("Referrer not found for code", referredBy);
+  const referrer = await simpleFindReferrer(referredBy);
+  if(!referrer?.id){
+    console.warn("Referral bonus skipped: referrer not found", referredBy);
     return;
   }
 
-  if (await refFirstDepositBonusAlreadyPaid(userId, userEmail)) {
-    console.log("First deposit referral bonus already paid", { userId, userEmail });
+  if(await simpleReferralAlreadyPaid(userId, userEmail)){
+    console.log("Referral bonus already paid for first deposit", {userId,userEmail});
     return;
   }
 
-  const bonusAmount = Number((depositAmount * REFERRAL_FIRST_DEPOSIT_PERCENT / 100).toFixed(2));
+  const bonus = Number((amount * SIMPLE_REF_PERCENT / 100).toFixed(2));
 
   const record = {
     id: "ref10_" + Date.now() + "_" + Math.random().toString(16).slice(2),
@@ -1905,19 +1901,18 @@ async function refApplyFirstDeposit10PercentBonus(dep) {
     userId,
     userEmail,
     depositId,
-    depositAmount,
-    bonusAmount,
-    percent: REFERRAL_FIRST_DEPOSIT_PERCENT,
+    depositAmount: amount,
+    bonusAmount: bonus,
+    percent: SIMPLE_REF_PERCENT,
     status: "PAID",
-    type: "FIRST_DEPOSIT_BONUS",
     date: new Date().toLocaleString()
   };
 
   state.referrals = state.referrals || [];
   state.referrals.unshift(record);
 
-  if (supabaseClient) {
-    try {
+  if(supabaseClient){
+    try{
       await supabaseClient.from("referrals").insert({
         referrer_id: record.referrerId,
         referrer_email: record.referrerEmail,
@@ -1926,34 +1921,66 @@ async function refApplyFirstDeposit10PercentBonus(dep) {
         deposit_id: record.depositId,
         deposit_amount: record.depositAmount,
         bonus_amount: record.bonusAmount,
-        percent: REFERRAL_FIRST_DEPOSIT_PERCENT,
+        percent: record.percent,
         status: "PAID"
       });
-    } catch(e) {
-      console.warn("Referral record insert failed", e);
-    }
+    }catch(e){ console.warn("referral insert failed", e); }
 
-    try {
+    try{
       await supabaseClient.from("wallet_ledger").insert({
         user_id: record.referrerId,
         type: "REFERRAL_BONUS",
         amount: record.bonusAmount,
-        note: "10% first deposit referral bonus after approved deposit " + record.depositId
+        note: "10% referral bonus from first approved deposit " + depositId
       });
-    } catch(e) {
-      console.warn("Referral wallet ledger insert failed", e);
-    }
+    }catch(e){ console.warn("referral ledger insert failed", e); }
   }
 
-  if (state.user && refClean(state.user.id) === refClean(record.referrerId)) {
+  if(state.user && String(state.user.id) === String(referrer.id)){
     normalizeAccounts?.();
-    state.accounts.REAL.balance = Number(state.accounts.REAL.balance || state.realBalance || 0) + bonusAmount;
+    state.accounts.REAL.balance = Number(state.accounts.REAL.balance || state.realBalance || 0) + bonus;
     state.realBalance = state.accounts.REAL.balance;
   }
 
   saveState?.();
-  console.log("10% FIRST DEPOSIT REFERRAL BONUS PAID", record);
+  console.log("REFERRAL BONUS PAID", record);
 }
+
+function simpleRenderReferral(){
+  try{
+    if(!state.user || state.user.role === "admin") return;
+    const code = state.user.referral_code || state.user.referralCode || state.user.id || "";
+    const link = `${location.origin}${location.pathname}?ref=${encodeURIComponent(code)}`;
+
+    if($("referralCodeText")) $("referralCodeText").textContent = code;
+    if($("referralLink")) $("referralLink").value = link;
+    if($("referralLinkText")) $("referralLinkText").textContent = link;
+
+    const uid = String(state.user.id || "");
+    const email = simpleRefLower(state.user.email || "");
+    const rows = (state.referrals || []).filter(r =>
+      String(r.referrer_id || r.referrerId || "") === uid ||
+      (!!email && simpleRefLower(r.referrer_email || r.referrerEmail) === email)
+    );
+    const total = rows.reduce((a,r)=>a+Number(r.bonus_amount || r.bonusAmount || 0),0);
+
+    ["referralBonusText","refBonusText","referralEarningsText","referralTotalBonus","referralBonusAmount","refEarningAmount"].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.textContent = money(total);
+    });
+  }catch(e){}
+}
+
+window.addEventListener("load", function(){
+  setTimeout(simpleEnsureUserReferralFields, 1000);
+  setInterval(simpleRenderReferral, 1500);
+});
+
+document.addEventListener("click", function(e){
+  if(e.target && (e.target.id === "registerBtn" || e.target.closest?.("#registerBtn"))){
+    setTimeout(simpleEnsureUserReferralFields, 1200);
+  }
+});
 
 async function approveDeposit(id) {
   const req = (state.depositRequests || []).find(d => String(d.id) === String(id));
@@ -4157,99 +4184,4 @@ document.addEventListener("click", function(e){
 
 
 
-/* REFERRAL 10 REGISTER SYNC */
-window.addEventListener("load", function(){
-  setTimeout(() => { try { refEnsureCurrentUserCode(); } catch(e){} }, 1500);
-});
 
-document.addEventListener("click", function(e){
-  if (e.target && (e.target.id === "registerBtn" || e.target.closest?.("#registerBtn"))) {
-    const refCode = $("regReferral")?.value?.trim?.() || $("referralInput")?.value?.trim?.() || "";
-    setTimeout(async () => {
-      try {
-        await refEnsureCurrentUserCode();
-        if (refCode) await refSaveReferredByForCurrentUser(refCode);
-      } catch(e) {
-        console.warn("register referral sync failed", e);
-      }
-    }, 1200);
-  }
-});
-
-
-/* ===== USER REFERRAL 10 PERCENT HARD FIX ===== */
-function refUserRowsFinal() {
-  const uid = String(state.user?.id || "");
-  const email = String(state.user?.email || "").toLowerCase();
-
-  return (state.referrals || []).filter(r => {
-    const refId = String(r.referrerId || r.referrer_id || "");
-    const refEmail = String(r.referrerEmail || r.referrer_email || "").toLowerCase();
-    return refId === uid || (!!email && refEmail === email);
-  });
-}
-
-function refUserBonusTotalFinal() {
-  // Only real paid referral records count.
-  return refUserRowsFinal()
-    .filter(r => String(r.status || "").toUpperCase() === "PAID")
-    .reduce((a, r) => a + Number(r.bonusAmount || r.bonus_amount || 0), 0);
-}
-
-function renderUserReferralFinal() {
-  try {
-    if (!state.user || state.user.role === "admin") return;
-
-    const total = refUserBonusTotalFinal();
-    const rows = refUserRowsFinal();
-
-    const possibleTotalIds = [
-      "referralBonusText",
-      "refBonusText",
-      "referralEarningsText",
-      "referralTotalBonus",
-      "referralBonusAmount",
-      "refEarningAmount",
-      "referralRewardText"
-    ];
-
-    possibleTotalIds.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = money(total);
-    });
-
-    const possibleCountIds = ["referralCountText", "totalReferralsText", "referralTotalCount"];
-    possibleCountIds.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = rows.length;
-    });
-
-    const log = document.getElementById("userReferralLog") || document.getElementById("referralHistoryLog") || document.getElementById("referralList");
-    if (log) {
-      log.innerHTML = rows.map(r => {
-        const deposit = Number(r.depositAmount || r.deposit_amount || 0);
-        const bonus = Number(r.bonusAmount || r.bonus_amount || 0);
-        return `<tr>
-          <td>${r.userEmail || r.user_email || r.userId || r.user_id || "-"}</td>
-          <td>${deposit ? money(deposit) : "-"}</td>
-          <td>${money(bonus)}</td>
-          <td>${r.status || "PAID"}</td>
-        </tr>`;
-      }).join("") || `<tr><td colspan="4" class="empty">No referral bonus yet.</td></tr>`;
-    }
-
-    // Update any visible text that still says 50 in referral area.
-    document.querySelectorAll("#referral, .referral-card, .referral-page").forEach(box => {
-      box.querySelectorAll("*").forEach(el => {
-        if (el.childNodes.length === 1 && el.textContent && /₹50|Rs\.50|INR 50/.test(el.textContent)) {
-          el.textContent = el.textContent.replace(/₹50|Rs\.50|INR 50/g, "10% of first deposit");
-        }
-      });
-    });
-  } catch(e) {
-    console.warn("renderUserReferralFinal failed", e);
-  }
-}
-
-setInterval(renderUserReferralFinal, 1200);
-window.addEventListener("load", () => setTimeout(renderUserReferralFinal, 1200));

@@ -572,3 +572,12 @@ User Referral 10% Hard Fix:
 - Referral page/list shows joined user, deposit amount, actual 10% bonus, status.
 - If old ₹50 test rows exist in Supabase, delete old referral/REFERRAL_BONUS rows before fresh test.
 - JS syntax check: OK
+
+
+Referral Working Final Fix:
+- Referral code/referred_by is saved to profiles.
+- URL ?ref=CODE and register referral input both supported.
+- On first approved deposit, referrer gets 10% automatically in wallet_ledger.
+- No referral approval needed.
+- If nothing adds, verify referred user's profiles.referred_by has referrer's referral_code.
+- JS syntax check: OK
