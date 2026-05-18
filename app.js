@@ -4536,3 +4536,105 @@ function restoreManualHistoryBackup(mode = state.mode) {
   window.addEventListener("load", () => setTimeout(restoreOrderBookFeed, 800));
   setInterval(restoreOrderBookFeed, 2500);
 })();
+
+
+/* ===== TRADE PAGE VISIBILITY FIX ===== */
+(function(){
+  const pageIds = ["dashboard","home","trade","tradepage","wallet","pnl","history","plans","more","profile"];
+
+  function normalizePageName(name){
+    name = String(name || "dashboard").toLowerCase();
+    if (name === "home") return "dashboard";
+    if (name === "tradepage") return "trade";
+    if (name === "profile") return "more";
+    return name;
+  }
+
+  function getActivePageFromNav(){
+    const activeNav =
+      document.querySelector(".bottom-nav .active,[data-page].active,[data-tab].active,.nav-btn.active,.tab-btn.active") ||
+      document.querySelector(".bottom-nav button.active,.mobile-nav button.active");
+
+    const val = activeNav?.dataset?.page || activeNav?.dataset?.tab || activeNav?.getAttribute("href")?.replace("#","");
+    if (val) return normalizePageName(val);
+
+    if (document.getElementById("trade")?.classList.contains("active-page") || document.getElementById("tradepage")?.classList.contains("active-page")) return "trade";
+    if (document.getElementById("wallet")?.classList.contains("active-page")) return "wallet";
+    if (document.getElementById("pnl")?.classList.contains("active-page")) return "pnl";
+    if (document.getElementById("history")?.classList.contains("active-page")) return "history";
+    if (document.getElementById("plans")?.classList.contains("active-page")) return "plans";
+    if (document.getElementById("more")?.classList.contains("active-page")) return "more";
+    return "dashboard";
+  }
+
+  function setActivePage(page){
+    page = normalizePageName(page);
+
+    const known = {
+      dashboard: ["dashboard","home"],
+      trade: ["trade","tradepage"],
+      wallet: ["wallet"],
+      pnl: ["pnl"],
+      history: ["history"],
+      plans: ["plans"],
+      more: ["more","profile"]
+    };
+
+    Object.values(known).flat().forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const show = (known[page] || []).includes(id);
+      if (show) {
+        el.classList.add("active-page");
+        el.classList.remove("force-page-hidden","trade-force-hidden");
+        el.style.display = "";
+      } else {
+        el.classList.remove("active-page");
+        el.classList.add("force-page-hidden");
+        if (id === "trade" || id === "tradepage") el.classList.add("trade-force-hidden");
+      }
+    });
+
+    document.querySelectorAll(".page,.app-page,.screen,.panel-page,[data-page-section]").forEach(el => {
+      const id = normalizePageName(el.id || el.dataset.pageSection || "");
+      if (!id || !pageIds.includes(id)) return;
+      const show = (known[page] || []).includes(el.id) || id === page;
+      if (show) {
+        el.classList.add("active-page");
+        el.classList.remove("force-page-hidden","trade-force-hidden");
+        el.style.display = "";
+      } else {
+        el.classList.remove("active-page");
+        el.classList.add("force-page-hidden");
+        if (id === "trade") el.classList.add("trade-force-hidden");
+      }
+    });
+
+    document.body.dataset.activePage = page;
+  }
+
+  function bindNav(){
+    document.querySelectorAll("[data-page],[data-tab],.bottom-nav button,.mobile-nav button,.nav-btn,.tab-btn").forEach(btn => {
+      if (btn.dataset.pageVisibilityBound === "1") return;
+      btn.dataset.pageVisibilityBound = "1";
+      btn.addEventListener("click", function(){
+        setTimeout(() => {
+          const page = btn.dataset.page || btn.dataset.tab || btn.getAttribute("href")?.replace("#","") || getActivePageFromNav();
+          setActivePage(page);
+        }, 30);
+      });
+    });
+  }
+
+  function fixVisibility(){
+    bindNav();
+    setActivePage(getActivePageFromNav());
+  }
+
+  window.fixTradePageVisibility = fixVisibility;
+  window.setActiveAppPageSafe = setActivePage;
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(fixVisibility, 400));
+  window.addEventListener("load", () => setTimeout(fixVisibility, 600));
+  setInterval(fixVisibility, 1200);
+})();

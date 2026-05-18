@@ -4831,3 +4831,32 @@ body[data-user-clean-ui="true"] #trade .force-show-order-feed.card,
 body[data-user-clean-ui="true"] #tradepage .force-show-order-feed.card{
   margin-top:12px!important;
 }
+
+
+/* ===== TRADE PAGE VISIBILITY FIX ===== */
+.force-page-hidden{
+  display:none!important;
+}
+body:not([data-active-page="trade"]) #trade,
+body:not([data-active-page="trade"]) #tradepage,
+body:not([data-active-page="trade"]) .trade-force-hidden{
+  display:none!important;
+}
+body[data-active-page="trade"] #trade,
+body[data-active-page="trade"] #tradepage{
+  display:block!important;
+}
+body[data-active-page="dashboard"] #dashboard,
+body[data-active-page="dashboard"] #home,
+body[data-active-page="wallet"] #wallet,
+body[data-active-page="pnl"] #pnl,
+body[data-active-page="history"] #history,
+body[data-active-page="plans"] #plans,
+body[data-active-page="more"] #more{
+  display:block!important;
+}
+
+/* Floating bar remains visible across pages; only full Trade page is hidden */
+#floatingLivePositionBar.show{
+  display:flex!important;
+}

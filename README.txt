@@ -526,3 +526,12 @@ Order Book + Trade Feed Restore Fix:
 - Chart cleanup, order title, SIM warning removal remain.
 - No SQL required.
 - JS syntax check: OK
+
+
+Trade Page Visibility Fix:
+- Fixes issue where full Trade page appears on Home/Wallet/PnL/History.
+- Trade page is now visible only when Trade tab/page is active.
+- Home, Wallet, PnL, History, Plans, More remain separate pages.
+- Floating live position bar still works across pages.
+- No SQL required.
+- JS syntax check: OK
