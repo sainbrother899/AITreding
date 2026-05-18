@@ -296,3 +296,10 @@ create index if not exists idx_referrals_user_percent on public.referrals(user_i
 alter table public.deposit_requests add column if not exists user_name text;
 alter table public.deposit_requests add column if not exists txn text;
 alter table public.deposit_requests add column if not exists created_at_text text;
+
+
+
+alter table public.deposit_requests add column if not exists txn text;
+create unique index if not exists idx_deposit_requests_unique_txn
+on public.deposit_requests(txn)
+where txn is not null and txn <> '';

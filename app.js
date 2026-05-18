@@ -4289,3 +4289,134 @@ document.addEventListener("click", function(e) {
 window.submitDeposit = submitDepositFinal;
 window.createDepositRequest = submitDepositFinal;
 window.handleDepositSubmit = submitDepositFinal;
+
+
+/* ===== UTR 12 DIGIT + DUPLICATE CHECK FIX ===== */
+function normalizeUtrFinal(value) {
+  return String(value || "").replace(/\D/g, "").trim();
+}
+
+async function isDuplicateUtrFinal(utr) {
+  utr = normalizeUtrFinal(utr);
+  if (!utr) return false;
+
+  // Local duplicate check
+  const localDuplicate = (state.depositRequests || []).some(d => {
+    const oldUtr = normalizeUtrFinal(d.txn || d.utr || d.transaction_id || d.transactionId);
+    return oldUtr === utr;
+  });
+
+  if (localDuplicate) return true;
+
+  // Supabase duplicate check
+  if (supabaseClient) {
+    try {
+      const { data } = await supabaseClient
+        .from("deposit_requests")
+        .select("id")
+        .eq("txn", utr)
+        .limit(1);
+
+      if (data && data.length) return true;
+    } catch (e) {
+      console.warn("UTR duplicate check failed:", e);
+    }
+  }
+
+  return false;
+}
+
+// Override existing submitDepositFinal with UTR validation.
+async function submitDepositFinalWithUtrCheck() {
+  try {
+    if (!state.user) {
+      toast("Please login first.");
+      return;
+    }
+
+    const amount = typeof getDepositAmountFinal === "function" ? getDepositAmountFinal() : 0;
+    const rawTxn = typeof getDepositTxnFinal === "function" ? getDepositTxnFinal() : "";
+    const txn = normalizeUtrFinal(rawTxn);
+
+    if (!amount || amount < 1000) {
+      toast("Minimum deposit ₹1000 है.");
+      return;
+    }
+
+    if (!/^\d{12}$/.test(txn)) {
+      toast("UTR number exactly 12 digits ka hona chahiye.");
+      alert("UTR number exactly 12 digits ka hona chahiye.");
+      return;
+    }
+
+    if (await isDuplicateUtrFinal(txn)) {
+      toast("Duplicate UTR. Ye UTR pehle submit ho chuka hai.");
+      alert("Duplicate UTR");
+      return;
+    }
+
+    const req = {
+      id: "dep_" + Date.now() + "_" + Math.random().toString(16).slice(2),
+      userId: state.user.id || "local",
+      userEmail: state.user.email || "",
+      userName: state.user.name || "",
+      amount,
+      txn,
+      status: "PENDING",
+      createdAt: new Date().toLocaleString()
+    };
+
+    state.depositRequests = state.depositRequests || [];
+    state.depositRequests.unshift(req);
+
+    if (supabaseClient) {
+      try {
+        await supabaseClient.from("deposit_requests").insert({
+          id: req.id,
+          user_id: req.userId,
+          user_email: req.userEmail,
+          user_name: req.userName,
+          amount: req.amount,
+          txn: req.txn,
+          status: req.status,
+          created_at_text: req.createdAt
+        });
+      } catch (e) {
+        console.warn("Supabase deposit insert failed, local saved:", e);
+        if (String(e?.message || "").toLowerCase().includes("duplicate")) {
+          toast("Duplicate UTR. Ye UTR pehle submit ho chuka hai.");
+          alert("Duplicate UTR");
+          return;
+        }
+      }
+    }
+
+    saveState?.();
+    render?.();
+
+    ["depositAmount", "depositAmountInput", "depositInput", "walletDepositAmount"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+    ["depositTxn", "depositTxnInput", "transactionId", "utrInput", "depositUtr"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+
+    toast("Deposit request submitted. Admin approval pending.");
+  } catch (e) {
+    console.error("Deposit submit failed:", e);
+    toast("Deposit submit failed. Please check UTR and amount.");
+  }
+}
+
+window.submitDepositFinal = submitDepositFinalWithUtrCheck;
+window.submitDeposit = submitDepositFinalWithUtrCheck;
+window.createDepositRequest = submitDepositFinalWithUtrCheck;
+window.handleDepositSubmit = submitDepositFinalWithUtrCheck;
+
+document.addEventListener("input", function(e) {
+  const el = e.target;
+  if (!el || !["depositTxn", "depositTxnInput", "transactionId", "utrInput", "depositUtr"].includes(el.id)) return;
+  el.value = normalizeUtrFinal(el.value).slice(0, 12);
+}, true);

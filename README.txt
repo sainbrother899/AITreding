@@ -590,3 +590,12 @@ Deposit Submit Fix:
 - Admin panel should show pending deposit after refresh/load.
 - SQL may be required if deposit_requests columns are missing.
 - JS syntax check: OK
+
+
+UTR 12 Digit + Duplicate Fix:
+- Deposit UTR must be exactly 12 digits.
+- UTR input accepts only digits and max 12 characters.
+- Duplicate UTR is blocked with popup/toast.
+- Supabase duplicate check added.
+- SQL unique index added for txn duplicate prevention.
+- JS syntax check: OK
