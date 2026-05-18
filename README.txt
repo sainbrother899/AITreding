@@ -394,3 +394,12 @@ Floating Live Position Bar:
 - AI/admin trades are not user-closeable from this bar.
 - No SQL required.
 - JS syntax check: OK
+
+
+Global Profit/Loss Color Fix:
+- Profit / positive PnL is green across the app.
+- Loss / negative PnL is red across the app.
+- Applies to Home, PnL page, History, Wallet/ledger records, Open Positions, Floating live position bar, and admin/user tables.
+- Runs after render so dynamic values also update color.
+- No SQL required.
+- JS syntax check: OK

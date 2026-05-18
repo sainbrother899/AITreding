@@ -4419,3 +4419,51 @@ body:has(.floating-live-position-bar.show){
     font-size:11px!important;
   }
 }
+
+
+/* ===== GLOBAL PROFIT LOSS COLOR FIX ===== */
+:root{
+  --profit-green:#00e7a8;
+  --loss-red:#ff456b;
+}
+.plc-profit,
+.profit,
+.pnl-plus,
+.pos{
+  color:var(--profit-green)!important;
+}
+.plc-loss,
+.loss,
+.pnl-minus,
+.neg{
+  color:var(--loss-red)!important;
+}
+.manual-position-card .position-top strong.plc-profit,
+.floating-live-position-bar #flpPnl.plc-profit,
+.clean-stat-card b.plc-profit,
+td.plc-profit,
+b.plc-profit,
+strong.plc-profit,
+span.plc-profit{
+  color:var(--profit-green)!important;
+}
+.manual-position-card .position-top strong.plc-loss,
+.floating-live-position-bar #flpPnl.plc-loss,
+.clean-stat-card b.plc-loss,
+td.plc-loss,
+b.plc-loss,
+strong.plc-loss,
+span.plc-loss{
+  color:var(--loss-red)!important;
+}
+
+/* Keep close/sell buttons red but not affected by PnL scanner */
+button,
+.close-position-btn,
+#flpCloseBtn{
+  color:inherit;
+}
+.close-position-btn,
+#flpCloseBtn{
+  color:#fff!important;
+}

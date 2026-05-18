@@ -3939,3 +3939,112 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
     flRender();
   }, 1000);
 })();
+
+
+/* ===== GLOBAL PROFIT LOSS COLOR FIX ===== */
+(function(){
+  function plcTextAmount(text){
+    if (!text) return null;
+    const t = String(text).replace(/,/g, "").trim();
+
+    // detect negative sign or minus unicode before currency/number
+    if (/^-/.test(t) || /−/.test(t) || /-\s*₹/.test(t) || /₹\s*-/.test(t) || /-\s*\$/.test(t) || /\$\s*-/.test(t)) return -1;
+    if (/^\+/.test(t) || /\+\s*₹/.test(t) || /₹\s*\+/.test(t) || /\+\s*\$/.test(t) || /\$\s*\+/.test(t)) return 1;
+
+    // Words status fallback
+    if (/\b(loss|negative|minus|red)\b/i.test(t)) return -1;
+    if (/\b(profit|positive|gain|green)\b/i.test(t)) return 1;
+
+    // Parse numeric with currency
+    const m = t.match(/-?\d+(\.\d+)?/);
+    if (!m) return null;
+    const n = Number(m[0]);
+    if (!Number.isFinite(n)) return null;
+    if (n < 0) return -1;
+    if (n > 0 && /pnl|profit|loss|₹|\$|\+/.test(t.toLowerCase())) return 1;
+    return null;
+  }
+
+  function plcApplyTo(el){
+    if (!el || el.dataset.plcSkip === "1") return;
+
+    const txt = (el.textContent || "").trim();
+    if (!txt) return;
+
+    // Only target likely financial/PnL elements to avoid coloring all numbers.
+    const cls = String(el.className || "").toLowerCase();
+    const id = String(el.id || "").toLowerCase();
+    const parentText = (el.parentElement?.textContent || "").toLowerCase();
+
+    const likely = (
+      cls.includes("pnl") || cls.includes("profit") || cls.includes("loss") ||
+      id.includes("pnl") || id.includes("profit") || id.includes("loss") ||
+      parentText.includes("pnl") || parentText.includes("profit") || parentText.includes("loss") ||
+      parentText.includes("today pnl") || parentText.includes("p/l") ||
+      el.closest(".manual-position-card") ||
+      el.closest(".floating-live-position-bar") ||
+      el.closest(".clean-stat-card") ||
+      el.closest(".premium-history-card") ||
+      el.closest(".clean-record-card")
+    );
+
+    if (!likely) return;
+
+    const sign = plcTextAmount(txt);
+    if (sign === null) return;
+
+    el.classList.remove("plc-profit", "plc-loss", "profit", "loss", "pnl-plus", "pnl-minus", "pos", "neg");
+    if (sign >= 0) el.classList.add("plc-profit");
+    if (sign < 0) el.classList.add("plc-loss");
+  }
+
+  function plcApplyAll(){
+    try {
+      // Direct known IDs/classes
+      [
+        "#cleanTodayPnl",
+        "#flpPnl",
+        "#totalPnlMetric",
+        "#todayPnlMetric",
+        "#premiumPnlTrend",
+        ".pnl-plus",
+        ".pnl-minus",
+        ".profit",
+        ".loss",
+        ".pos",
+        ".neg",
+        "[class*='pnl']",
+        "[id*='pnl']",
+        "[class*='profit']",
+        "[class*='loss']",
+        "[id*='profit']",
+        "[id*='loss']"
+      ].forEach(sel => {
+        document.querySelectorAll(sel).forEach(plcApplyTo);
+      });
+
+      // Tables/cards: check values under headers/labels with PnL/Profit/Loss/P/L
+      document.querySelectorAll("td, th, b, strong, span, small, p").forEach(el => {
+        const txt = (el.textContent || "").trim();
+        if (!txt || txt.length > 60) return;
+        const parent = (el.parentElement?.textContent || "").toLowerCase();
+        if (
+          /pnl|p\/l|profit|loss/.test(parent) ||
+          /[+-]\s*₹|₹\s*[+-]|[+-]\s*\$|\$\s*[+-]/.test(txt)
+        ) {
+          plcApplyTo(el);
+        }
+      });
+
+      document.body.classList.add("global-pl-color-ready");
+    } catch(e) {
+      console.warn("Global profit/loss color skipped", e);
+    }
+  }
+
+  window.applyGlobalProfitLossColors = plcApplyAll;
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(plcApplyAll, 400));
+  window.addEventListener("load", () => setTimeout(plcApplyAll, 600));
+  setInterval(plcApplyAll, 1000);
+})();
