@@ -851,3 +851,14 @@ Admin KYC Existing Table Bind Fix:
 - Approve/Reject buttons update kyc_requests.status in DB.
 - Includes fallback if table is div/grid based instead of tbody.
 - JS syntax check: OK
+
+
+Admin KYC Existing Table No Flicker Fix:
+- Removed previous interval-based KYC table bind block that caused hide/unhide flicker.
+- KYC DB rows now load on KYC tab click and update only when content changes.
+- No repeated loading row.
+- Slow safety refresh every 30 seconds only, with no DOM rewrite unless data changed.
+- Design locked: no sidebar/header/layout changes.
+- Removed old JS block: 1
+- Removed old CSS block: 1
+- JS syntax check: OK

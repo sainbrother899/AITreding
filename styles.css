@@ -6512,7 +6512,10 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
 .db-status.rejected{color:#ff456b!important;background:rgba(255,69,107,.13)!important;}
 
 
-/* ===== ADMIN KYC EXISTING TABLE BIND FIX ===== */
+
+
+
+/* ===== ADMIN KYC EXISTING TABLE NO FLICKER FIX ===== */
 .ek-kyc-status{
   display:inline-flex!important;
   align-items:center!important;
@@ -6548,6 +6551,4 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
   padding:18px 22px!important;
   color:#9fb2d0!important;
 }
-.ek-kyc-empty.error{
-  color:#ff8da1!important;
-}
+.ek-kyc-empty.error{color:#ff8da1!important;}

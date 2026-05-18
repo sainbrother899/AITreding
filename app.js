@@ -6863,8 +6863,15 @@ function restoreManualHistoryBackup(mode = state.mode) {
 })();
 
 
-/* ===== ADMIN KYC EXISTING TABLE BIND FIX ===== */
+
+
+
+/* ===== ADMIN KYC EXISTING TABLE NO FLICKER FIX ===== */
 (function(){
+  let ekLoadedOnce = false;
+  let ekLoading = false;
+  let ekLastRender = "";
+
   function ekIsAdmin(){
     return location.pathname.toLowerCase().includes("admin") ||
       state?.user?.role === "admin" ||
@@ -6894,29 +6901,25 @@ function restoreManualHistoryBackup(mode = state.mode) {
     return fallback;
   }
 
-  function ekFindKycTable(){
+  function ekFindKycContainer(){
+    const candidates = Array.from(document.querySelectorAll(".card, section, div, table"));
+    for (const el of candidates) {
+      const txt = (el.textContent || "").toLowerCase();
+      if (txt.includes("user kyc requests") && txt.includes("doc type") && txt.includes("doc no")) return el;
+    }
     const tables = Array.from(document.querySelectorAll("table"));
-    for (const table of tables) {
-      const txt = (table.textContent || "").toLowerCase();
-      if (txt.includes("doc type") && txt.includes("doc no") && txt.includes("status")) return table;
-    }
-
-    // Fallback: screenshot-style card contains the headers even if not a real table.
-    const cards = Array.from(document.querySelectorAll(".card, section, div"));
-    for (const card of cards) {
-      const txt = (card.textContent || "").toLowerCase();
-      if (txt.includes("user kyc requests") && txt.includes("doc type") && txt.includes("doc no")) {
-        return card.querySelector("table") || card;
-      }
-    }
-    return null;
+    return tables.find(t => {
+      const txt = (t.textContent || "").toLowerCase();
+      return txt.includes("doc type") && txt.includes("doc no") && txt.includes("status");
+    }) || null;
   }
 
   function ekFindTbody(){
-    const table = ekFindKycTable();
-    if (!table) return null;
+    const container = ekFindKycContainer();
+    if (!container) return null;
 
-    if (table.tagName === "TABLE") {
+    const table = container.tagName === "TABLE" ? container : container.querySelector("table");
+    if (table) {
       let tbody = table.querySelector("tbody");
       if (!tbody) {
         tbody = document.createElement("tbody");
@@ -6925,14 +6928,22 @@ function restoreManualHistoryBackup(mode = state.mode) {
       return tbody;
     }
 
-    let body = table.querySelector("[data-ek-kyc-body]");
+    let body = container.querySelector("[data-ek-kyc-body]");
     if (!body) {
       body = document.createElement("div");
       body.dataset.ekKycBody = "1";
       body.className = "ek-kyc-body";
-      table.appendChild(body);
+      container.appendChild(body);
     }
     return body;
+  }
+
+  function ekKycTabVisible(){
+    const c = ekFindKycContainer();
+    if (!c) return false;
+    const rect = c.getBoundingClientRect();
+    const st = getComputedStyle(c);
+    return st.display !== "none" && st.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
   }
 
   async function ekLoadRows(){
@@ -6947,7 +6958,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
 
     let docsById = {};
     try {
-      let dres = await client.from("kyc_documents").select("*");
+      const dres = await client.from("kyc_documents").select("*");
       if (!dres.error) {
         (dres.data || []).forEach(d => {
           const id = String(d.kyc_id || "");
@@ -6973,13 +6984,10 @@ function restoreManualHistoryBackup(mode = state.mode) {
     });
   }
 
-  function ekRenderRows(rows){
-    const body = ekFindTbody();
-    if (!body) return false;
-
-    if (body.tagName === "TBODY") {
-      body.innerHTML = rows.length ? rows.map(r => `
-        <tr>
+  function ekHtmlForRows(rows, isTable){
+    if (isTable) {
+      return rows.length ? rows.map(r => `
+        <tr data-ek-kyc-row="${r.id}">
           <td>${r.user}</td>
           <td>${r.name}</td>
           <td>${r.docType}</td>
@@ -6992,12 +7000,10 @@ function restoreManualHistoryBackup(mode = state.mode) {
           </td>
         </tr>
       `).join("") : `<tr><td colspan="7" class="empty">No KYC requests found.</td></tr>`;
-      return true;
     }
 
-    // If admin UI is div/grid based, render rows underneath existing header without changing header design.
-    body.innerHTML = rows.length ? rows.map(r => `
-      <div class="ek-kyc-grid-row">
+    return rows.length ? rows.map(r => `
+      <div class="ek-kyc-grid-row" data-ek-kyc-row="${r.id}">
         <span>${r.user}</span>
         <span>${r.name}</span>
         <span>${r.docType}</span>
@@ -7010,35 +7016,37 @@ function restoreManualHistoryBackup(mode = state.mode) {
         </span>
       </div>
     `).join("") : `<div class="ek-kyc-empty">No KYC requests found.</div>`;
-    return true;
   }
 
-  async function ekRefresh(){
-    if (!ekIsAdmin()) return;
-    const table = ekFindKycTable();
-    if (!table) return;
-
-    const isKycVisible = /user kyc requests|kyc management|doc type|doc no/i.test(table.textContent || "");
-    if (!isKycVisible) return;
+  async function ekRefresh(options = {}){
+    if (!ekIsAdmin() || ekLoading) return;
+    if (!ekKycTabVisible() && !options.force) return;
 
     const body = ekFindTbody();
-    if (body && !body.dataset.ekLoading) {
-      body.dataset.ekLoading = "1";
-      if (body.tagName === "TBODY") body.innerHTML = `<tr><td colspan="7" class="empty">Loading KYC requests...</td></tr>`;
-      else body.innerHTML = `<div class="ek-kyc-empty">Loading KYC requests...</div>`;
-    }
+    if (!body) return;
 
+    ekLoading = true;
     try {
       const rows = await ekLoadRows();
-      ekRenderRows(rows);
-      if (body) delete body.dataset.ekLoading;
+      const html = ekHtmlForRows(rows, body.tagName === "TBODY");
+
+      // Critical: only write DOM if content changed. This stops hide/unhide flicker.
+      if (html !== ekLastRender || options.force) {
+        body.innerHTML = html;
+        ekLastRender = html;
+      }
+      ekLoadedOnce = true;
     } catch(e) {
       console.error("KYC existing table load failed", e);
-      if (body) {
-        if (body.tagName === "TBODY") body.innerHTML = `<tr><td colspan="7" class="empty">KYC load failed: ${e.message || e}</td></tr>`;
-        else body.innerHTML = `<div class="ek-kyc-empty error">KYC load failed: ${e.message || e}</div>`;
-        delete body.dataset.ekLoading;
+      const errHtml = body.tagName === "TBODY"
+        ? `<tr><td colspan="7" class="empty">KYC load failed: ${e.message || e}</td></tr>`
+        : `<div class="ek-kyc-empty error">KYC load failed: ${e.message || e}</div>`;
+      if (errHtml !== ekLastRender) {
+        body.innerHTML = errHtml;
+        ekLastRender = errHtml;
       }
+    } finally {
+      ekLoading = false;
     }
   }
 
@@ -7067,7 +7075,8 @@ function restoreManualHistoryBackup(mode = state.mode) {
       e.target.textContent = "Updating...";
       try {
         await ekUpdate(id, status);
-        await ekRefresh();
+        ekLastRender = "";
+        await ekRefresh({ force:true });
       } catch(err) {
         alert("KYC update failed: " + (err.message || err));
       } finally {
@@ -7076,21 +7085,26 @@ function restoreManualHistoryBackup(mode = state.mode) {
       }
     }, true);
 
-    // Refresh when KYC menu/tab is clicked, without changing menu design.
+    // Load only when KYC tab is clicked, not on a short repeating interval.
     document.addEventListener("click", function(e){
       const txt = (e.target?.textContent || "").toLowerCase();
-      if (txt.includes("kyc")) setTimeout(ekRefresh, 500);
+      if (txt.includes("kyc")) {
+        setTimeout(() => ekRefresh({ force: !ekLoadedOnce }), 450);
+        setTimeout(() => ekRefresh({ force: false }), 1200);
+      }
     }, true);
   }
 
-  window.refreshExistingAdminKycTable = ekRefresh;
+  window.refreshExistingAdminKycTable = function(){ ekLastRender = ""; return ekRefresh({ force:true }); };
 
-  if (!window.__existingAdminKycTableBound) {
-    window.__existingAdminKycTableBound = true;
+  if (!window.__existingAdminKycNoFlickerBound) {
+    window.__existingAdminKycNoFlickerBound = true;
     ekBind();
   }
 
-  document.addEventListener("DOMContentLoaded", () => setTimeout(ekRefresh, 1000));
-  window.addEventListener("load", () => setTimeout(ekRefresh, 1300));
-  setInterval(ekRefresh, 6000);
+  document.addEventListener("DOMContentLoaded", () => setTimeout(() => ekRefresh({ force:false }), 1200));
+  window.addEventListener("load", () => setTimeout(() => ekRefresh({ force:false }), 1500));
+
+  // Very slow safety refresh only; no loading row, no DOM rewrite unless changed.
+  setInterval(() => ekRefresh({ force:false }), 30000);
 })();
