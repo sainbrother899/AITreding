@@ -6220,69 +6220,13 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
 }
 
 
-/* ===== ADMIN PAYMENT TABS FIX ===== */
-.admin-pay-tab-btn{
-  width:100%!important;
-  min-height:44px!important;
-  display:flex!important;
-  align-items:center!important;
-  gap:10px!important;
-  border:0!important;
-  border-radius:13px!important;
-  padding:0 12px!important;
-  margin:5px 0!important;
-  background:rgba(255,255,255,.045)!important;
-  color:#eaf2ff!important;
-  text-align:left!important;
-  cursor:pointer!important;
-}
-.admin-pay-tab-btn span{
-  width:26px!important;
-  display:grid!important;
-  place-items:center!important;
-}
-.admin-pay-tab-btn b{
-  font-size:13px!important;
-  font-weight:850!important;
-}
-.admin-pay-tab-btn.active{
-  background:linear-gradient(135deg,rgba(0,231,168,.20),rgba(53,167,255,.16))!important;
-  color:#00e7a8!important;
-  border:1px solid rgba(0,231,168,.22)!important;
-}
-.force-admin-pay-hidden{
-  display:none!important;
-}
-.active-admin-pay-panel{
-  display:block!important;
-  width:100%!important;
-  max-width:none!important;
-  margin:0!important;
-}
-#adminPayoutRequestsPanel,
-#adminPaymentSettingsPanel{
-  width:100%!important;
-  max-width:none!important;
-  margin:0 0 16px!important;
-}
-body[data-admin-active-section="payoutMethods"] #adminPayoutRequestsPanel,
-body[data-admin-active-section="paymentSettings"] #adminPaymentSettingsPanel{
-  display:block!important;
-}
-@media(min-width:900px){
-  body.admin-pc-restore #adminPayoutRequestsPanel,
-  body.admin-pc-restore #adminPaymentSettingsPanel{
-    width:100%!important;
-    max-width:none!important;
-  }
-}
 
 
-/* ===== ADMIN PAYMENT MENU FORCE FIX ===== */
-.admin-pay-force-btn,
-.admin-payment-quick-menu button,
-[data-admin-pay-open],
-[data-admin-pay-tab]{
+
+/* ===== ADMIN PAYMENT STABLE PAGE FIX ===== */
+.aps-menu-btn,
+.aps-quick-menu button,
+[data-admin-stable-pay]{
   width:100%!important;
   min-height:44px!important;
   display:flex!important;
@@ -6298,26 +6242,18 @@ body[data-admin-active-section="paymentSettings"] #adminPaymentSettingsPanel{
   cursor:pointer!important;
   box-sizing:border-box!important;
 }
-.admin-pay-force-btn span,
-.admin-payment-quick-menu button span{
+.aps-menu-btn span,
+.aps-quick-menu button span{
   width:26px!important;
   display:grid!important;
   place-items:center!important;
 }
-.admin-pay-force-btn b,
-.admin-payment-quick-menu button b{
+.aps-menu-btn b,
+.aps-quick-menu button b{
   font-size:13px!important;
   font-weight:850!important;
 }
-.admin-pay-force-btn.active,
-.admin-payment-quick-menu button.active,
-[data-admin-pay-open].active,
-[data-admin-pay-tab].active{
-  background:linear-gradient(135deg,rgba(0,231,168,.20),rgba(53,167,255,.16))!important;
-  color:#00e7a8!important;
-  border:1px solid rgba(0,231,168,.22)!important;
-}
-.admin-payment-quick-menu{
+.aps-quick-menu{
   display:grid!important;
   grid-template-columns:repeat(2,minmax(0,1fr))!important;
   gap:10px!important;
@@ -6329,64 +6265,174 @@ body[data-admin-active-section="paymentSettings"] #adminPaymentSettingsPanel{
   border-radius:18px!important;
   box-sizing:border-box!important;
 }
-.admin-payment-quick-menu.fallback-hidden{
+.aps-quick-menu.hide-quick{
   display:none!important;
 }
-.force-admin-pay-hidden,
-.admin-pay-force-temp-hide{
+.aps-page{
+  position:fixed!important;
+  inset:0!important;
+  z-index:99999!important;
   display:none!important;
+  overflow:auto!important;
+  padding:18px!important;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(0,231,168,.10), transparent 28%),
+    linear-gradient(180deg,#07111c,#0b1020 55%,#13091d)!important;
+  box-sizing:border-box!important;
 }
-#adminPayoutRequestsPanel.active-admin-pay-panel,
-#adminPaymentSettingsPanel.active-admin-pay-panel{
+.aps-page.show{
   display:block!important;
 }
-@media(max-width:700px){
-  .admin-payment-quick-menu{
-    grid-template-columns:1fr!important;
-  }
+.aps-head{
+  display:flex!important;
+  align-items:center!important;
+  gap:12px!important;
+  width:100%!important;
+  max-width:1180px!important;
+  margin:0 auto 16px!important;
 }
-
-
-
-
-
-/* ===== ADMIN PAYMENT NO FLICKER FIX ===== */
-.admin-pay-normal-hidden-stable{
-  display:none!important;
+#apsBackBtn{
+  width:46px!important;
+  height:46px!important;
+  border:0!important;
+  border-radius:15px!important;
+  background:rgba(255,255,255,.08)!important;
+  color:#f4f7ff!important;
+  font-size:30px!important;
+  display:grid!important;
+  place-items:center!important;
 }
-
+.aps-head h2{
+  margin:2px 0 0!important;
+  color:#f4f7ff!important;
+  font-size:26px!important;
+}
+.aps-content{
+  width:100%!important;
+  max-width:1180px!important;
+  margin:0 auto!important;
+  display:grid!important;
+  gap:14px!important;
+}
+.aps-section-card,
+.aps-request-card,
+.aps-form,
+.aps-empty{
+  border:1px solid rgba(255,255,255,.10)!important;
+  background:rgba(255,255,255,.045)!important;
+  border-radius:18px!important;
+  padding:16px!important;
+  box-sizing:border-box!important;
+}
+.aps-section-card h3{
+  margin:3px 0 6px!important;
+  color:#f4f7ff!important;
+  font-size:22px!important;
+}
+.aps-section-card small,
+.aps-empty{
+  color:#9fb2d0!important;
+}
+.aps-list{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:14px!important;
+}
+.aps-request-top{
+  display:flex!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+  margin-bottom:12px!important;
+}
+.aps-request-top span,
+.aps-grid span{
+  color:#9fb2d0!important;
+  font-size:12px!important;
+}
+.aps-request-top b,
+.aps-grid b{
+  color:#f4f7ff!important;
+  word-break:break-word!important;
+}
+.aps-status{
+  font-style:normal!important;
+  font-size:11px!important;
+  font-weight:950!important;
+  border-radius:999px!important;
+  padding:6px 10px!important;
+  white-space:nowrap!important;
+}
+.aps-status.pending{color:#f8bd7a!important;background:rgba(248,189,122,.13)!important;}
+.aps-status.approved{color:#00e7a8!important;background:rgba(0,231,168,.13)!important;}
+.aps-status.rejected{color:#ff456b!important;background:rgba(255,69,107,.13)!important;}
+.aps-grid{
+  display:grid!important;
+  gap:8px!important;
+}
+.aps-grid p{
+  margin:0!important;
+  display:flex!important;
+  justify-content:space-between!important;
+  gap:10px!important;
+  border-top:1px solid rgba(255,255,255,.06)!important;
+  padding-top:8px!important;
+}
+.aps-actions{
+  display:grid!important;
+  grid-template-columns:1fr 1fr!important;
+  gap:10px!important;
+  margin-top:12px!important;
+}
+.aps-actions button,
+.aps-form button{
+  min-height:44px!important;
+  border:0!important;
+  border-radius:12px!important;
+  font-weight:950!important;
+}
+.aps-actions button:first-child,
+.aps-form button{
+  background:#00e7a8!important;
+  color:#06101e!important;
+}
+.aps-actions button:last-child{
+  background:#ff456b!important;
+  color:#fff!important;
+}
+.aps-form{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:12px!important;
+}
+.aps-form label{
+  display:grid!important;
+  gap:6px!important;
+  color:#9fb2d0!important;
+  font-size:12px!important;
+}
+.aps-form input,
+.aps-form select{
+  min-height:44px!important;
+  border-radius:12px!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  background:rgba(0,0,0,.20)!important;
+  color:#f4f7ff!important;
+  padding:0 10px!important;
+}
+.aps-form button{
+  grid-column:1 / -1!important;
+}
 #adminPayoutRequestsPanel,
 #adminPaymentSettingsPanel{
-  transition:none!important;
-}
-
-#adminPayoutRequestsPanel.admin-pay-no-flicker-visible,
-#adminPaymentSettingsPanel.admin-pay-no-flicker-visible,
-#adminPayoutRequestsPanel.active-admin-pay-panel,
-#adminPaymentSettingsPanel.active-admin-pay-panel{
-  display:block!important;
-  visibility:visible!important;
-  opacity:1!important;
-}
-
-#adminPayoutRequestsPanel.force-admin-pay-hidden,
-#adminPaymentSettingsPanel.force-admin-pay-hidden{
   display:none!important;
-  visibility:hidden!important;
-  opacity:0!important;
 }
-
-body[data-admin-active-section="payoutMethods"].admin-payment-section-open #adminPayoutRequestsPanel{
-  display:block!important;
-  visibility:visible!important;
-  opacity:1!important;
-}
-body[data-admin-active-section="paymentSettings"].admin-payment-section-open #adminPaymentSettingsPanel{
-  display:block!important;
-  visibility:visible!important;
-  opacity:1!important;
-}
-body[data-admin-active-section="payoutMethods"].admin-payment-section-open #adminPaymentSettingsPanel,
-body[data-admin-active-section="paymentSettings"].admin-payment-section-open #adminPayoutRequestsPanel{
-  display:none!important;
+@media(max-width:800px){
+  .aps-list,
+  .aps-form,
+  .aps-quick-menu{
+    grid-template-columns:1fr!important;
+  }
+  .aps-page{
+    padding:12px!important;
+  }
 }

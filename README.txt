@@ -784,3 +784,14 @@ Admin Payment No Flicker Fix:
 - Removed CSS stay block count: 1
 - No SQL required.
 - JS syntax check: OK
+
+
+Admin Payment Stable Page Fix:
+- Removed conflicting admin payment tab/menu/flicker scripts: ['ADMIN PAYMENT NO FLICKER FIX', 'ADMIN PAYMENT MENU FORCE FIX', 'ADMIN PAYMENT TABS FIX']
+- Payment Settings and Payout Method Requests now open in a stable full-page admin panel.
+- Admin sidebar/menu buttons remain, and quick-menu fallback remains.
+- Older inline panels are hidden permanently to prevent 2-second disappear/flicker issue.
+- Payout approvals and payment settings save in local state/localStorage.
+- User-side design untouched.
+- No SQL required.
+- JS syntax check: OK
