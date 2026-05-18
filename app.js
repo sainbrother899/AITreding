@@ -7145,3 +7145,292 @@ function restoreManualHistoryBackup(mode = state.mode) {
   window.addEventListener("load", () => setTimeout(akBind, 1100));
   setInterval(akBind, 3000);
 })();
+
+
+/* ===== ADMIN KYC DB VISIBLE FIX ===== */
+(function(){
+  function kdbIsAdmin(){
+    return location.pathname.toLowerCase().includes("admin") ||
+      state?.user?.role === "admin" ||
+      document.body.classList.contains("admin-pc-restore") ||
+      document.body.classList.contains("admin") ||
+      !!document.getElementById("adminPage") ||
+      !!document.getElementById("adminApp") ||
+      !!document.querySelector(".admin-shell,.admin-layout,.admin-sidebar,.admin-page");
+  }
+
+  function kdbClient(){
+    try {
+      if (window.supabaseClient) return window.supabaseClient;
+      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
+      if (window.supabase && window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+        window.supabaseClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+        return window.supabaseClient;
+      }
+    } catch(e){}
+    return null;
+  }
+
+  function kdbRoot(){
+    return document.getElementById("adminPage") ||
+      document.getElementById("adminApp") ||
+      document.querySelector(".admin-page,.admin-shell,.admin-layout,.admin-main,.admin-content") ||
+      document.body;
+  }
+
+  function kdbMenu(){
+    const list = [
+      ".admin-sidebar nav",".admin-sidebar",".admin-menu",".admin-nav",".admin-tabs",
+      ".sidebar nav",".sidebar","aside nav","aside",".admin-actions",".admin-header"
+    ];
+    for (const s of list) {
+      const el = document.querySelector(s);
+      if (el && (el.querySelector("button,a") || /admin|user|deposit|withdraw|trade/i.test(el.textContent || ""))) return el;
+    }
+    return null;
+  }
+
+  function kdbEnsureButton(){
+    if (!kdbIsAdmin()) return;
+
+    let btn = document.querySelector("[data-kdb-open]");
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "kdb-menu-btn";
+      btn.dataset.kdbOpen = "1";
+      btn.innerHTML = `<span>🛡️</span><b>KYC Requests</b>`;
+    }
+
+    const menu = kdbMenu();
+    if (menu && !menu.querySelector("[data-kdb-open]")) {
+      menu.appendChild(btn);
+    }
+
+    let quick = document.getElementById("kdbQuickMenu");
+    if (!quick) {
+      quick = document.createElement("div");
+      quick.id = "kdbQuickMenu";
+      quick.className = "kdb-quick-menu";
+      quick.innerHTML = `<button type="button" data-kdb-open="1"><span>🛡️</span><b>KYC Requests</b></button>`;
+      kdbRoot().insertAdjacentElement("afterbegin", quick);
+    }
+
+    // Keep quick visible if sidebar injection may be hidden by admin CSS.
+    quick.classList.remove("hide-quick");
+  }
+
+  function kdbPanel(){
+    let p = document.getElementById("kdbStablePage");
+    if (!p) {
+      p = document.createElement("div");
+      p.id = "kdbStablePage";
+      p.className = "kdb-page";
+      p.innerHTML = `
+        <div class="kdb-head">
+          <button type="button" id="kdbBack">‹</button>
+          <div><p class="label">User Verification</p><h2>KYC Requests</h2></div>
+          <button type="button" id="kdbRefresh">Refresh</button>
+        </div>
+        <div id="kdbDebug" class="kdb-debug"></div>
+        <div id="kdbContent" class="kdb-content"></div>
+      `;
+      document.body.appendChild(p);
+      p.querySelector("#kdbBack").addEventListener("click", () => p.classList.remove("show"));
+      p.querySelector("#kdbRefresh").addEventListener("click", () => kdbOpen());
+    }
+    return p;
+  }
+
+  function kdbStatus(s){
+    s = String(s || "PENDING").toUpperCase();
+    const cls = s === "APPROVED" ? "approved" : (s === "REJECTED" ? "rejected" : "pending");
+    return `<em class="kdb-status ${cls}">${s}</em>`;
+  }
+
+  function kdbVal(row, keys, fallback="-"){
+    for (const k of keys) {
+      if (row && row[k] !== undefined && row[k] !== null && row[k] !== "") return row[k];
+    }
+    return fallback;
+  }
+
+  async function kdbLoadRows(){
+    const client = kdbClient();
+    if (!client) {
+      throw new Error("Supabase client not found. Check config.js / supabaseClient.");
+    }
+
+    // First try normal order by created_at
+    let res = await client.from("kyc_requests").select("*").order("created_at", { ascending:false });
+    if (res.error) {
+      // Fallback if created_at column does not exist
+      res = await client.from("kyc_requests").select("*");
+      if (res.error) throw res.error;
+    }
+
+    const rows = res.data || [];
+
+    let docsByKyc = {};
+    try {
+      let dres = await client.from("kyc_documents").select("*").order("uploaded_at", { ascending:false });
+      if (dres.error) dres = await client.from("kyc_documents").select("*");
+      (dres.data || []).forEach(d => {
+        const key = String(d.kyc_id || d.kycId || "");
+        docsByKyc[key] ||= [];
+        docsByKyc[key].push(d);
+      });
+    } catch(e) {
+      console.warn("kyc docs load failed", e);
+    }
+
+    return rows.map(r => {
+      const id = String(kdbVal(r, ["id"], ""));
+      return {
+        raw: r,
+        id,
+        userId: kdbVal(r, ["user_id","userId","uid"]),
+        userEmail: kdbVal(r, ["user_email","email","userEmail"]),
+        name: kdbVal(r, ["full_name","name","kyc_name"]),
+        mobile: kdbVal(r, ["mobile","phone"]),
+        docType: kdbVal(r, ["doc_type","document_type"], "KYC"),
+        docNumber: kdbVal(r, ["doc_number","document_number","kyc_id"]),
+        dob: kdbVal(r, ["dob","date_of_birth"]),
+        address: kdbVal(r, ["address","full_address"]),
+        status: kdbVal(r, ["status"], "PENDING"),
+        submittedAt: kdbVal(r, ["submitted_at","created_at","createdAt"]),
+        documents: r.documents || {},
+        docRows: docsByKyc[id] || []
+      };
+    });
+  }
+
+  function kdbDocsHtml(item){
+    const out = [];
+    const docs = item.documents || {};
+    Object.keys(docs).forEach(k => {
+      const d = docs[k] || {};
+      out.push(`<p><span>${k}</span><b>${d.name || d.file_name || d.path || d.file_path || "Uploaded"}</b></p>`);
+    });
+    (item.docRows || []).forEach(d => {
+      out.push(`<p><span>${d.doc_key || "document"}</span><b>${d.file_name || d.file_path || d.file_url || "-"}</b></p>`);
+    });
+    return out.length ? out.join("") : `<p><span>Documents</span><b>Saved in DB/Storage, metadata not found</b></p>`;
+  }
+
+  function kdbRender(rows){
+    if (!rows.length) {
+      return `<div class="kdb-empty">No KYC requests found in DB. Supabase table kyc_requests has rows? Check anon grants/RLS.</div>`;
+    }
+
+    return `
+      <div class="kdb-list">
+        ${rows.map(k => `
+          <div class="kdb-card">
+            <div class="kdb-top">
+              <div>
+                <span>User</span>
+                <b>${k.name || "-"}</b>
+                <small>${k.userEmail || k.userId || "-"}</small>
+              </div>
+              ${kdbStatus(k.status)}
+            </div>
+            <div class="kdb-grid">
+              <p><span>Request ID</span><b>${k.id || "-"}</b></p>
+              <p><span>User ID</span><b>${k.userId || "-"}</b></p>
+              <p><span>Mobile</span><b>${k.mobile || "-"}</b></p>
+              <p><span>Document Type</span><b>${k.docType || "-"}</b></p>
+              <p><span>Document No</span><b>${k.docNumber || "-"}</b></p>
+              <p><span>DOB</span><b>${k.dob || "-"}</b></p>
+              <p><span>Submitted</span><b>${k.submittedAt || "-"}</b></p>
+              <p class="wide"><span>Address</span><b>${k.address || "-"}</b></p>
+            </div>
+            <div class="kdb-docs">
+              <h4>Documents</h4>
+              ${kdbDocsHtml(k)}
+            </div>
+            <div class="kdb-actions">
+              <button type="button" data-kdb-approve="${k.id}">Approve KYC</button>
+              <button type="button" data-kdb-reject="${k.id}">Reject</button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  async function kdbOpen(){
+    const panel = kdbPanel();
+    const content = panel.querySelector("#kdbContent");
+    const debug = panel.querySelector("#kdbDebug");
+    panel.classList.add("show");
+    content.innerHTML = `<div class="kdb-empty">Loading KYC requests from Supabase...</div>`;
+
+    try {
+      const client = kdbClient();
+      debug.textContent = client ? "DB: connected • table: kyc_requests" : "DB: not connected";
+      const rows = await kdbLoadRows();
+      debug.textContent += ` • rows: ${rows.length}`;
+      content.innerHTML = kdbRender(rows);
+    } catch(e) {
+      console.error(e);
+      debug.textContent = "Error while loading KYC requests";
+      content.innerHTML = `<div class="kdb-empty error">Load failed: ${e.message || e}<br><small>${e.details || ""} ${e.hint || ""}</small></div>`;
+    }
+  }
+
+  async function kdbUpdate(id, status){
+    const client = kdbClient();
+    if (!client) throw new Error("Supabase client not found");
+    let res = await client.from("kyc_requests").update({ status, reviewed_at:new Date().toISOString() }).eq("id", id);
+    if (res.error && /reviewed_at/i.test(res.error.message || "")) {
+      res = await client.from("kyc_requests").update({ status }).eq("id", id);
+    }
+    if (res.error) throw res.error;
+  }
+
+  function kdbBind(){
+    if (!kdbIsAdmin()) return;
+    kdbEnsureButton();
+
+    document.querySelectorAll("[data-kdb-open]").forEach(btn => {
+      if (btn.dataset.kdbBound === "1") return;
+      btn.dataset.kdbBound = "1";
+      btn.addEventListener("click", function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        kdbOpen();
+      }, true);
+    });
+
+    const panel = kdbPanel();
+    if (panel.dataset.kdbActionBound !== "1") {
+      panel.dataset.kdbActionBound = "1";
+      panel.addEventListener("click", async function(e){
+        const approve = e.target.dataset.kdbApprove;
+        const reject = e.target.dataset.kdbReject;
+        if (!approve && !reject) return;
+        const id = approve || reject;
+        const status = approve ? "APPROVED" : "REJECTED";
+        const old = e.target.textContent;
+        e.target.disabled = true;
+        e.target.textContent = "Updating...";
+        try {
+          await kdbUpdate(id, status);
+          await kdbOpen();
+        } catch(err) {
+          alert("KYC status update failed: " + (err.message || err));
+        } finally {
+          e.target.disabled = false;
+          e.target.textContent = old;
+        }
+      });
+    }
+  }
+
+  window.openKycDbAdminPage = kdbOpen;
+  document.addEventListener("DOMContentLoaded", () => setTimeout(kdbBind, 900));
+  window.addEventListener("load", () => setTimeout(kdbBind, 1200));
+  setInterval(kdbBind, 2500);
+})();

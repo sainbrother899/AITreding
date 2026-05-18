@@ -854,3 +854,15 @@ Admin KYC Requests Fix:
 - Documents show file names/paths; signed URL document preview can be added later.
 - No new SQL required if kyc_requests/kyc_documents already exist and RLS testing fix is applied.
 - JS syntax check: OK
+
+
+Admin KYC DB Visible Fix:
+- Added stronger admin KYC Requests page that directly loads Supabase kyc_requests table.
+- Adds always-visible quick menu fallback button if sidebar injection fails.
+- Query has fallback if created_at column/order fails.
+- Shows debug line: DB connected + row count.
+- Shows exact load error on screen if query fails.
+- Approve/Reject updates kyc_requests status.
+- Designed to work even if previous admin KYC panel was not rendering.
+- No new SQL required if DB tables exist and testing RLS fix is applied.
+- JS syntax check: OK
