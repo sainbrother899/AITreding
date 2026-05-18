@@ -2317,8 +2317,8 @@ function pctAdminGetTradeFields() {
   const coin = document.getElementById("massTradeCoin")?.value || document.getElementById("managedCoin")?.value || "BTCUSDT";
   const side = document.getElementById("massTradeSide")?.value || document.getElementById("managedSide")?.value || "BUY";
   const risk = document.getElementById("massTradeRisk")?.value || document.getElementById("managedRisk")?.value || "MEDIUM";
-  const leverage = Number(document.getElementById("massTradeLeverage")?.value || document.getElementById("managedLeverage")?.value || 1);
-  const orderType = document.getElementById("massTradeOrderType")?.value || document.getElementById("managedOrderType")?.value || "MARKET";
+  const leverage = Number(window.__bulkAiLeverage || document.getElementById("massTradeLeverage")?.value || document.getElementById("managedLeverage")?.value || 1);
+  const orderType = window.__bulkAiOrderType || document.getElementById("massTradeOrderType")?.value || document.getElementById("managedOrderType")?.value || "MARKET";
 
   let entry = 0;
   try {
@@ -2815,3 +2815,28 @@ function bindBulkLeverageCloseAll() {
 }
 setInterval(bindBulkLeverageCloseAll, 1000);
 window.addEventListener("load", () => setTimeout(bindBulkLeverageCloseAll, 700));
+
+
+
+
+
+/* ===== DIRECT ADMIN BULK LEVERAGE LOGIC FIX ===== */
+function getAdminBulkLeverageDirect() {
+  const v = Number(document.getElementById("massTradeLeverage")?.value || 1);
+  return Math.min(2000, Math.max(1, v || 1));
+}
+function getAdminBulkOrderTypeDirect() {
+  return document.getElementById("massTradeOrderType")?.value || "MARKET";
+}
+document.addEventListener("click", function(e){
+  const btn = e.target.closest("#openMassTradeBtn");
+  if (!btn) return;
+  const lev = getAdminBulkLeverageDirect();
+  const typ = getAdminBulkOrderTypeDirect();
+  window.__bulkAiLeverage = lev;
+  window.__bulkAiOrderType = typ;
+  const ml = document.getElementById("managedLeverage");
+  const mt = document.getElementById("managedOrderType");
+  if (ml) ml.value = lev;
+  if (mt) mt.value = typ;
+}, true);

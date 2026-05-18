@@ -180,3 +180,19 @@ Bulk Leverage + Close All AI Trades Update:
 - PnL calculation includes leverage.
 - No SQL required.
 - JS syntax check: OK
+
+
+Admin Leverage Force Fix:
+- Leverage field is now force-injected into Bulk AI Trade panel by JavaScript.
+- Order Type and Leverage are visible even if HTML placement fails.
+- Open Bulk AI Trade bridges selected leverage/order type into existing trade logic.
+- No SQL required.
+- JS syntax check: OK
+
+
+Direct Admin Leverage Fix:
+- Leverage and Order Type are now directly written inside admin.html Bulk AI Trade form.
+- Removed unreliable force-injection block.
+- Bulk trade click stores selected leverage/order type before opening trade.
+- No SQL required.
+- JS syntax check: OK

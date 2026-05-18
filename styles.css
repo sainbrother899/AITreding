@@ -3507,3 +3507,41 @@ body[data-admin-page="true"] #adminManagedTrade .admin-two-grid{
     flex-direction:column;
   }
 }
+
+
+/* ===== ADMIN BULK LEVERAGE FORCE VISIBLE UI ===== */
+.force-bulk-leverage-box{
+  display:grid!important;
+  gap:10px!important;
+  margin:12px 0!important;
+  padding:12px!important;
+  border-radius:16px!important;
+  border:1px solid rgba(0,229,155,.18)!important;
+  background:rgba(0,229,155,.055)!important;
+}
+.force-bulk-leverage-box select{
+  display:block!important;
+  width:100%!important;
+  min-height:44px!important;
+  opacity:1!important;
+  visibility:visible!important;
+}
+.force-bulk-leverage-box .input-label{
+  display:block!important;
+  color:var(--text,#fff)!important;
+  font-weight:800!important;
+}
+body[data-admin-page="true"] #adminMassTrade #forceBulkLeverageBox{
+  display:grid!important;
+}
+
+
+/* Direct admin leverage visible */
+body[data-admin-page="true"] #adminMassTrade #massTradeLeverage,
+body[data-admin-page="true"] #adminMassTrade #massTradeOrderType{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  width:100%!important;
+  min-height:44px!important;
+}
