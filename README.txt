@@ -842,3 +842,12 @@ KYC RLS + Storage Upload Fix:
 - Included SQL: supabase-rls-temporary-testing-fix.sql
 - That SQL temporarily disables RLS on app tables for testing and keeps Storage insert-only.
 - JS syntax check: OK
+
+
+Admin KYC Existing Table Bind Fix:
+- Design locked: no new admin page, no overlay, no quick menu, no sidebar/header/layout changes.
+- Binds Supabase kyc_requests data into the existing KYC Management table shown in admin.
+- Uses existing columns: User, Name, Doc Type, Doc No., Files, Status, Action.
+- Approve/Reject buttons update kyc_requests.status in DB.
+- Includes fallback if table is div/grid based instead of tbody.
+- JS syntax check: OK

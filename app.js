@@ -6861,3 +6861,236 @@ function restoreManualHistoryBackup(mode = state.mode) {
   setInterval(dbcInjectKycDocs, 2500);
   setInterval(dbcLoadFromDb, 12000);
 })();
+
+
+/* ===== ADMIN KYC EXISTING TABLE BIND FIX ===== */
+(function(){
+  function ekIsAdmin(){
+    return location.pathname.toLowerCase().includes("admin") ||
+      state?.user?.role === "admin" ||
+      !!document.getElementById("adminPage") ||
+      !!document.getElementById("adminApp") ||
+      !!document.querySelector(".admin-shell,.admin-layout,.admin-sidebar");
+  }
+
+  function ekClient(){
+    try {
+      if (window.supabaseClient) return window.supabaseClient;
+      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
+    } catch(e){}
+    return null;
+  }
+
+  function ekStatus(s){
+    s = String(s || "PENDING").toUpperCase();
+    const cls = s === "APPROVED" ? "approved" : (s === "REJECTED" ? "rejected" : "pending");
+    return `<span class="ek-kyc-status ${cls}">${s}</span>`;
+  }
+
+  function ekVal(row, keys, fallback="-"){
+    for (const k of keys) {
+      if (row && row[k] !== undefined && row[k] !== null && row[k] !== "") return row[k];
+    }
+    return fallback;
+  }
+
+  function ekFindKycTable(){
+    const tables = Array.from(document.querySelectorAll("table"));
+    for (const table of tables) {
+      const txt = (table.textContent || "").toLowerCase();
+      if (txt.includes("doc type") && txt.includes("doc no") && txt.includes("status")) return table;
+    }
+
+    // Fallback: screenshot-style card contains the headers even if not a real table.
+    const cards = Array.from(document.querySelectorAll(".card, section, div"));
+    for (const card of cards) {
+      const txt = (card.textContent || "").toLowerCase();
+      if (txt.includes("user kyc requests") && txt.includes("doc type") && txt.includes("doc no")) {
+        return card.querySelector("table") || card;
+      }
+    }
+    return null;
+  }
+
+  function ekFindTbody(){
+    const table = ekFindKycTable();
+    if (!table) return null;
+
+    if (table.tagName === "TABLE") {
+      let tbody = table.querySelector("tbody");
+      if (!tbody) {
+        tbody = document.createElement("tbody");
+        table.appendChild(tbody);
+      }
+      return tbody;
+    }
+
+    let body = table.querySelector("[data-ek-kyc-body]");
+    if (!body) {
+      body = document.createElement("div");
+      body.dataset.ekKycBody = "1";
+      body.className = "ek-kyc-body";
+      table.appendChild(body);
+    }
+    return body;
+  }
+
+  async function ekLoadRows(){
+    const client = ekClient();
+    if (!client) throw new Error("Supabase client not found");
+
+    let res = await client.from("kyc_requests").select("*").order("created_at", { ascending:false });
+    if (res.error) {
+      res = await client.from("kyc_requests").select("*");
+      if (res.error) throw res.error;
+    }
+
+    let docsById = {};
+    try {
+      let dres = await client.from("kyc_documents").select("*");
+      if (!dres.error) {
+        (dres.data || []).forEach(d => {
+          const id = String(d.kyc_id || "");
+          docsById[id] ||= [];
+          docsById[id].push(d);
+        });
+      }
+    } catch(e){}
+
+    return (res.data || []).map(r => {
+      const id = String(ekVal(r, ["id"], ""));
+      const docs = r.documents || {};
+      const docCount = Object.keys(docs || {}).length + (docsById[id] || []).length;
+      return {
+        id,
+        user: ekVal(r, ["user_email","email","user_id","userId"], "-"),
+        name: ekVal(r, ["full_name","name","kyc_name"], "-"),
+        docType: ekVal(r, ["doc_type","document_type"], "KYC"),
+        docNo: ekVal(r, ["doc_number","document_number","kyc_id"], "-"),
+        files: docCount ? `${docCount} file${docCount > 1 ? "s" : ""}` : "Uploaded",
+        status: ekVal(r, ["status"], "PENDING")
+      };
+    });
+  }
+
+  function ekRenderRows(rows){
+    const body = ekFindTbody();
+    if (!body) return false;
+
+    if (body.tagName === "TBODY") {
+      body.innerHTML = rows.length ? rows.map(r => `
+        <tr>
+          <td>${r.user}</td>
+          <td>${r.name}</td>
+          <td>${r.docType}</td>
+          <td>${r.docNo}</td>
+          <td>${r.files}</td>
+          <td>${ekStatus(r.status)}</td>
+          <td>
+            <button type="button" class="ek-kyc-action approve" data-ek-approve="${r.id}">Approve</button>
+            <button type="button" class="ek-kyc-action reject" data-ek-reject="${r.id}">Reject</button>
+          </td>
+        </tr>
+      `).join("") : `<tr><td colspan="7" class="empty">No KYC requests found.</td></tr>`;
+      return true;
+    }
+
+    // If admin UI is div/grid based, render rows underneath existing header without changing header design.
+    body.innerHTML = rows.length ? rows.map(r => `
+      <div class="ek-kyc-grid-row">
+        <span>${r.user}</span>
+        <span>${r.name}</span>
+        <span>${r.docType}</span>
+        <span>${r.docNo}</span>
+        <span>${r.files}</span>
+        <span>${ekStatus(r.status)}</span>
+        <span>
+          <button type="button" class="ek-kyc-action approve" data-ek-approve="${r.id}">Approve</button>
+          <button type="button" class="ek-kyc-action reject" data-ek-reject="${r.id}">Reject</button>
+        </span>
+      </div>
+    `).join("") : `<div class="ek-kyc-empty">No KYC requests found.</div>`;
+    return true;
+  }
+
+  async function ekRefresh(){
+    if (!ekIsAdmin()) return;
+    const table = ekFindKycTable();
+    if (!table) return;
+
+    const isKycVisible = /user kyc requests|kyc management|doc type|doc no/i.test(table.textContent || "");
+    if (!isKycVisible) return;
+
+    const body = ekFindTbody();
+    if (body && !body.dataset.ekLoading) {
+      body.dataset.ekLoading = "1";
+      if (body.tagName === "TBODY") body.innerHTML = `<tr><td colspan="7" class="empty">Loading KYC requests...</td></tr>`;
+      else body.innerHTML = `<div class="ek-kyc-empty">Loading KYC requests...</div>`;
+    }
+
+    try {
+      const rows = await ekLoadRows();
+      ekRenderRows(rows);
+      if (body) delete body.dataset.ekLoading;
+    } catch(e) {
+      console.error("KYC existing table load failed", e);
+      if (body) {
+        if (body.tagName === "TBODY") body.innerHTML = `<tr><td colspan="7" class="empty">KYC load failed: ${e.message || e}</td></tr>`;
+        else body.innerHTML = `<div class="ek-kyc-empty error">KYC load failed: ${e.message || e}</div>`;
+        delete body.dataset.ekLoading;
+      }
+    }
+  }
+
+  async function ekUpdate(id, status){
+    const client = ekClient();
+    if (!client) throw new Error("Supabase client not found");
+    let res = await client.from("kyc_requests").update({ status, reviewed_at:new Date().toISOString() }).eq("id", id);
+    if (res.error && /reviewed_at/i.test(res.error.message || "")) {
+      res = await client.from("kyc_requests").update({ status }).eq("id", id);
+    }
+    if (res.error) throw res.error;
+  }
+
+  function ekBind(){
+    if (!ekIsAdmin()) return;
+
+    document.addEventListener("click", async function(e){
+      const approve = e.target?.dataset?.ekApprove;
+      const reject = e.target?.dataset?.ekReject;
+      if (!approve && !reject) return;
+
+      const id = approve || reject;
+      const status = approve ? "APPROVED" : "REJECTED";
+      const old = e.target.textContent;
+      e.target.disabled = true;
+      e.target.textContent = "Updating...";
+      try {
+        await ekUpdate(id, status);
+        await ekRefresh();
+      } catch(err) {
+        alert("KYC update failed: " + (err.message || err));
+      } finally {
+        e.target.disabled = false;
+        e.target.textContent = old;
+      }
+    }, true);
+
+    // Refresh when KYC menu/tab is clicked, without changing menu design.
+    document.addEventListener("click", function(e){
+      const txt = (e.target?.textContent || "").toLowerCase();
+      if (txt.includes("kyc")) setTimeout(ekRefresh, 500);
+    }, true);
+  }
+
+  window.refreshExistingAdminKycTable = ekRefresh;
+
+  if (!window.__existingAdminKycTableBound) {
+    window.__existingAdminKycTableBound = true;
+    ekBind();
+  }
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(ekRefresh, 1000));
+  window.addEventListener("load", () => setTimeout(ekRefresh, 1300));
+  setInterval(ekRefresh, 6000);
+})();
