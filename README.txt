@@ -299,3 +299,12 @@ Trade Page Positions + Chart Fix:
 - AI/Bulk trades remain admin-managed; manual trades remain user-closeable.
 - No SQL required.
 - JS syntax check: OK
+
+
+Home AI Control Visible Fix:
+- AI Trade Control card is force-rendered at bottom of Home/cleanHomeShell.
+- Old trade-page AI control card remains hidden.
+- Percent buttons 25/50/75/100 update user setting.
+- Auto AI Trade toggle updates user setting.
+- No SQL required.
+- JS syntax check: OK

@@ -4304,3 +4304,75 @@ body[data-user-clean-ui="true"] .table-wrap{
     grid-template-columns:1fr;
   }
 }
+
+
+/* ===== HOME AI CONTROL FORCE VISIBLE FIX ===== */
+.force-home-ai-control{
+  display:block!important;
+  margin-top:14px!important;
+  order:999!important;
+}
+.old-ai-control-hidden,
+.trade-page-ai-settings-card{
+  display:none!important;
+}
+.home-ai-percent-grid{
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:10px!important;
+  margin:12px 0!important;
+}
+.home-ai-percent-grid .percent-btn,
+.force-home-ai-control .percent-btn{
+  min-height:44px!important;
+  border-radius:14px!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  background:rgba(255,255,255,.05)!important;
+  color:var(--clean-text,#f4f7ff)!important;
+  font-weight:900!important;
+}
+.home-ai-percent-grid .percent-btn.active,
+.force-home-ai-control .percent-btn.active{
+  border-color:rgba(0,231,168,.55)!important;
+  background:rgba(0,231,168,.16)!important;
+  color:var(--clean-green,#00e7a8)!important;
+}
+.home-ai-preview{
+  border:1px solid rgba(0,231,168,.18)!important;
+  background:rgba(0,231,168,.055)!important;
+  border-radius:16px!important;
+  padding:12px!important;
+  margin-top:10px!important;
+}
+.home-ai-preview span{
+  display:block!important;
+  color:var(--clean-muted,#9fb2d0)!important;
+  font-size:12px!important;
+  margin-bottom:5px!important;
+}
+.home-ai-preview b{
+  display:block!important;
+  color:var(--clean-green,#00e7a8)!important;
+  font-size:20px!important;
+}
+.home-ai-preview small{
+  display:block!important;
+  color:var(--clean-text,#f4f7ff)!important;
+  margin-top:4px!important;
+}
+.home-ai-toggle-row{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+  border:1px solid rgba(255,255,255,.08)!important;
+  background:rgba(255,255,255,.035)!important;
+  border-radius:14px!important;
+  padding:12px!important;
+  margin-top:12px!important;
+}
+@media(max-width:520px){
+  .home-ai-percent-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+}
