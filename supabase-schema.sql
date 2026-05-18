@@ -265,3 +265,6 @@ alter table public.referrals add column if not exists deposit_amount numeric def
 alter table public.referrals add column if not exists bonus_amount numeric default 0;
 alter table public.referrals add column if not exists percent numeric default 5;
 alter table public.referrals add column if not exists status text default 'PAID';
+
+
+-- Fixed referral bonus uses bonus_amount = 500 and percent = 0 after referred user's first approved deposit.

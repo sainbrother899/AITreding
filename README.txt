@@ -508,3 +508,22 @@ Referral Bonus Percentage Fix:
 - ₹100000 deposit now correctly gives ₹5000 referral bonus.
 - Added safer numeric parsing for approved deposit amount.
 - No SQL required.
+
+
+Final Referral Auto 5% Fix:
+- Referral bonus is automatic after admin approves the referred user's deposit.
+- No separate referral approval needed.
+- Every approved deposit pays 5% to the referrer.
+- ₹100000 deposit pays ₹5000 bonus.
+- Prevents duplicate bonus for same deposit.
+- Uses referrals table + wallet_ledger REFERRAL_BONUS.
+- Run referral SQL once if columns are missing.
+
+
+Referral Fixed ₹500 Bonus Update:
+- Referral bonus changed from 5% to fixed ₹500.
+- Bonus is paid automatically after the referred user's first approved deposit.
+- No separate admin approval required for referral bonus.
+- Bonus is paid only once per referred user.
+- Uses referrals table and wallet_ledger REFERRAL_BONUS.
+- No SQL required if referral columns already exist.
