@@ -289,3 +289,13 @@ User UI Structure Clean Rebuild:
 - Admin/Supabase/trade/deposit logic untouched.
 - No SQL required.
 - JS syntax check: OK
+
+
+Trade Page Positions + Chart Fix:
+- Manual/user live trades now render in Trade page under Open Positions.
+- Each open manual trade card shows coin, side, leverage, amount, entry, live price, live PnL, and Close Trade button.
+- AI Trade Settings/percentage control is moved to bottom of Home page.
+- Trade page chart is enlarged.
+- AI/Bulk trades remain admin-managed; manual trades remain user-closeable.
+- No SQL required.
+- JS syntax check: OK
