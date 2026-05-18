@@ -945,7 +945,7 @@ function setupEvents() {
   $("openDepositBtn")?.addEventListener("click", () => openModal("depositModal"));
   $("openDepositBtn2")?.addEventListener("click", () => openModal("depositModal"));
   $("closeDepositModal")?.addEventListener("click", () => closeModal("depositModal"));
-  $("submitDepositRequest")?.addEventListener("click", submitDeposit);
+  $("submitDepositRequest")?.addEventListener("click", depositSubmitNoIdHard);
   $("openWithdrawBtn")?.addEventListener("click", () => openModal("withdrawModal"));
   $("closeWithdrawModal")?.addEventListener("click", () => closeModal("withdrawModal"));
   $("submitWithdrawRequest")?.addEventListener("click", submitWithdrawal);
@@ -985,3 +985,180 @@ document.addEventListener("DOMContentLoaded", async () => {
   setInterval(fetchPrices, 5000);
   setInterval(() => { renderTrades(); renderWallet(); renderAnalytics(); renderHistory(); }, 1500);
 });
+
+
+/* ===== DEPOSIT BIGINT HARD OVERRIDE FIX ===== */
+function depositHardToast(msg) {
+  if (typeof toast === "function") toast(msg);
+  else alert(msg);
+}
+
+function depositHardAmount() {
+  const ids = ["depositAmount", "depositAmountInput", "depositInput", "walletDepositAmount", "amountInput"];
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const n = Number(String(el.value || "").replace(/,/g, "").trim());
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
+}
+
+function depositHardUtr() {
+  const ids = ["depositTxn", "depositTxnInput", "transactionId", "utrInput", "depositUtr", "utr"];
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    return String(el.value || "").replace(/\D/g, "").slice(0, 12);
+  }
+  return "";
+}
+
+async function depositHardDuplicate(utr) {
+  if (!utr) return false;
+
+  if ((state.depositRequests || []).some(d => String(d.txn || d.utr || "").trim() === utr)) return true;
+
+  if (supabaseClient) {
+    try {
+      const { data } = await supabaseClient
+        .from("deposit_requests")
+        .select("id")
+        .eq("txn", utr)
+        .limit(1);
+      if (data && data.length) return true;
+    } catch (e) {
+      console.warn("UTR duplicate check skipped", e);
+    }
+  }
+
+  return false;
+}
+
+async function depositSubmitNoIdHard() {
+  try {
+    if (!state.user) {
+      depositHardToast("Please login first.");
+      return false;
+    }
+
+    const amount = depositHardAmount();
+    const txn = depositHardUtr();
+
+    if (!amount || amount < 1000) {
+      alert("Minimum deposit ₹1000 hai.");
+      return false;
+    }
+
+    if (!/^[0-9]{12}$/.test(txn)) {
+      alert("UTR exactly 12 digit hona chahiye.");
+      return false;
+    }
+
+    if (await depositHardDuplicate(txn)) {
+      alert("Duplicate UTR");
+      return false;
+    }
+
+    const localId = "local_dep_" + Date.now();
+    const req = {
+      id: localId,
+      userId: state.user.id || "",
+      userEmail: state.user.email || "",
+      userName: state.user.name || "",
+      amount,
+      txn,
+      status: "PENDING",
+      createdAt: new Date().toLocaleString()
+    };
+
+    // IMPORTANT: Database insert me ID bilkul nahi bhejna.
+    // Ye bigint id error ko completely avoid karega.
+    if (supabaseClient) {
+      const dbRow = {
+        user_id: req.userId,
+        user_email: req.userEmail,
+        user_name: req.userName,
+        amount: req.amount,
+        txn: req.txn,
+        status: req.status,
+        created_at_text: req.createdAt
+      };
+
+      const { data, error } = await supabaseClient
+        .from("deposit_requests")
+        .insert(dbRow)
+        .select("id")
+        .single();
+
+      if (error) {
+        console.error("Deposit insert error", error, dbRow);
+        if (String(error.message || "").toLowerCase().includes("duplicate")) {
+          alert("Duplicate UTR");
+          return false;
+        }
+        alert("Deposit save error: " + (error.message || "Unknown error"));
+        return false;
+      }
+
+      if (data && data.id !== undefined && data.id !== null) req.id = String(data.id);
+    }
+
+    state.depositRequests = state.depositRequests || [];
+    state.depositRequests.unshift(req);
+    saveState?.();
+
+    ["depositAmount", "depositAmountInput", "depositInput", "walletDepositAmount", "amountInput"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+    ["depositTxn", "depositTxnInput", "transactionId", "utrInput", "depositUtr", "utr"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+
+    try { closeModal?.("depositModal"); } catch(e) {}
+    render?.();
+    depositHardToast("Deposit request submitted. Admin approval pending.");
+    return false;
+  } catch (e) {
+    console.error("Deposit hard submit failed", e);
+    alert("Deposit submit failed: " + (e.message || e));
+    return false;
+  }
+}
+
+// Override every possible old function name.
+try { submitDeposit = depositSubmitNoIdHard; } catch(e) {}
+try { submitDepositFinal = depositSubmitNoIdHard; } catch(e) {}
+try { submitDepositWorkingFinal = depositSubmitNoIdHard; } catch(e) {}
+try { createDepositRequest = depositSubmitNoIdHard; } catch(e) {}
+try { handleDepositSubmit = depositSubmitNoIdHard; } catch(e) {}
+
+window.submitDeposit = depositSubmitNoIdHard;
+window.submitDepositFinal = depositSubmitNoIdHard;
+window.submitDepositWorkingFinal = depositSubmitNoIdHard;
+window.createDepositRequest = depositSubmitNoIdHard;
+window.handleDepositSubmit = depositSubmitNoIdHard;
+
+// Capture click before old listeners and stop them.
+document.addEventListener("click", function(e) {
+  const btn = e.target.closest(
+    "#submitDepositRequest, #depositBtn, #submitDepositBtn, #depositSubmitBtn, #makeDepositBtn, [data-action='deposit-submit']"
+  );
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  e.stopImmediatePropagation();
+  depositSubmitNoIdHard();
+  return false;
+}, true);
+
+// UTR input hard limit.
+document.addEventListener("input", function(e) {
+  const el = e.target;
+  if (!el) return;
+  if (["depositTxn", "depositTxnInput", "transactionId", "utrInput", "depositUtr", "utr"].includes(el.id)) {
+    el.value = String(el.value || "").replace(/\D/g, "").slice(0, 12);
+  }
+}, true);

@@ -29,3 +29,12 @@ DB Compatibility Fix:
 - Added SQL compatibility patch for missing metadata columns.
 - Keep UI/design same.
 - JS syntax check: OK
+
+
+Deposit Bigint Hard Fix:
+- Deposit submit now captures click before old handlers.
+- Supabase insert never sends id to deposit_requests.
+- Old submitDeposit/submitDepositFinal/createDepositRequest aliases overridden.
+- 12 digit UTR validation and duplicate check kept.
+- If same error appears, browser is still serving old cached app.js.
+- JS syntax check: OK
