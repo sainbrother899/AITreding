@@ -5011,144 +5011,253 @@ body[data-active-page="more"] #more{
 }
 
 
-/* ===== PC DESKTOP LAYOUT FIX ONLY ===== */
-/* This block affects only PC/tablet wide screens. Mobile remains unchanged. */
+
+
+
+/* ===== PC DESKTOP COMPLETE FIX ===== */
+/* Desktop-only complete reset. Mobile below 900px is untouched. */
 @media (min-width: 900px){
 
-  html, body{
+  :root{
+    --pc-max: 1180px;
+    --pc-gap: 18px;
+    --pc-card-radius: 22px;
+  }
+
+  html,
+  body{
+    width:100%!important;
+    max-width:100%!important;
     overflow-x:hidden!important;
   }
 
+  body{
+    background:
+      radial-gradient(circle at 12% 6%, rgba(0,231,168,.10), transparent 26%),
+      radial-gradient(circle at 92% 36%, rgba(83,93,255,.12), transparent 28%),
+      linear-gradient(180deg,#041715 0%,#070b18 55%,#12091f 100%)!important;
+  }
+
+  /* Global app frame */
   body[data-user-clean-ui="true"] #appPage,
   body[data-user-clean-ui="true"] main,
+  body.pc-desktop-mode #appPage,
+  body.pc-desktop-mode main,
   #appPage,
   main{
     width:100%!important;
-    max-width:1180px!important;
+    max-width:var(--pc-max)!important;
     margin:0 auto!important;
     padding-left:24px!important;
     padding-right:24px!important;
+    padding-bottom:130px!important;
+    box-sizing:border-box!important;
   }
 
-  /* Desktop header alignment */
+  .pc-page-container,
+  #dashboard,#home,#trade,#tradepage,#wallet,#pnl,#history,#plans,#more{
+    width:100%!important;
+    max-width:var(--pc-max)!important;
+    margin-left:auto!important;
+    margin-right:auto!important;
+    box-sizing:border-box!important;
+  }
+
+  /* Header */
   .clean-top-header{
-    max-width:1180px!important;
-    margin:0 auto!important;
-    left:0!important;
-    right:0!important;
-    border-radius:0 0 22px 22px!important;
+    width:100%!important;
+    max-width:var(--pc-max)!important;
+    margin:0 auto 16px!important;
+    padding:14px 24px!important;
+    border-radius:0 0 24px 24px!important;
+    box-sizing:border-box!important;
   }
 
   .top-header-title span{
     font-size:24px!important;
   }
 
+  .top-header-menu-btn{
+    width:48px!important;
+    height:48px!important;
+  }
+
   .top-header-user-btn{
-    max-width:220px!important;
+    max-width:240px!important;
   }
 
-  /* Page containers should not stretch strangely on PC */
-  #dashboard,
-  #home,
-  #trade,
-  #tradepage,
-  #wallet,
-  #pnl,
-  #history,
-  #plans,
-  #more{
-    width:100%!important;
-    max-width:1180px!important;
-    margin-left:auto!important;
-    margin-right:auto!important;
+  .top-header-menu-panel{
+    left:calc(50% - (var(--pc-max) / 2) + 24px)!important;
+    top:76px!important;
   }
 
-  /* Home desktop grid */
-  .clean-home-shell{
-    width:100%!important;
-    max-width:1180px!important;
-    margin:0 auto!important;
-    display:grid!important;
-    grid-template-columns:1.15fr .85fr!important;
-    gap:18px!important;
-    align-items:start!important;
-  }
-
-  .clean-home-shell .clean-welcome-card{
-    grid-column:1 / 2!important;
-  }
-
-  .clean-home-shell .clean-market-grid{
-    grid-column:1 / 3!important;
-    display:grid!important;
-    grid-template-columns:repeat(4,minmax(0,1fr))!important;
-    gap:14px!important;
-  }
-
-  .clean-home-shell .clean-stats-grid{
-    grid-column:1 / 3!important;
-    display:grid!important;
-    grid-template-columns:repeat(4,minmax(0,1fr))!important;
-    gap:14px!important;
-  }
-
-  .clean-home-shell .clean-ai-signal-card{
-    grid-column:1 / 3!important;
-  }
-
-  #homeAiTradeControlCard{
-    max-width:1180px!important;
-    margin-left:auto!important;
-    margin-right:auto!important;
-  }
-
-  /* Generic cards on desktop */
+  /* Generic cards */
   .card,
+  .pc-card,
   .clean-welcome-card,
   .clean-ai-signal-card,
   .clean-market-card,
-  .clean-stat-card{
-    border-radius:22px!important;
+  .clean-stat-card,
+  .manual-open-positions-card,
+  .exact-order-ticket-card,
+  .mini-feed-card{
+    box-sizing:border-box!important;
+    border-radius:var(--pc-card-radius)!important;
+    max-width:100%!important;
   }
 
-  /* Trade page desktop layout */
+  .card{
+    margin-left:auto!important;
+    margin-right:auto!important;
+  }
+
+  input,select,textarea,button{
+    max-width:100%!important;
+    box-sizing:border-box!important;
+  }
+
+  /* HOME: clean desktop layout */
+  #cleanHomeMount{
+    width:100%!important;
+    max-width:var(--pc-max)!important;
+    margin:0 auto!important;
+  }
+
+  .clean-home-shell{
+    width:100%!important;
+    max-width:var(--pc-max)!important;
+    margin:0 auto!important;
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:var(--pc-gap)!important;
+  }
+
+  .clean-welcome-card{
+    width:100%!important;
+  }
+
+  .clean-account-mode{
+    grid-template-columns:1fr 1fr!important;
+    gap:14px!important;
+  }
+
+  .clean-market-grid{
+    display:grid!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    gap:14px!important;
+    width:100%!important;
+  }
+
+  .clean-stats-grid{
+    display:grid!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    gap:14px!important;
+    width:100%!important;
+  }
+
+  .clean-signal-grid{
+    display:grid!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    gap:14px!important;
+  }
+
+  #homeAiTradeControlCard{
+    width:100%!important;
+    max-width:var(--pc-max)!important;
+    margin:18px auto!important;
+  }
+
+  .clean-ai-percent-grid,
+  .home-ai-percent-grid{
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  }
+
+  /* TRADE: desktop clean stack with readable width */
   body[data-active-page="trade"] #trade,
   body[data-active-page="trade"] #tradepage,
   #trade.active-page,
   #tradepage.active-page{
     width:100%!important;
-    max-width:1180px!important;
+    max-width:var(--pc-max)!important;
     margin:0 auto!important;
-    padding-left:0!important;
-    padding-right:0!important;
-    padding-bottom:120px!important;
+    padding:0 0 130px!important;
+    display:block!important;
+    box-sizing:border-box!important;
   }
 
-  /* Trade chart should use desktop width cleanly */
+  #trade .card,
+  #tradepage .card{
+    width:100%!important;
+    max-width:var(--pc-max)!important;
+  }
+
   #trade .chart-card,
   #tradepage .chart-card,
   #trade .exact-chart-card,
   #tradepage .exact-chart-card{
     width:100%!important;
-    max-width:1180px!important;
-    margin-left:auto!important;
-    margin-right:auto!important;
+    max-width:var(--pc-max)!important;
+    margin:14px auto!important;
+    padding:10px!important;
   }
 
-  /* Order ticket and feed cards should not become too narrow/wide */
+  /* Keep existing chart behavior from base, just make desktop card fit nicely */
+  #crypto_live_chart,
+  #tradingViewChart,
+  #chartContainer{
+    width:100%!important;
+    max-width:100%!important;
+  }
+
+  #crypto_live_chart iframe,
+  #tradingViewChart iframe,
+  #chartContainer iframe{
+    width:100%!important;
+    max-width:100%!important;
+  }
+
   .trade-page-ticket-wrap,
   .exact-order-ticket-card,
-  .manual-open-positions-card,
+  .manual-open-positions-card{
+    width:100%!important;
+    max-width:var(--pc-max)!important;
+    margin:16px auto!important;
+  }
+
+  .trade-page-ticket-wrap .order-ticket,
+  .exact-order-ticket-card .order-ticket{
+    width:100%!important;
+  }
+
+  .order-ticket .form-grid,
+  .trade-form-grid,
+  #trade .form-grid,
+  #tradepage .form-grid{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:14px!important;
+  }
+
+  .trade-actions,
+  #trade .action-row,
+  #tradepage .action-row{
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:14px!important;
+  }
+
+  .trade-actions button,
+  #trade .action-row button,
+  #tradepage .action-row button{
+    min-height:54px!important;
+    width:100%!important;
+  }
+
   .chart-bottom-feed,
   .exact-feed-grid{
     width:100%!important;
-    max-width:1180px!important;
-    margin-left:auto!important;
-    margin-right:auto!important;
-  }
-
-  .chart-bottom-feed,
-  .exact-feed-grid{
+    max-width:var(--pc-max)!important;
+    margin:16px auto!important;
     display:grid!important;
     grid-template-columns:1fr 1fr!important;
     gap:16px!important;
@@ -5156,85 +5265,122 @@ body[data-active-page="more"] #more{
   }
 
   .mini-feed-card,
-  .exact-feed-card{
+  .exact-feed-card,
+  .force-show-order-feed{
+    display:block!important;
     width:100%!important;
     min-width:0!important;
+    visibility:visible!important;
+    opacity:1!important;
   }
 
-  /* Wallet desktop layout */
+  .mini-feed-card table,
+  .exact-feed-card table{
+    width:100%!important;
+  }
+
+  /* WALLET: desktop */
+  #wallet{
+    display:block;
+  }
+
   #wallet .card{
-    max-width:1180px!important;
-    margin-left:auto!important;
-    margin-right:auto!important;
+    width:100%!important;
+    max-width:var(--pc-max)!important;
+    margin:16px auto!important;
   }
 
+  #wallet .grid,
   #wallet .wallet-grid,
   #wallet .balance-grid,
   #wallet .account-grid,
   #wallet .deposit-withdraw-grid,
-  #wallet .two-col,
-  #wallet .grid{
+  #wallet .two-col{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:16px!important;
+    width:100%!important;
+  }
+
+  #wallet .table-wrap,
+  #history .table-wrap,
+  #pnl .table-wrap{
+    width:100%!important;
+    overflow-x:auto!important;
+  }
+
+  #wallet table,
+  #history table,
+  #pnl table{
+    width:100%!important;
+    min-width:720px!important;
+  }
+
+  /* PNL / HISTORY / PLANS / MORE */
+  #pnl .card,
+  #history .card,
+  #plans .card,
+  #more .card{
+    width:100%!important;
+    max-width:var(--pc-max)!important;
+    margin:16px auto!important;
+  }
+
+  #pnl .grid,
+  #history .grid,
+  #plans .grid{
     display:grid!important;
     grid-template-columns:repeat(2,minmax(0,1fr))!important;
     gap:16px!important;
   }
 
-  #wallet table{
-    width:100%!important;
+  /* Admin-like pages should not overflow on PC */
+  .admin-page,
+  #adminPage,
+  #adminApp{
+    max-width:var(--pc-max)!important;
+    margin:0 auto!important;
+    overflow-x:hidden!important;
   }
 
-  #wallet .table-wrap{
-    overflow-x:auto!important;
-  }
-
-  /* History/PnL desktop cards/tables */
-  #history .card,
-  #pnl .card,
-  #plans .card,
-  #more .card{
-    max-width:1180px!important;
-    margin-left:auto!important;
-    margin-right:auto!important;
-  }
-
-  #history .table-wrap,
-  #pnl .table-wrap{
-    overflow-x:auto!important;
-  }
-
-  /* Bottom nav on desktop centered and not full messy width */
+  /* Bottom nav desktop */
   .bottom-nav,
   .mobile-nav,
   nav.bottom{
-    max-width:760px!important;
+    width:760px!important;
+    max-width:calc(100vw - 48px)!important;
     left:50%!important;
     right:auto!important;
     transform:translateX(-50%)!important;
     bottom:18px!important;
     border-radius:28px!important;
+    box-sizing:border-box!important;
   }
 
-  /* Floating position bar desktop */
   .floating-live-position-bar{
-    max-width:760px!important;
+    width:760px!important;
+    max-width:calc(100vw - 48px)!important;
     left:50%!important;
     right:auto!important;
     transform:translateX(-50%)!important;
     bottom:88px!important;
-  }
-
-  /* Prevent mobile-only cramped widths on desktop */
-  input, select, textarea, button{
-    max-width:100%!important;
-  }
-
-  .action-row{
-    gap:14px!important;
+    box-sizing:border-box!important;
   }
 }
 
-/* Mid-size tablet/desktop safeguard */
-@media (min-width: 900px) and (max-width: 1180px){
+/* Large PC screens */
+@media (min-width: 1280px){
+  :root{
+    --pc-max: 1240px;
+  }
+}
+
+/* Desktop but not too wide */
+@media (min-width:900px) and (max-width:1040px){
+  :root{
+    --pc-max: calc(100vw - 36px);
+  }
+
   body[data-user-clean-ui="true"] #appPage,
   body[data-user-clean-ui="true"] main,
   #appPage,
@@ -5243,13 +5389,14 @@ body[data-active-page="more"] #more{
     padding-right:18px!important;
   }
 
-  .clean-home-shell{
-    grid-template-columns:1fr!important;
+  .clean-market-grid,
+  .clean-stats-grid,
+  .clean-signal-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
   }
 
-  .clean-home-shell .clean-market-grid,
-  .clean-home-shell .clean-stats-grid,
-  .clean-home-shell .clean-ai-signal-card{
-    grid-column:1 / 2!important;
+  .chart-bottom-feed,
+  .exact-feed-grid{
+    grid-template-columns:1fr!important;
   }
 }

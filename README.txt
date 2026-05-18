@@ -629,3 +629,16 @@ PC Desktop Layout Fix Only:
 - Bottom nav and floating position bar centered on desktop.
 - No SQL required.
 - JS syntax check: OK
+
+
+PC Desktop Complete Fix:
+- Replaced previous desktop patch with a stronger desktop-only layout reset.
+- Mobile below 900px remains untouched.
+- Desktop app frame max-width and centered.
+- Home, Trade, Wallet, PnL, History, Plans, More desktop layouts aligned.
+- Trade Order Book/Trade Feed desktop two-column.
+- Wallet/History/PnL tables controlled with horizontal scroll where needed.
+- Bottom nav and floating bar centered on PC.
+- Existing chart behavior from uploaded base is not rebuilt; only desktop card fitting is adjusted.
+- No SQL required.
+- JS syntax check: OK
