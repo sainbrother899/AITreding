@@ -234,3 +234,44 @@ alter table public.profiles add column if not exists ai_trade_percent numeric de
 alter table public.profiles add column if not exists auto_trade_permission boolean default true;
 alter table public.profiles add column if not exists status text default 'ACTIVE';
 alter table public.wallet_ledger add column if not exists note text;
+
+
+
+-- Final stability pack: permanent manual trade history
+create table if not exists public.manual_trades (
+  id text primary key,
+  user_id uuid,
+  coin text,
+  side text,
+  amount numeric default 0,
+  entry_price numeric default 0,
+  close_price numeric default 0,
+  leverage numeric default 1,
+  pnl numeric default 0,
+  status text default 'CLOSED',
+  opened_at timestamptz,
+  closed_at timestamptz default now(),
+  mode text default 'REAL',
+  created_at timestamptz default now()
+);
+
+alter table public.manual_trades enable row level security;
+
+drop policy if exists "manual_trades_select_own" on public.manual_trades;
+create policy "manual_trades_select_own"
+on public.manual_trades for select
+using (auth.uid() = user_id);
+
+drop policy if exists "manual_trades_insert_own" on public.manual_trades;
+create policy "manual_trades_insert_own"
+on public.manual_trades for insert
+with check (auth.uid() = user_id);
+
+drop policy if exists "manual_trades_update_own" on public.manual_trades;
+create policy "manual_trades_update_own"
+on public.manual_trades for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create index if not exists idx_manual_trades_user_closed
+on public.manual_trades(user_id, closed_at desc);

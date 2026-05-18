@@ -4379,3 +4379,8 @@ button,
 .plc-loss{
   color:#ff456b!important;
 }
+
+
+/* ===== FINAL STABILITY PACK UI SAFETY ===== */
+.plc-profit,.profit,.pnl-plus,.pos{color:#00e7a8!important}
+.plc-loss,.loss,.pnl-minus,.neg{color:#ff456b!important}

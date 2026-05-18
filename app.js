@@ -3753,7 +3753,7 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
   setInterval(function(){
     try { if (typeof fetchPrices === "function") fetchPrices(); } catch(e){}
     flRender();
-  }, 1000);
+  }, 1500);
 })();
 
 
@@ -3862,7 +3862,7 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
 
   document.addEventListener("DOMContentLoaded", () => setTimeout(plcApplyAll, 400));
   window.addEventListener("load", () => setTimeout(plcApplyAll, 600));
-  setInterval(plcApplyAll, 1000);
+  setInterval(plcApplyAll, 2500);
 })();
 
 
@@ -3994,4 +3994,226 @@ function restoreManualHistoryBackup(mode = state.mode) {
       restoreManualHistoryBackup("REAL");
     } catch(e) {}
   }, 3000);
+})();
+
+
+/* ===== FINAL STABILITY PACK: MANUAL HISTORY DB + INTERVAL GUARDS ===== */
+(function(){
+  if (window.__finalStabilityPackInstalled) return;
+  window.__finalStabilityPackInstalled = true;
+
+  function fsUserId(){
+    try { return String(state?.user?.id || state?.user?.email || "local"); } catch(e) { return "local"; }
+  }
+  function fsMode(){
+    try { return state?.mode || "DEMO"; } catch(e) { return "DEMO"; }
+  }
+  function fsAccount(mode = fsMode()){
+    state.accounts ||= {};
+    state.accounts[mode] ||= { balance: mode === "DEMO" ? 100000 : 0, trades: [], closedTrades: [] };
+    state.accounts[mode].trades ||= [];
+    state.accounts[mode].closedTrades ||= [];
+    return state.accounts[mode];
+  }
+  function fsNormalizeTrade(t){
+    if (!t) return t;
+    t.id = t.id || ("tr_" + Date.now() + "_" + Math.random().toString(16).slice(2));
+    t.userId = t.userId || t.user_id || fsUserId();
+    t.coin = t.coin || "BTCUSDT";
+    t.side = String(t.side || "BUY").toUpperCase();
+    t.amount = Number(t.amount || 0);
+    t.entry = Number(t.entry || t.entry_price || 0);
+    t.current = Number(t.current || t.close || t.closePrice || t.close_price || t.entry || 0);
+    t.close = Number(t.close || t.closePrice || t.close_price || t.current || t.entry || 0);
+    t.closePrice = t.close;
+    t.leverage = Number(t.leverage || 1);
+    t.pnl = Number(t.pnl || 0);
+    t.status = String(t.status || "CLOSED").toUpperCase();
+    t.source = t.source || "USER";
+    if (t.status === "CLOSED") {
+      t.current = t.close;
+      t.pnlFrozen = true;
+      t.closedAtISO = t.closedAtISO || new Date().toISOString();
+      t.closedAt = t.closedAt || new Date(t.closedAtISO).toLocaleString();
+    }
+    return t;
+  }
+
+  async function fsDbInsertManualTrade(t, mode = fsMode()){
+    if (typeof supabaseClient === "undefined" || !supabaseClient || !t) return;
+    if (String(mode).toUpperCase() !== "REAL") return; // Demo stays local only.
+    try {
+      const row = {
+        id: String(t.id),
+        user_id: fsUserId(),
+        coin: t.coin,
+        side: t.side,
+        amount: Number(t.amount || 0),
+        entry_price: Number(t.entry || 0),
+        close_price: Number(t.close || t.current || 0),
+        leverage: Number(t.leverage || 1),
+        pnl: Number(t.pnl || 0),
+        status: String(t.status || "CLOSED").toUpperCase(),
+        opened_at: t.openedAtISO || t.openedAt || null,
+        closed_at: t.closedAtISO || new Date().toISOString(),
+        mode: mode
+      };
+
+      // Try upsert first. If table lacks constraint, fallback insert/update.
+      const up = await supabaseClient.from("manual_trades").upsert(row, { onConflict: "id" });
+      if (up.error) {
+        const ins = await supabaseClient.from("manual_trades").insert(row);
+        if (ins.error && String(ins.error.message || "").toLowerCase().includes("duplicate")) {
+          await supabaseClient.from("manual_trades").update(row).eq("id", row.id);
+        }
+      }
+    } catch(e) {
+      console.warn("manual_trades save skipped", e);
+    }
+  }
+
+  async function fsLoadManualTradesFromDb(mode = "REAL"){
+    if (typeof supabaseClient === "undefined" || !supabaseClient || String(mode).toUpperCase() !== "REAL") return [];
+    try {
+      const res = await supabaseClient
+        .from("manual_trades")
+        .select("*")
+        .eq("user_id", fsUserId())
+        .eq("status", "CLOSED")
+        .order("closed_at", { ascending: false });
+
+      if (res.error || !Array.isArray(res.data)) return [];
+
+      return res.data.map(r => fsNormalizeTrade({
+        id: r.id,
+        userId: r.user_id,
+        coin: r.coin,
+        side: r.side,
+        amount: r.amount,
+        entry: r.entry_price,
+        current: r.close_price,
+        close: r.close_price,
+        leverage: r.leverage,
+        pnl: r.pnl,
+        status: r.status,
+        source: "USER",
+        openedAtISO: r.opened_at,
+        closedAtISO: r.closed_at,
+        closedAt: r.closed_at ? new Date(r.closed_at).toLocaleString() : undefined,
+        pnlFrozen: true
+      }));
+    } catch(e) {
+      console.warn("manual_trades load skipped", e);
+      return [];
+    }
+  }
+
+  function fsMergeClosedTrades(mode, incoming){
+    const acc = fsAccount(mode);
+    const existing = (acc.closedTrades || [])
+      .filter(t => (!t.source || t.source === "USER") && String(t.status || "").toUpperCase() === "CLOSED")
+      .map(fsNormalizeTrade);
+    const nonUser = (acc.closedTrades || [])
+      .filter(t => (t.source && t.source !== "USER") || String(t.status || "").toUpperCase() !== "CLOSED");
+
+    const map = new Map();
+    [...existing, ...(incoming || [])].forEach(t => {
+      if (!t) return;
+      const nt = fsNormalizeTrade(t);
+      map.set(String(nt.id), nt);
+    });
+
+    const merged = [...map.values()].sort((a,b) => {
+      const ad = Date.parse(a.closedAtISO || a.closedAt || 0) || 0;
+      const bd = Date.parse(b.closedAtISO || b.closedAt || 0) || 0;
+      return bd - ad;
+    });
+    acc.closedTrades = [...merged, ...nonUser];
+    return merged;
+  }
+
+  async function fsSyncManualHistory(){
+    try {
+      // Keep local backup synced first if existing helpers exist.
+      try { restoreManualHistoryBackup?.("DEMO"); restoreManualHistoryBackup?.("REAL"); } catch(e) {}
+
+      const accReal = fsAccount("REAL");
+      const localReal = (accReal.closedTrades || [])
+        .filter(t => (!t.source || t.source === "USER") && String(t.status || "").toUpperCase() === "CLOSED")
+        .map(fsNormalizeTrade);
+      for (const t of localReal) await fsDbInsertManualTrade(t, "REAL");
+
+      const remote = await fsLoadManualTradesFromDb("REAL");
+      if (remote.length) {
+        fsMergeClosedTrades("REAL", remote);
+        try { saveManualHistoryBackup?.("REAL"); } catch(e) {}
+      }
+
+      const accDemo = fsAccount("DEMO");
+      accDemo.closedTrades = (accDemo.closedTrades || []).map(t => String(t.status || "").toUpperCase() === "CLOSED" ? fsNormalizeTrade(t) : t);
+      try { saveManualHistoryBackup?.("DEMO"); } catch(e) {}
+    } catch(e) {
+      console.warn("fsSyncManualHistory failed", e);
+    }
+  }
+
+  // Patch closeTrade after all earlier definitions: force frozen PnL and DB save.
+  try {
+    const oldClose = window.closeTrade || closeTrade;
+    window.closeTrade = closeTrade = async function(id, mode = state.mode) {
+      const acc = fsAccount(mode);
+      const beforeOpen = [...(acc.trades || [])];
+      await oldClose.apply(this, arguments);
+
+      const afterAcc = fsAccount(mode);
+      let closed = (afterAcc.closedTrades || []).find(t => String(t.id) === String(id));
+      if (!closed) {
+        const old = beforeOpen.find(t => String(t.id) === String(id));
+        if (old) {
+          closed = fsNormalizeTrade({
+            ...old,
+            status: "CLOSED",
+            close: old.current || old.close || old.entry,
+            current: old.current || old.close || old.entry,
+            closedAtISO: new Date().toISOString(),
+            closedAt: new Date().toLocaleString(),
+            pnlFrozen: true
+          });
+          afterAcc.closedTrades.unshift(closed);
+        }
+      }
+      if (closed) {
+        fsNormalizeTrade(closed);
+        try { saveManualHistoryBackup?.(mode); } catch(e) {}
+        await fsDbInsertManualTrade(closed, mode);
+      }
+      try { saveState?.(); renderHistory?.(); renderFloatingLivePositionBar?.(); } catch(e) {}
+    };
+  } catch(e) {}
+
+  // Patch renderHistory one more time via wrapper: restore before rendering and freeze after.
+  try {
+    const oldRenderHistory = window.renderHistory || renderHistory;
+    window.renderHistory = renderHistory = function() {
+      try { restoreManualHistoryBackup?.("DEMO"); restoreManualHistoryBackup?.("REAL"); } catch(e) {}
+      const result = oldRenderHistory.apply(this, arguments);
+      try {
+        ["DEMO", "REAL"].forEach(mode => {
+          const acc = fsAccount(mode);
+          acc.closedTrades = (acc.closedTrades || []).map(t => String(t.status || "").toUpperCase() === "CLOSED" ? fsNormalizeTrade(t) : t);
+        });
+      } catch(e) {}
+      return result;
+    };
+  } catch(e) {}
+
+  window.syncManualHistoryPermanent = fsSyncManualHistory;
+
+  window.addEventListener("load", () => {
+    setTimeout(fsSyncManualHistory, 1200);
+    setTimeout(() => { try { renderHistory?.(); } catch(e) {} }, 1800);
+  });
+
+  // Light sync, not heavy. Keeps cross-render stability without spamming.
+  setInterval(fsSyncManualHistory, 15000);
 })();

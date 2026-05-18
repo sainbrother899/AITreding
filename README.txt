@@ -433,3 +433,17 @@ Safe Old Code Cleanup:
 - Kept active stable user UI, live rates, home-only AI control, floating bar, manual positions, global P/L color, and manual history stability.
 - Core logic, Supabase, trade, wallet, deposit, admin users, and bulk trade functions are untouched.
 - Cleanup summary: {"app_js_removed_chars": 10194, "css_removed_chars": 3303, "removed_js_blocks": ["ADMIN USERS HARD INSERT LOGIC"], "removed_css_blocks": ["ADMIN USERS FORCE VISIBLE PANEL UI", "ADMIN USERS HARD INSERT UI"], "removed_old_ai_html": 0, "removed_orphan_functions": 0, "required_active_blocks": {"USER UI STRUCTURE CLEAN REBUILD": true, "HOME RATE LIVE + STATIC SHELL FIX": true, "CLEAN HOME AI CONTROL ONLY": true, "TRADE PAGE OPEN POSITIONS + BIG CHART ONLY": true, "FLOATING LIVE POSITION BAR": true, "GLOBAL PROFIT LOSS COLOR FIX": true, "MANUAL TRADE HISTORY PERMANENT BACKUP": true}, "syntax": "OK"}
+
+
+Final Stability Pack:
+- Manual trade history now has local backup + optional Supabase manual_trades permanent save/load.
+- Closed manual trade PnL remains frozen; it will not keep changing with live price.
+- closeTrade wrapper saves closed REAL manual trades to Supabase manual_trades when table exists.
+- Demo manual history stays local only.
+- Global P/L color scanner throttled to reduce load.
+- Floating bar refresh reduced slightly to reduce mobile lag while staying live.
+- Current UI and admin features kept.
+- SQL patch included for manual_trades table. Run it once in Supabase for permanent cross-device manual history.
+- setInterval count after pack: 21
+- Markers: {"final_pack": true, "manual_table_sql": true, "global_color": true, "floating_bar": true, "home_static": true}
+- JS syntax check: OK
