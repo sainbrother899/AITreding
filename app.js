@@ -6499,178 +6499,365 @@ function restoreManualHistoryBackup(mode = state.mode) {
 })();
 
 
-/* ===== KYC DOCUMENT UPLOAD FIX ===== */
+
+
+
+/* ===== DB CONNECTED KYC + PAYOUT FINAL ===== */
 (function(){
-  function kdUser(){ return state?.user || {}; }
-  function kdSave(){
+  const KYC_BUCKET = "kyc-documents";
+
+  function dbcClient(){
+    try {
+      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
+      if (window.supabaseClient) return window.supabaseClient;
+    } catch(e){}
+    return null;
+  }
+
+  function dbcUser(){ return state?.user || {}; }
+  function dbcUid(){ return String(dbcUser().id || dbcUser().email || "local"); }
+  function dbcEmail(){ return String(dbcUser().email || ""); }
+  function dbcName(){
+    const u = dbcUser();
+    return u.kycName || u.kyc_name || u.name || u.full_name || u.email?.split("@")[0] || "User";
+  }
+  function dbcSaveLocal(){
     try { saveState?.(); } catch(e){}
     try { saveSession?.(); } catch(e){}
-    try {
-      localStorage.setItem("ai_kyc_docs_v1_" + (kdUser().id || kdUser().email || "local"), JSON.stringify({
-        kycDocuments: kdUser().kycDocuments || {},
-        kycStatus: kdUser().kycStatus || "PENDING",
-        kycSubmittedAt: kdUser().kycSubmittedAt || ""
-      }));
-    } catch(e){}
   }
-  function kdLoad(){
-    try {
-      const raw = localStorage.getItem("ai_kyc_docs_v1_" + (kdUser().id || kdUser().email || "local"));
-      if (!raw) return;
-      const d = JSON.parse(raw);
-      state.user.kycDocuments ||= d.kycDocuments || {};
-      if (d.kycStatus && !state.user.kycStatus) state.user.kycStatus = d.kycStatus;
-      if (d.kycSubmittedAt && !state.user.kycSubmittedAt) state.user.kycSubmittedAt = d.kycSubmittedAt;
-    } catch(e){}
+  function dbcStatus(s){
+    s = String(s || "PENDING").toUpperCase();
+    const cls = s === "APPROVED" ? "approved" : (s === "REJECTED" ? "rejected" : "pending");
+    return `<em class="db-status ${cls}">${s}</em>`;
+  }
+  function dbcMaskMethod(m){
+    const type = String(m.type || m.method || "").toUpperCase();
+    if (type === "UPI") return m.upi || "-";
+    const acc = String(m.accountNumber || m.account_number || "");
+    return `${m.bankName || m.bank_name || "Bank"} ${acc ? "****" + acc.slice(-4) : ""}`.trim();
+  }
+  function dbcKycApproved(){
+    return String(dbcUser().kycStatus || dbcUser().kyc_status || "").toUpperCase() === "APPROVED";
   }
 
-  function fileToDataUrl(file){
-    return new Promise((resolve, reject) => {
-      if (!file) return resolve("");
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ""));
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function docLabel(key){
-    return {
-      idFront:"ID / PAN / Aadhaar Front",
-      idBack:"ID / Aadhaar Back",
-      selfie:"Selfie Verification",
-      addressProof:"Address Proof"
-    }[key] || key;
-  }
-
-  function kdDocsHtml(){
-    const docs = kdUser().kycDocuments || {};
-    const keys = ["idFront","idBack","selfie","addressProof"];
+  function dbcDocsHtml(){
+    const docs = dbcUser().kycDocuments || {};
+    const keys = [
+      ["idFront","ID / PAN / Aadhaar Front"],
+      ["idBack","ID / Aadhaar Back"],
+      ["selfie","Selfie Verification"],
+      ["addressProof","Address Proof Optional"]
+    ];
     return `
       <div id="kycDocumentUploadBlock" class="kyc-doc-upload-block">
         <div class="kyc-doc-title">
           <h3>Upload KYC Documents</h3>
-          <p>Admin verification ke liye clear images upload karein.</p>
+          <p>Documents Supabase Storage में upload होंगे. Admin approval के बाद KYC approved होगा.</p>
         </div>
-
-        <label class="kyc-doc-field">ID / PAN / Aadhaar Front
-          <input type="file" name="idFront" accept="image/*,.pdf">
-        </label>
-
-        <label class="kyc-doc-field">ID / Aadhaar Back
-          <input type="file" name="idBack" accept="image/*,.pdf">
-        </label>
-
-        <label class="kyc-doc-field">Selfie Verification
-          <input type="file" name="selfie" accept="image/*" capture="user">
-        </label>
-
-        <label class="kyc-doc-field">Address Proof Optional
-          <input type="file" name="addressProof" accept="image/*,.pdf">
-        </label>
-
+        ${keys.map(([key,label]) => `
+          <label class="kyc-doc-field">${label}
+            <input type="file" name="${key}" accept="image/*,.pdf" ${key === "selfie" ? 'capture="user"' : ""}>
+          </label>
+        `).join("")}
         <div class="kyc-doc-preview-list">
-          ${keys.map(k => `
-            <div class="kyc-doc-preview ${docs[k] ? "uploaded" : ""}">
-              <span>${docLabel(k)}</span>
-              <b>${docs[k] ? "Uploaded" : "Not uploaded"}</b>
+          ${keys.map(([key,label]) => `
+            <div class="kyc-doc-preview ${docs[key] ? "uploaded" : ""}">
+              <span>${label}</span>
+              <b>${docs[key] ? "Uploaded" : "Not uploaded"}</b>
             </div>
           `).join("")}
         </div>
-
-        <small class="kyc-doc-note">
-          अभी यह local/browser save flow है. Real production में documents को Supabase Storage या secure server storage में upload करना होगा.
-        </small>
+        <small class="kyc-doc-note">File DB/Storage में save करने के लिए Supabase SQL और Storage bucket setup जरूरी है.</small>
       </div>
     `;
   }
 
-  function kdInjectDocs(){
-    kdLoad();
+  function dbcInjectKycDocs(){
     const page = document.getElementById("kycPage");
     if (!page || !page.classList.contains("active-page")) return;
-
     const form = page.querySelector("#realKycForm, #menuKycForm");
     if (!form || form.querySelector("#kycDocumentUploadBlock")) return;
-
-    const submit = form.querySelector("button[type='submit'], button");
     const wrap = document.createElement("div");
-    wrap.innerHTML = kdDocsHtml();
+    wrap.innerHTML = dbcDocsHtml();
     const block = wrap.firstElementChild;
-
+    const submit = form.querySelector("button[type='submit'], button");
     if (submit) submit.insertAdjacentElement("beforebegin", block);
     else form.appendChild(block);
-
-    const btn = form.querySelector("button[type='submit'], button");
-    if (btn) btn.textContent = "Submit KYC Documents for Approval";
+    if (submit) submit.textContent = "Submit KYC Documents for Approval";
   }
 
-  async function kdHandleSubmit(form){
+  async function dbcUploadDoc(client, kycId, key, file){
+    if (!file || !file.name) return null;
+    const safeName = file.name.replace(/[^\w.\-]+/g, "_");
+    const path = `${dbcUid()}/${kycId}/${key}_${Date.now()}_${safeName}`;
+    const up = await client.storage.from(KYC_BUCKET).upload(path, file, { upsert: true });
+    if (up.error) throw up.error;
+    const pub = client.storage.from(KYC_BUCKET).getPublicUrl(path);
+    return {
+      id: "doc_" + Date.now() + "_" + key,
+      kyc_id: kycId,
+      user_id: dbcUid(),
+      doc_key: key,
+      file_name: file.name,
+      file_path: path,
+      file_url: pub?.data?.publicUrl || "",
+      mime_type: file.type || "",
+      size_bytes: file.size || 0
+    };
+  }
+
+  async function dbcSubmitKyc(form){
+    const client = dbcClient();
+    if (!client) {
+      alert("Supabase connect नहीं है. config.js में URL और ANON KEY check करो.");
+      return;
+    }
+
     const fd = new FormData(form);
-    state.user.kycStatus = "PENDING";
-    state.user.kycName = fd.get("kycName") || state.user.kycName || state.user.name || "";
-    state.user.kycId = fd.get("kycId") || state.user.kycId || "";
-    state.user.kycDob = fd.get("kycDob") || state.user.kycDob || "";
-    state.user.kycAddress = fd.get("kycAddress") || state.user.kycAddress || "";
-    state.user.kycSubmittedAt = new Date().toLocaleString();
-    state.user.kycDocuments ||= {};
+    const kycId = "kyc_" + Date.now();
+    const fullName = String(fd.get("kycName") || dbcUser().name || "").trim();
+    const docNumber = String(fd.get("kycId") || "").trim();
+    const dob = String(fd.get("kycDob") || "").trim();
+    const address = String(fd.get("kycAddress") || "").trim();
+
+    const row = {
+      id: kycId,
+      user_id: dbcUid(),
+      user_email: dbcEmail(),
+      name: fullName,
+      mobile: dbcUser().mobile || dbcUser().phone || "",
+      doc_type: "KYC",
+      doc_number: docNumber,
+      full_name: fullName,
+      dob,
+      address,
+      status: "PENDING",
+      submitted_at: new Date().toISOString()
+    };
+
+    const ins = await client.from("kyc_requests").insert(row);
+    if (ins.error) throw ins.error;
 
     const fileKeys = ["idFront","idBack","selfie","addressProof"];
+    const uploadedDocs = {};
+    const docRows = [];
     for (const key of fileKeys) {
       const file = fd.get(key);
       if (file && file.name) {
-        state.user.kycDocuments[key] = {
-          name: file.name,
-          type: file.type || "",
-          size: file.size || 0,
-          dataUrl: await fileToDataUrl(file),
-          uploadedAt: new Date().toLocaleString()
-        };
+        const doc = await dbcUploadDoc(client, kycId, key, file);
+        if (doc) {
+          docRows.push(doc);
+          uploadedDocs[key] = {
+            name: doc.file_name,
+            url: doc.file_url,
+            path: doc.file_path,
+            uploadedAt: new Date().toLocaleString()
+          };
+        }
       }
     }
 
-    kdSave();
+    if (docRows.length) {
+      const docsIns = await client.from("kyc_documents").insert(docRows);
+      if (docsIns.error) console.warn("kyc_documents insert issue", docsIns.error);
+      await client.from("kyc_requests").update({ documents: uploadedDocs }).eq("id", kycId);
+    }
+
+    state.user.kycStatus = "PENDING";
+    state.user.kycName = fullName;
+    state.user.kycId = docNumber;
+    state.user.kycDob = dob;
+    state.user.kycAddress = address;
+    state.user.kycSubmittedAt = new Date().toLocaleString();
+    state.user.kycDocuments = uploadedDocs;
+    state.kycRequests ||= [];
+    state.kycRequests.unshift({
+      id: kycId,
+      userId: dbcUid(),
+      userEmail: dbcEmail(),
+      name: fullName,
+      docNumber,
+      status: "PENDING"
+    });
+    dbcSaveLocal();
   }
 
-  function kdBind(){
-    kdInjectDocs();
-
-    document.addEventListener("submit", async function(e){
-      const form = e.target;
-      if (!form || (form.id !== "realKycForm" && form.id !== "menuKycForm")) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-
-      const btn = form.querySelector("button[type='submit'], button");
-      const old = btn ? btn.textContent : "";
-      if (btn) {
-        btn.disabled = true;
-        btn.textContent = "Uploading KYC...";
+  async function dbcLoadFromDb(){
+    const client = dbcClient();
+    if (!client || !state?.user) return;
+    try {
+      // KYC
+      let q = client.from("kyc_requests").select("*").order("created_at", { ascending:false });
+      if (state.user.role !== "admin") q = q.eq("user_id", dbcUid());
+      const { data: kycs } = await q;
+      if (Array.isArray(kycs)) {
+        state.kycRequests = kycs.map(r => ({
+          id: String(r.id),
+          userId: r.user_id,
+          userEmail: r.user_email,
+          name: r.full_name || r.name,
+          mobile: r.mobile,
+          docType: r.doc_type,
+          docNumber: r.doc_number,
+          status: r.status || "PENDING",
+          documents: r.documents || {}
+        }));
+        const mine = kycs.find(k => String(k.user_id) === dbcUid());
+        if (mine && state.user.role !== "admin") {
+          state.user.kycStatus = mine.status || "PENDING";
+          state.user.kycName = mine.full_name || mine.name || state.user.kycName;
+          state.user.kycDocuments = mine.documents || state.user.kycDocuments || {};
+        }
       }
 
-      try {
-        await kdHandleSubmit(form);
-        alert("KYC documents submitted. Status: Pending admin approval.");
-        if (typeof openRealMenuPage === "function") openRealMenuPage("kyc");
-        else if (typeof openMenuFullPage === "function") openMenuFullPage("kyc");
-        setTimeout(kdInjectDocs, 500);
-      } catch(err) {
-        console.error(err);
-        alert("KYC upload failed. Please try again.");
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = old || "Submit KYC Documents for Approval";
+      // Payout methods
+      let pmQ = client.from("user_payout_methods").select("*").order("created_at", { ascending:false });
+      if (state.user.role !== "admin") pmQ = pmQ.eq("user_id", dbcUid());
+      const { data: pms } = await pmQ;
+      if (Array.isArray(pms)) {
+        state.userPayoutMethods = pms.map(r => ({
+          id: String(r.id),
+          userId: r.user_id,
+          type: r.method_type,
+          upi: r.upi_id,
+          holderName: r.holder_name,
+          kycName: r.kyc_name_snapshot,
+          bankName: r.bank_name,
+          accountNumber: r.account_number,
+          ifsc: r.ifsc,
+          status: r.status || "PENDING",
+          createdAt: r.created_at || ""
+        }));
+        state.payoutMethods = state.userPayoutMethods;
+      }
+
+      // Payment settings
+      const { data: settings } = await client.from("payment_settings").select("*").eq("is_active", true);
+      if (Array.isArray(settings)) {
+        const upi = settings.find(x => String(x.method).toUpperCase() === "UPI");
+        const bank = settings.find(x => String(x.method).toUpperCase() === "BANK");
+        state.paymentSettings ||= {};
+        if (upi) state.paymentSettings.upi = { active:true, upiId:upi.upi_id, name:upi.title || upi.account_name || "UPI", qrUrl:upi.qr_url || "" };
+        if (bank) state.paymentSettings.bank = {
+          active:true, accountName:bank.account_name, bankName:bank.bank_name,
+          accountNumber:bank.account_number, ifsc:bank.ifsc, branch:bank.branch || ""
+        };
+      }
+
+      dbcSaveLocal();
+    } catch(e) {
+      console.warn("DB sync skipped", e);
+    }
+  }
+
+  async function dbcSavePayoutMethod(method){
+    const client = dbcClient();
+    if (!client) return;
+    const row = {
+      id: method.id || ("pm_" + Date.now()),
+      user_id: dbcUid(),
+      method_type: String(method.type || "UPI").toUpperCase(),
+      holder_name: method.holderName || dbcName(),
+      kyc_name_snapshot: dbcName(),
+      upi_id: method.upi || "",
+      bank_name: method.bankName || "",
+      account_number: method.accountNumber || "",
+      ifsc: method.ifsc || "",
+      status: "PENDING",
+      name_match: true,
+      created_at_text: new Date().toLocaleString()
+    };
+    const up = await client.from("user_payout_methods").upsert(row, { onConflict:"id" });
+    if (up.error) throw up.error;
+  }
+
+  function dbcBind(){
+    document.addEventListener("submit", async function(e){
+      const form = e.target;
+      if (!form) return;
+
+      if (form.id === "realKycForm" || form.id === "menuKycForm") {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        const btn = form.querySelector("button[type='submit'], button");
+        const old = btn ? btn.textContent : "";
+        try {
+          if (btn) { btn.disabled = true; btn.textContent = "Uploading to DB..."; }
+          await dbcSubmitKyc(form);
+          alert("KYC documents DB/Storage में submit हो गए. Status: Pending admin approval.");
+          if (typeof openRealMenuPage === "function") openRealMenuPage("kyc");
+          setTimeout(dbcInjectKycDocs, 400);
+        } catch(err) {
+          console.error(err);
+          alert("KYC DB upload failed: " + (err.message || err));
+        } finally {
+          if (btn) { btn.disabled = false; btn.textContent = old || "Submit KYC Documents for Approval"; }
         }
+      }
+
+      if (form.id === "securePaymentMethodForm" || form.id === "realPaymentMethodForm") {
+        setTimeout(async () => {
+          try {
+            const m = (state.userPayoutMethods || [])[0];
+            if (m) await dbcSavePayoutMethod(m);
+            await dbcLoadFromDb();
+          } catch(err) { console.warn("payout DB save issue", err); }
+        }, 250);
+      }
+
+      if (form.id === "apsPaymentSettingsForm" || form.id === "adminPaymentSettingsForm") {
+        setTimeout(async () => {
+          const client = dbcClient();
+          if (!client || !state.paymentSettings) return;
+          try {
+            const upi = state.paymentSettings.upi || {};
+            const bank = state.paymentSettings.bank || {};
+            await client.from("payment_settings").upsert([
+              { id:"upi_default", method:"UPI", title:upi.name || "UPI", upi_id:upi.upiId || "", qr_url:upi.qrUrl || "", is_active:upi.active !== false },
+              { id:"bank_default", method:"BANK", title:"Bank Transfer", account_name:bank.accountName || "", bank_name:bank.bankName || "", account_number:bank.accountNumber || "", ifsc:bank.ifsc || "", branch:bank.branch || "", is_active:bank.active !== false }
+            ], { onConflict:"id" });
+          } catch(err) { console.warn("payment settings DB save issue", err); }
+        }, 250);
+      }
+    }, true);
+
+    document.addEventListener("click", function(e){
+      const approve = e.target?.dataset?.apsApprove || e.target?.dataset?.approvePayout;
+      const reject = e.target?.dataset?.apsReject || e.target?.dataset?.rejectPayout;
+      if (approve || reject) {
+        const id = approve || reject;
+        setTimeout(async () => {
+          const client = dbcClient();
+          if (!client) return;
+          try {
+            await client.from("user_payout_methods").update({
+              status: approve ? "APPROVED" : "REJECTED",
+              reviewed_at: new Date().toISOString()
+            }).eq("id", id);
+            await dbcLoadFromDb();
+          } catch(err) { console.warn("approve/reject DB issue", err); }
+        }, 100);
       }
     }, true);
   }
 
-  window.injectKycDocumentUpload = kdInjectDocs;
+  window.dbcLoadKycPayoutFromDb = dbcLoadFromDb;
+  window.dbcInjectKycDocs = dbcInjectKycDocs;
 
-  document.addEventListener("DOMContentLoaded", () => setTimeout(kdBind, 900));
-  window.addEventListener("load", () => setTimeout(kdBind, 1100));
-  setInterval(kdInjectDocs, 1500);
+  if (!window.__dbConnectedKycPayoutBound) {
+    window.__dbConnectedKycPayoutBound = true;
+    dbcBind();
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(dbcLoadFromDb, 1000);
+    setTimeout(dbcInjectKycDocs, 1200);
+  });
+  window.addEventListener("load", () => {
+    setTimeout(dbcLoadFromDb, 1200);
+    setTimeout(dbcInjectKycDocs, 1500);
+  });
+  setInterval(dbcInjectKycDocs, 2500);
+  setInterval(dbcLoadFromDb, 12000);
 })();

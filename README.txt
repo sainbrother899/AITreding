@@ -810,3 +810,18 @@ KYC Document Upload Fix:
 - User/admin design untouched except KYC upload block.
 - No SQL required for this local test version.
 - JS syntax check: OK
+
+
+DB Connected KYC + Payout Update:
+- KYC form now uploads document files to Supabase Storage bucket: kyc-documents.
+- KYC text/details save to public.kyc_requests.
+- Uploaded document metadata saves to public.kyc_documents.
+- User payout methods save to public.user_payout_methods.
+- Admin approve/reject updates user_payout_methods in DB.
+- Admin Payment Settings save/load from public.payment_settings.
+- User Wallet deposit details load from DB payment_settings.
+- Added SQL patch file: supabase-db-connected-kyc-payout.sql
+- Also appended same SQL patch to supabase-schema.sql.
+- Important: Run SQL in Supabase SQL Editor before testing DB upload.
+- Policies are permissive for testing; production should use Supabase Auth + stricter RLS.
+- JS syntax check: OK

@@ -6438,7 +6438,10 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
 }
 
 
-/* ===== KYC DOCUMENT UPLOAD FIX ===== */
+
+
+
+/* ===== DB CONNECTED KYC + PAYOUT FINAL ===== */
 .kyc-doc-upload-block{
   display:grid!important;
   gap:11px!important;
@@ -6453,7 +6456,8 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
   font-size:18px!important;
   margin:0 0 4px!important;
 }
-.kyc-doc-title p{
+.kyc-doc-title p,
+.kyc-doc-note{
   color:#9fb2d0!important;
   margin:0!important;
   font-size:12px!important;
@@ -6489,23 +6493,20 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
   border-radius:13px!important;
   padding:10px!important;
 }
-.kyc-doc-preview span{
-  color:#9fb2d0!important;
-  font-size:12px!important;
-}
-.kyc-doc-preview b{
-  color:#f8bd7a!important;
-  font-size:12px!important;
-}
+.kyc-doc-preview span{ color:#9fb2d0!important; font-size:12px!important; }
+.kyc-doc-preview b{ color:#f8bd7a!important; font-size:12px!important; }
 .kyc-doc-preview.uploaded{
   border-color:rgba(0,231,168,.20)!important;
   background:rgba(0,231,168,.06)!important;
 }
-.kyc-doc-preview.uploaded b{
-  color:#00e7a8!important;
+.kyc-doc-preview.uploaded b{ color:#00e7a8!important; }
+.db-status{
+  font-style:normal!important;
+  font-size:11px!important;
+  font-weight:950!important;
+  border-radius:999px!important;
+  padding:6px 10px!important;
 }
-.kyc-doc-note{
-  color:#9fb2d0!important;
-  font-size:12px!important;
-  line-height:1.35!important;
-}
+.db-status.pending{color:#f8bd7a!important;background:rgba(248,189,122,.13)!important;}
+.db-status.approved{color:#00e7a8!important;background:rgba(0,231,168,.13)!important;}
+.db-status.rejected{color:#ff456b!important;background:rgba(255,69,107,.13)!important;}
