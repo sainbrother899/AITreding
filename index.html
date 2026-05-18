@@ -66,6 +66,35 @@
             <p>✅ AI-style trade signals</p>
           </div>
         </div>
+        <div class="card ai-percent-settings-card">
+          <div class="section-head">
+            <div>
+              <p class="label">AI Trade Settings</p>
+              <h2>Admin Trade Amount</h2>
+              <p class="muted small">Admin trade आपके Real Wallet के selected percentage से लगेगी.</p>
+            </div>
+          </div>
+
+          <div class="percent-grid" id="aiTradePercentGrid">
+            <button type="button" class="percent-btn" data-ai-percent="25">25%</button>
+            <button type="button" class="percent-btn" data-ai-percent="50">50%</button>
+            <button type="button" class="percent-btn" data-ai-percent="75">75%</button>
+            <button type="button" class="percent-btn" data-ai-percent="100">100%</button>
+          </div>
+
+          <div class="ai-percent-preview">
+            <span>Selected</span>
+            <b id="aiTradePercentText">25%</b>
+            <small id="aiTradeAmountPreview">AI trade amount: ₹0</small>
+          </div>
+
+          <label class="toggle-row">
+            <span>Auto Admin Trade</span>
+            <input type="checkbox" id="userAutoAdminTradeToggle" checked>
+          </label>
+        </div>
+
+
 
         <div class="card auth-card">
           <div class="tabs">
@@ -612,6 +641,6 @@
 
   <div id="toast"></div>
   <script src="config.js"></script>
-  <script src="app.js?v=planwallet20260518"></script>
+  <script src="app.js?v=percentaitrade20260518"></script>
 </body>
 </html>

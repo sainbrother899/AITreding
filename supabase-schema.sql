@@ -204,3 +204,9 @@ alter table public.kyc_requests add column if not exists doc_type text;
 alter table public.kyc_requests add column if not exists doc_number text;
 alter table public.managed_trades add column if not exists source text default 'ADMIN_MANAGED';
 alter table public.managed_trades add column if not exists risk text;
+
+
+
+-- User selected AI trade percent support
+alter table public.profiles add column if not exists ai_trade_percent numeric default 25;
+alter table public.profiles add column if not exists auto_trade_permission boolean default true;

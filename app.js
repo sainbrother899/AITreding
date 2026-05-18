@@ -2176,3 +2176,283 @@ window.addEventListener("load", () => setTimeout(() => {
   adminBindControlsSafe();
   adminRenderAllSafe();
 }, 800));
+
+
+/* ===== USER WALLET PERCENT AI TRADE FIX ===== */
+function pctUserId(u = state.user) {
+  return String(u?.id || u?.email || "local");
+}
+
+function pctMoney(n) {
+  try { if (typeof money === "function") return money(n); } catch(e) {}
+  return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+}
+
+function pctRealWalletForUser(u) {
+  if (!u) return 0;
+  const uid = String(u.id || u.email || "");
+  try {
+    if (typeof realWallet === "function") return Number(realWallet(uid) || 0);
+  } catch(e) {}
+
+  const dep = (state.depositRequests || [])
+    .filter(d => String(d.userId || d.user_id || "") === uid && String(d.status || "").toUpperCase() === "APPROVED")
+    .reduce((a, d) => a + Number(d.amount || 0), 0);
+
+  const led = (state.walletLedger || [])
+    .filter(l => String(l.userId || l.user_id || "") === uid)
+    .reduce((a, l) => a + Number(l.amount || 0), 0);
+
+  return Math.max(0, dep + led);
+}
+
+function pctGetUserPercent(u = state.user) {
+  const p = Number(u?.aiTradePercent || u?.ai_trade_percent || 25);
+  return [25, 50, 75, 100].includes(p) ? p : 25;
+}
+
+function pctSetUserPercent(percent) {
+  percent = Number(percent || 25);
+  if (![25,50,75,100].includes(percent)) percent = 25;
+  if (!state.user) return;
+
+  state.user.aiTradePercent = percent;
+  state.user.ai_trade_percent = percent;
+
+  const u = (state.users || []).find(x =>
+    String(x.id || "") === String(state.user.id || "") ||
+    String(x.email || "").toLowerCase() === String(state.user.email || "").toLowerCase()
+  );
+  if (u) {
+    u.aiTradePercent = percent;
+    u.ai_trade_percent = percent;
+  }
+
+  if (typeof supabaseClient !== "undefined" && supabaseClient && state.user.id) {
+    supabaseClient.from("profiles").update({ ai_trade_percent: percent }).eq("id", state.user.id)
+      .then(() => {})
+      .catch(e => console.warn("ai_trade_percent save failed", e));
+  }
+
+  try { saveSession?.(); } catch(e) {}
+  try { saveState?.(); } catch(e) {}
+  renderAiPercentSettings();
+}
+
+function pctSetAutoTrade(enabled) {
+  if (!state.user) return;
+  state.user.autoTradePermission = !!enabled;
+  const u = (state.users || []).find(x =>
+    String(x.id || "") === String(state.user.id || "") ||
+    String(x.email || "").toLowerCase() === String(state.user.email || "").toLowerCase()
+  );
+  if (u) u.autoTradePermission = !!enabled;
+
+  if (typeof supabaseClient !== "undefined" && supabaseClient && state.user.id) {
+    supabaseClient.from("profiles").update({ auto_trade_permission: !!enabled }).eq("id", state.user.id)
+      .then(() => {})
+      .catch(e => console.warn("auto_trade_permission save failed", e));
+  }
+  try { saveSession?.(); } catch(e) {}
+  try { saveState?.(); } catch(e) {}
+}
+
+function pctTradeAmountForUser(u) {
+  const percent = pctGetUserPercent(u);
+  const wallet = pctRealWalletForUser(u);
+  return Math.floor((wallet * percent / 100) * 100) / 100;
+}
+
+function renderAiPercentSettings() {
+  try {
+    if (!state.user || state.user.role === "admin") return;
+    const percent = pctGetUserPercent(state.user);
+    const amount = pctTradeAmountForUser(state.user);
+
+    document.querySelectorAll("[data-ai-percent]").forEach(btn => {
+      btn.classList.toggle("active", Number(btn.dataset.aiPercent) === percent);
+    });
+
+    const pctText = document.getElementById("aiTradePercentText");
+    if (pctText) pctText.textContent = percent + "%";
+
+    const amtText = document.getElementById("aiTradeAmountPreview");
+    if (amtText) amtText.textContent = "AI trade amount: " + pctMoney(amount);
+
+    const toggle = document.getElementById("userAutoAdminTradeToggle");
+    if (toggle) toggle.checked = state.user.autoTradePermission !== false;
+  } catch(e) {}
+}
+
+document.addEventListener("click", function(e) {
+  const btn = e.target.closest("[data-ai-percent]");
+  if (!btn) return;
+  e.preventDefault();
+  pctSetUserPercent(Number(btn.dataset.aiPercent || 25));
+}, true);
+
+document.addEventListener("change", function(e) {
+  if (e.target && e.target.id === "userAutoAdminTradeToggle") {
+    pctSetAutoTrade(e.target.checked);
+  }
+}, true);
+
+setInterval(renderAiPercentSettings, 1500);
+window.addEventListener("load", () => setTimeout(renderAiPercentSettings, 800));
+
+/* ===== ADMIN BULK USE USER PERCENT FIX ===== */
+function pctAdminTargets() {
+  const users = (state.users || []).filter(u => String(u.role || "user").toLowerCase() !== "admin");
+  return users.filter(u => {
+    const auto = u.autoTradePermission !== false;
+    let limitOk = true;
+    try {
+      if (typeof canReceiveAi === "function") limitOk = canReceiveAi(u);
+    } catch(e) {}
+    return auto && limitOk;
+  });
+}
+
+function pctAdminGetTradeFields() {
+  const coin = document.getElementById("massTradeCoin")?.value || document.getElementById("managedCoin")?.value || "BTCUSDT";
+  const side = document.getElementById("massTradeSide")?.value || document.getElementById("managedSide")?.value || "BUY";
+  const risk = document.getElementById("massTradeRisk")?.value || document.getElementById("managedRisk")?.value || "MEDIUM";
+  const leverage = Number(document.getElementById("massTradeLeverage")?.value || document.getElementById("managedLeverage")?.value || 1);
+  const orderType = document.getElementById("massTradeOrderType")?.value || document.getElementById("managedOrderType")?.value || "MARKET";
+
+  let entry = 0;
+  try {
+    if (typeof priceOf === "function") entry = Number(priceOf(coin) || 0);
+  } catch(e) {}
+  if (orderType === "LIMIT") {
+    entry = Number(document.getElementById("managedEntryPrice")?.value || entry || 0);
+  }
+
+  return { coin, side, risk, leverage: Math.min(2000, Math.max(1, leverage || 1)), orderType, entry };
+}
+
+function pctRenderBulkPreview() {
+  const useUserPct = document.getElementById("bulkUseUserPercent")?.checked !== false;
+  const mode = document.getElementById("bulkPercentModeText");
+  const prev = document.getElementById("bulkPercentPreviewText");
+  if (!mode && !prev) return;
+
+  if (!useUserPct) {
+    const amt = Number(document.getElementById("massTradeAmount")?.value || document.getElementById("managedAmount")?.value || 0);
+    if (mode) mode.textContent = "Same amount for all";
+    if (prev) prev.textContent = "Every eligible user trade amount: " + pctMoney(amt);
+    return;
+  }
+
+  const targets = pctAdminTargets();
+  const amounts = targets.map(u => pctTradeAmountForUser(u)).filter(a => a >= 100);
+  const total = amounts.reduce((a,b)=>a+b,0);
+  const skipped = targets.length - amounts.length;
+
+  if (mode) mode.textContent = "User selected %";
+  if (prev) prev.textContent = `${amounts.length} users | Total amount ${pctMoney(total)} | Skipped ${skipped}`;
+}
+
+async function pctOpenBulkTradeUserPercent() {
+  if (state.user?.role !== "admin") return;
+  const useUserPct = document.getElementById("bulkUseUserPercent")?.checked !== false;
+
+  // If disabled, use existing mass/managed flow.
+  if (!useUserPct) {
+    try {
+      if (typeof openMassTrade === "function") return openMassTrade();
+      if (typeof openManagedTrade === "function") return openManagedTrade();
+    } catch(e) {}
+  }
+
+  const fields = pctAdminGetTradeFields();
+  const targets = pctAdminTargets();
+  let opened = 0, skipped = 0;
+
+  for (const u of targets) {
+    const amount = pctTradeAmountForUser(u);
+    const wallet = pctRealWalletForUser(u);
+    if (!amount || amount < 100 || wallet < amount) {
+      skipped++;
+      continue;
+    }
+
+    const t = {
+      id: "mg_" + Date.now() + "_" + Math.random().toString(16).slice(2),
+      userId: u.id || u.email,
+      userEmail: u.email || "",
+      coin: fields.coin,
+      side: fields.side,
+      risk: fields.risk,
+      amount,
+      entry: fields.entry,
+      close: null,
+      pnl: 0,
+      leverage: fields.leverage,
+      orderType: fields.orderType,
+      status: "OPEN",
+      source: "ADMIN_MASS",
+      openedAt: new Date().toLocaleString()
+    };
+
+    state.managedTrades = state.managedTrades || [];
+    state.managedTrades.unshift(t);
+
+    try { if (typeof incAiUsage === "function") incAiUsage(u); } catch(e) {}
+
+    if (typeof supabaseClient !== "undefined" && supabaseClient) {
+      try {
+        await supabaseClient.from("managed_trades").insert({
+          id: t.id,
+          user_id: t.userId,
+          user_email: t.userEmail,
+          coin: t.coin,
+          side: t.side,
+          risk: t.risk,
+          amount: t.amount,
+          entry_price: t.entry,
+          pnl: 0,
+          status: "OPEN",
+          source: t.source,
+          opened_at: t.openedAt
+        });
+      } catch(e) {
+        console.warn("Percent bulk managed trade DB insert failed", e);
+      }
+    }
+    opened++;
+  }
+
+  try { saveState?.(); } catch(e) {}
+  try { render?.(); } catch(e) {}
+  try { toast?.(`Bulk trade opened: ${opened}, skipped: ${skipped}`); } catch(e) { alert(`Bulk trade opened: ${opened}, skipped: ${skipped}`); }
+}
+
+function pctBindAdminBulkPercent() {
+  const btn = document.getElementById("openMassTradeBtn");
+  if (btn && !btn.dataset.percentBulkBound) {
+    btn.dataset.percentBulkBound = "1";
+    btn.addEventListener("click", function(e) {
+      if (document.getElementById("bulkUseUserPercent")?.checked !== false) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        pctOpenBulkTradeUserPercent();
+        return false;
+      }
+    }, true);
+  }
+
+  ["bulkUseUserPercent","massTradeAmount","managedAmount","massTradeCoin","massTradeLeverage","massTradeOrderType"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.dataset.percentPreviewBound) {
+      el.dataset.percentPreviewBound = "1";
+      el.addEventListener("change", pctRenderBulkPreview);
+      el.addEventListener("input", pctRenderBulkPreview);
+    }
+  });
+
+  pctRenderBulkPreview();
+}
+setInterval(pctBindAdminBulkPercent, 1200);
+window.addEventListener("load", () => setTimeout(pctBindAdminBulkPercent, 1000));

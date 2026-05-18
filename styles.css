@@ -3370,3 +3370,77 @@ body[data-admin-page="true"] .ghost-btn{
     flex-wrap:nowrap!important;
   }
 }
+
+
+/* ===== USER WALLET PERCENT AI TRADE UI ===== */
+.ai-percent-settings-card{
+  margin:14px 0!important;
+}
+.percent-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+  margin:12px 0;
+}
+.percent-btn{
+  min-height:42px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.05);
+  color:var(--text,#fff);
+  font-weight:900;
+  cursor:pointer;
+}
+.percent-btn.active{
+  border-color:rgba(0,229,155,.55);
+  background:rgba(0,229,155,.16);
+  color:var(--green,#00e59b);
+}
+.ai-percent-preview{
+  border:1px solid rgba(0,229,155,.18);
+  background:rgba(0,229,155,.055);
+  border-radius:16px;
+  padding:12px;
+  margin-top:10px;
+}
+.ai-percent-preview span{
+  display:block;
+  color:var(--muted,#8ca2c0);
+  font-size:12px;
+  margin-bottom:5px;
+}
+.ai-percent-preview b{
+  display:block;
+  color:var(--green,#00e59b);
+  font-size:20px;
+}
+.ai-percent-preview small{
+  display:block;
+  color:var(--text,#fff);
+  margin-top:4px;
+}
+.toggle-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.035);
+  border-radius:14px;
+  padding:12px;
+  margin-top:12px;
+}
+.toggle-row span{
+  color:var(--text,#fff);
+  font-weight:800;
+}
+.toggle-row input{
+  width:20px;
+  height:20px;
+}
+.admin-percent-toggle{
+  margin:10px 0!important;
+}
+@media(max-width:520px){
+  .percent-grid{grid-template-columns:repeat(2,1fr);}
+}

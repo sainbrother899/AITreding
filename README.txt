@@ -128,3 +128,14 @@ Admin Stability Fix:
 - Admin desktop layout fixed to prevent shifting.
 - SQL optional columns added for admin tables if missing.
 - JS syntax check: OK
+
+
+User Wallet Percent AI Trade Update:
+- User side AI Trade Settings added: 25%, 50%, 75%, 100%.
+- User can turn Auto Admin Trade ON/OFF.
+- Admin Bulk/Mass trade can use each user's selected wallet percentage.
+- Default bulk mode: Use user selected wallet %.
+- Each user's trade amount = user's Real Wallet * selected percentage.
+- Users are skipped if auto OFF, AI daily limit complete, wallet low, or amount below ₹100.
+- SQL patch adds profiles.ai_trade_percent and profiles.auto_trade_permission.
+- JS syntax check: OK
