@@ -6595,7 +6595,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
     const pub = client.storage.from(KYC_BUCKET).getPublicUrl(path);
     return {
       id: "doc_" + Date.now() + "_" + key,
-      kyc_id: kycId,
+      kyc_id: String(kycId),
       user_id: dbcUid(),
       doc_key: key,
       file_name: file.name,
@@ -6614,7 +6614,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
     }
 
     const fd = new FormData(form);
-    const kycId = "kyc_" + Date.now();
+    const kycId = Date.now();
     const fullName = String(fd.get("kycName") || dbcUser().name || "").trim();
     const docNumber = String(fd.get("kycId") || "").trim();
     const dob = String(fd.get("kycDob") || "").trim();
@@ -6672,7 +6672,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
     state.user.kycDocuments = uploadedDocs;
     state.kycRequests ||= [];
     state.kycRequests.unshift({
-      id: kycId,
+      id: String(kycId),
       userId: dbcUid(),
       userEmail: dbcEmail(),
       name: fullName,

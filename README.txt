@@ -825,3 +825,11 @@ DB Connected KYC + Payout Update:
 - Important: Run SQL in Supabase SQL Editor before testing DB upload.
 - Policies are permissive for testing; production should use Supabase Auth + stricter RLS.
 - JS syntax check: OK
+
+
+KYC Bigint ID Fix:
+- Fixed error: invalid input syntax for type bigint: "kyc_<timestamp>".
+- KYC request id now uses numeric Date.now() instead of text id.
+- This matches existing kyc_requests.id bigint column.
+- No new SQL required for this fix.
+- JS syntax check: OK
