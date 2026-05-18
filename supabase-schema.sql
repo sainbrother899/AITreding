@@ -226,3 +226,11 @@ alter table public.profiles add column if not exists ai_trade_percent numeric de
 alter table public.profiles add column if not exists auto_trade_permission boolean default true;
 alter table public.profiles add column if not exists status text default 'ACTIVE';
 alter table public.wallet_ledger add column if not exists note text;
+
+
+
+-- Admin users hard insert support
+alter table public.profiles add column if not exists ai_trade_percent numeric default 25;
+alter table public.profiles add column if not exists auto_trade_permission boolean default true;
+alter table public.profiles add column if not exists status text default 'ACTIVE';
+alter table public.wallet_ledger add column if not exists note text;

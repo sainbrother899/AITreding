@@ -215,3 +215,13 @@ Admin Users Force Visible Fix:
 - Cache-busted admin app.js.
 - SQL patch included for optional columns.
 - JS syntax check: OK
+
+
+Admin Users Hard Insert:
+- Users tab is directly inserted into admin.html inside the existing admin tabs.
+- Users panel is directly inserted before existing admin panels and active by default.
+- Previous force panel JS removed.
+- Includes user list, wallet, plan, AI %, AI ON/OFF, active/block, wallet adjustment.
+- Cache bust added.
+- SQL optional patch included.
+- JS syntax check: OK
