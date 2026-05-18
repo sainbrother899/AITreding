@@ -3002,3 +3002,51 @@ body[data-admin-page="true"] .table-card:hover{
     display:none!important;
   }
 }
+
+
+/* =========================================================
+   PC WALLET NAV FIX
+   Wallet button visible on PC + mobile for Real account
+   ========================================================= */
+body.real-mode-active .bottom-nav .real-only-nav,
+body.real-mode-active .pro-bottom-nav .real-only-nav,
+body:not(.demo-mode-active) .bottom-nav .real-only-nav,
+body:not(.demo-mode-active) .pro-bottom-nav .real-only-nav{
+  display:flex!important;
+}
+
+body.demo-mode-active .bottom-nav .real-only-nav,
+body.demo-mode-active .pro-bottom-nav .real-only-nav{
+  display:none!important;
+}
+
+@media(min-width:901px){
+  body:not([data-admin-page="true"]) .bottom-nav,
+  body:not([data-admin-page="true"]) .pro-bottom-nav{
+    display:flex!important;
+    width:430px!important;
+    max-width:430px!important;
+    left:50%!important;
+    right:auto!important;
+    transform:translateX(-50%)!important;
+    justify-content:space-between!important;
+    overflow:visible!important;
+  }
+
+  body:not([data-admin-page="true"]) .bottom-nav .nav-btn,
+  body:not([data-admin-page="true"]) .pro-bottom-nav .nav-btn{
+    display:flex!important;
+    min-width:62px!important;
+    flex:1 1 auto!important;
+  }
+
+  body:not([data-admin-page="true"]) .bottom-nav .real-only-nav,
+  body:not([data-admin-page="true"]) .pro-bottom-nav .real-only-nav{
+    display:flex!important;
+  }
+
+  body.demo-mode-active:not([data-admin-page="true"]) .bottom-nav .real-only-nav,
+  body.demo-mode-active:not([data-admin-page="true"]) .pro-bottom-nav .real-only-nav{
+    display:none!important;
+  }
+}

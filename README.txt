@@ -487,3 +487,10 @@ Mobile History Fix:
 - PC/tablet view stays as table.
 - AI/Admin and Manual history both improved on mobile.
 - No SQL required.
+
+
+PC Wallet Nav Fix:
+- Wallet bottom-nav button now appears on PC for Real account.
+- Demo account still hides Wallet.
+- Mobile behavior remains unchanged.
+- No SQL required.
