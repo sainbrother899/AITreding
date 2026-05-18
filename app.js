@@ -4219,23 +4219,69 @@ function restoreManualHistoryBackup(mode = state.mode) {
 })();
 
 
-
-
-
-/* ===== OLD HOME CODE REMOVED GUARD ===== */
+/* ===== OLD HOME UI REMOVE FINAL ===== */
 (function(){
-  function guardOldHomeInjected(){
-    try {
-      const dash = document.getElementById("dashboard") || document.getElementById("home");
-      if (!dash) return;
-      Array.from(dash.children).forEach(child => {
-        if (["cleanHomeMount","homeAiTradeControlCard","manualOpenPositionsMount"].includes(child.id)) return;
-        const txt = child.textContent || "";
-        if (/BTC\/USDT|ETH\/USDT|SOL\/USDT|BNB\/USDT|Today PnL|Win Rate|Market Mood|Active Signal|Switch Account|AI\/AI Trades Today|AI Signal Live/i.test(txt)) {
-          child.remove();
-        }
-      });
-    } catch(e) {}
+  function ohIsUser(){
+    return state?.user && state.user.role !== "admin";
   }
-  window.addEventListener("load", () => setTimeout(guardOldHomeInjected, 1200));
+
+  function ohHomeContainers(){
+    return [
+      document.getElementById("dashboard"),
+      document.getElementById("home"),
+      document.querySelector('[data-page="home"]')
+    ].filter(Boolean);
+  }
+
+  function ohKeepNode(node){
+    if (!node) return true;
+    if (node.id === "cleanHomeMount") return true;
+    if (node.id === "homeAiTradeControlCard") return true;
+    if (node.id === "manualOpenPositionsMount") return true;
+
+    // Keep scripts/styles/navs and active app shell pieces.
+    const tag = String(node.tagName || "").toLowerCase();
+    if (["script","style","nav"].includes(tag)) return true;
+    if (node.classList?.contains("bottom-nav") || node.classList?.contains("mobile-nav")) return true;
+
+    return false;
+  }
+
+  function ohRemoveOldHomeUi(){
+    if (!ohIsUser()) return;
+
+    // Make sure clean home exists first.
+    try {
+      if (typeof uiRenderHomeShell === "function") uiRenderHomeShell();
+      if (typeof updateCleanHomeRates === "function") updateCleanHomeRates();
+      if (typeof renderCleanHomeAiControl === "function") renderCleanHomeAiControl(true);
+    } catch(e) {}
+
+    const clean = document.getElementById("cleanHomeMount");
+    if (!clean) return;
+
+    ohHomeContainers().forEach(container => {
+      Array.from(container.children).forEach(child => {
+        if (ohKeepNode(child)) return;
+        child.remove();
+      });
+    });
+
+    // Remove old standalone ticker/rate strips that may be outside dashboard.
+    document.querySelectorAll(".ticker-grid, #tickerGrid, .market-ticker, .live-rates, .rate-strip").forEach(el => {
+      if (!el.closest("#cleanHomeShell")) el.remove();
+    });
+
+    document.body.classList.add("old-home-ui-removed");
+  }
+
+  // Override old hiding function, if present, to remove instead of just hide.
+  window.hrHideOldHomeBlocks = ohRemoveOldHomeUi;
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(ohRemoveOldHomeUi, 500));
+  window.addEventListener("load", () => setTimeout(ohRemoveOldHomeUi, 900));
+  setTimeout(ohRemoveOldHomeUi, 1500);
+
+  // Low-frequency guard: old UI should not come back after app render.
+  setInterval(ohRemoveOldHomeUi, 5000);
 })();
