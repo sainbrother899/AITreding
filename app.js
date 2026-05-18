@@ -2871,16 +2871,7 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
     const progress = Math.min(100, Math.max(0, (used / (limit || 5))*100));
     return `
       <section id="cleanHomeShell" class="clean-home-shell">
-        <div class="clean-header-card">
-          <div class="clean-brand-badge">AI</div>
-          <div class="clean-brand-title">
-            <h1>AI Trading Assistant</h1>
-            <p>Live AI signal dashboard</p>
-          </div>
-          <button class="clean-logout-btn" type="button" onclick="uiLogout()">Logout</button>
-        </div>
-
-        <div class="clean-welcome-card card">
+<div class="clean-welcome-card card">
           <div class="clean-welcome-top">
             <div>
               <p class="label">Welcome Back</p>
@@ -3436,16 +3427,7 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
 
     return `
       <section id="cleanHomeShell" class="clean-home-shell static-home-shell">
-        <div class="clean-header-card">
-          <div class="clean-brand-badge">AI</div>
-          <div class="clean-brand-title">
-            <h1>AI Trading Assistant</h1>
-            <p>Live AI signal dashboard</p>
-          </div>
-          <button class="clean-logout-btn" type="button" onclick="uiLogout()">Logout</button>
-        </div>
-
-        <div class="clean-welcome-card card">
+<div class="clean-welcome-card card">
           <div class="clean-welcome-top">
             <div>
               <p class="label">Welcome Back</p>

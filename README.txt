@@ -457,3 +457,12 @@ Old UI Flash Safe Fix:
 - Existing logic/UI/features untouched.
 - No SQL required.
 - Summary: {"boot_script_added": true, "boot_style_added": true, "runtime_guard_added": true, "syntax": "OK"}
+
+
+Duplicate Home Header Removed:
+- Removed the duplicate clean Home header from the generated Home shell.
+- Top/original app header remains visible.
+- Only red-circled duplicate "AI Trading Assistant + Logout" inside Home content is removed.
+- Home cards, account cards, rate cards, AI Control, floating bar, trade/wallet/admin logic untouched.
+- No SQL required.
+- Summary: {"removed_exact_header_blocks": 0, "removed_fallback_header_blocks": 2, "syntax": "OK"}

@@ -4394,3 +4394,12 @@ html.clean-home-ready body[data-user-clean-ui="true"] #appPage,
 html.clean-home-boot-fallback body[data-user-clean-ui="true"] #appPage{
   opacity:1!important;
 }
+
+
+/* ===== DUPLICATE HOME HEADER REMOVED ===== */
+#cleanHomeShell > .clean-header-card{
+  display:none!important;
+}
+.clean-home-shell{
+  padding-top:0!important;
+}
