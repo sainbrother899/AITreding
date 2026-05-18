@@ -667,8 +667,18 @@ async function applyReferralBonus(dep) {
 
 /* ---------- Trading ---------- */
 function updateTradePnl(t) {
+  if (!t) return 0;
+
+  // CLOSED / CANCELLED manual trade PnL must stay frozen.
+  if (String(t.status || "").toUpperCase() !== "OPEN") {
+    const fixed = Number(t.pnl || 0);
+    t.current = Number(t.close || t.closePrice || t.close_price || t.current || t.entry || 0);
+    t.roi = (fixed / Number(t.amount || 1)) * 100;
+    return fixed;
+  }
+
   const current = priceOf(t.coin);
-  t.current = t.status === "OPEN" ? current : (t.current || t.close || current);
+  t.current = current;
   const diff = t.side === "SELL" ? (Number(t.entry) - Number(t.current)) : (Number(t.current) - Number(t.entry));
   t.pnl = (diff / Number(t.entry || 1)) * Number(t.amount || 0) * Number(t.leverage || 1);
   t.roi = (t.pnl / Number(t.amount || 1)) * 100;
@@ -690,19 +700,48 @@ function openManualTrade(side) {
 }
 async function closeTrade(id, mode = state.mode) {
   const acc = state.accounts[mode];
-  const idx = (acc.trades || []).findIndex(t => t.id === id);
+  if (!acc) return;
+
+  acc.trades ||= [];
+  acc.closedTrades ||= [];
+
+  const idx = acc.trades.findIndex(t => t.id === id);
   if (idx < 0) return;
+
   const t = acc.trades[idx];
-  updateTradePnl(t);
+
+  // Final live calculation only once at close time.
+  const closePrice = priceOf(t.coin);
+  t.current = closePrice;
+  const diff = t.side === "SELL" ? (Number(t.entry) - closePrice) : (closePrice - Number(t.entry));
+  t.pnl = (diff / Number(t.entry || 1)) * Number(t.amount || 0) * Number(t.leverage || 1);
+  t.roi = (t.pnl / Number(t.amount || 1)) * 100;
+
+  t.close = closePrice;
+  t.closePrice = closePrice;
+  t.closedPrice = closePrice;
   t.status = "CLOSED";
   t.closedAt = new Date().toLocaleString();
+  t.closedAtISO = new Date().toISOString();
+  t.pnlFrozen = true;
+  t.source = t.source || "USER";
+
   acc.trades.splice(idx, 1);
+
+  // Prevent duplicates.
+  acc.closedTrades = (acc.closedTrades || []).filter(x => String(x.id) !== String(t.id));
   acc.closedTrades.unshift(t);
+
   if (mode === "REAL") {
+    state.walletLedger ||= [];
     state.walletLedger.unshift({ id: "led_" + Date.now(), userId: state.user.id, type: "TRADE_PNL", amount: t.pnl, note: "Manual trade PnL" });
     await dbInsert("wallet_ledger", { user_id: state.user.id, type: "TRADE_PNL", amount: t.pnl, note: "Manual trade PnL" });
   }
-  saveState(); render();
+
+  try { saveManualHistoryBackup(mode); } catch(e) {}
+  saveState();
+  render();
+  try { renderFloatingLivePositionBar?.(); } catch(e) {}
 }
 function pnlForManaged(side, entry, close, amount) {
   const diff = side === "SELL" ? Number(entry) - Number(close) : Number(close) - Number(entry);
@@ -867,8 +906,9 @@ function renderHistory() {
   const managed = state.managedTrades.filter(t => (String(t.userId) === uid || normalizeEmail(t.userEmail) === email) && t.status === "CLOSED");
   if ($("userManagedTradesLog")) $("userManagedTradesLog").innerHTML = managed.map(t => `<tr><td>${t.coin?.replace("USDT","/USDT")}</td><td>${t.side}</td><td>${money(t.amount)}</td><td>${usd(t.entry)}</td><td>${usd(t.close)}</td><td class="${t.pnl>=0?'pnl-plus':'pnl-minus'}">${money(t.pnl)}</td><td>${t.status}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">No closed AI/AI trades yet.</td></tr>`;
   const acc = currentAccount();
+  try { restoreManualHistoryBackup(state.mode); } catch(e) {}
   const manual = [...(acc.trades||[]), ...(acc.closedTrades||[])].filter(t => !t.source || t.source === "USER");
-  if ($("userManualTradesLog")) $("userManualTradesLog").innerHTML = manual.map(t => { updateTradePnl(t); return `<tr><td>${t.coin?.replace("USDT","/USDT")}</td><td>${t.side}</td><td>${money(t.amount)}</td><td>${usd(t.entry)}</td><td>${usd(t.current)}</td><td class="${t.pnl>=0?'pnl-plus':'pnl-minus'}">${money(t.pnl)}</td><td>${t.status}</td></tr>`; }).join("") || `<tr><td colspan="7" class="empty">No manual trades yet.</td></tr>`;
+  if ($("userManualTradesLog")) $("userManualTradesLog").innerHTML = manual.map(t => { if (String(t.status || "OPEN").toUpperCase() === "OPEN") updateTradePnl(t); return `<tr><td>${t.coin?.replace("USDT","/USDT")}</td><td>${t.side}</td><td>${money(t.amount)}</td><td>${usd(t.entry)}</td><td>${usd(t.close || t.current)}</td><td class="${t.pnl>=0?'pnl-plus':'pnl-minus'}">${money(t.pnl)}</td><td>${t.status}</td></tr>`; }).join("") || `<tr><td colspan="7" class="empty">No manual trades yet.</td></tr>`;
 }
 function renderAnalytics() {
   const acc = currentAccount();
@@ -4047,4 +4087,135 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
   document.addEventListener("DOMContentLoaded", () => setTimeout(plcApplyAll, 400));
   window.addEventListener("load", () => setTimeout(plcApplyAll, 600));
   setInterval(plcApplyAll, 1000);
+})();
+
+
+/* ===== MANUAL TRADE HISTORY PERMANENT BACKUP + PNL FREEZE ===== */
+function manualHistoryKey(mode = state.mode) {
+  return `manual_closed_trades_${userKey()}_${mode}`;
+}
+
+function normalizeManualClosedTrade(t) {
+  if (!t) return t;
+  t.status = String(t.status || "CLOSED").toUpperCase();
+  t.source = t.source || "USER";
+  t.pnl = Number(t.pnl || 0);
+  t.amount = Number(t.amount || 0);
+  t.entry = Number(t.entry || 0);
+  t.close = Number(t.close || t.closePrice || t.close_price || t.current || t.entry || 0);
+  t.current = t.close;
+  t.closePrice = t.close;
+  t.pnlFrozen = true;
+  return t;
+}
+
+function getManualHistoryBackup(mode = state.mode) {
+  try {
+    const raw = localStorage.getItem(manualHistoryKey(mode));
+    const arr = JSON.parse(raw || "[]");
+    return Array.isArray(arr) ? arr.map(normalizeManualClosedTrade).filter(Boolean) : [];
+  } catch(e) {
+    return [];
+  }
+}
+
+function saveManualHistoryBackup(mode = state.mode) {
+  try {
+    state.accounts ||= {};
+    state.accounts[mode] ||= { balance: mode === "DEMO" ? 100000 : 0, trades: [], closedTrades: [] };
+    state.accounts[mode].closedTrades ||= [];
+
+    const existing = getManualHistoryBackup(mode);
+    const current = (state.accounts[mode].closedTrades || [])
+      .filter(t => (!t.source || t.source === "USER") && String(t.status || "").toUpperCase() === "CLOSED")
+      .map(normalizeManualClosedTrade);
+
+    const map = new Map();
+    [...existing, ...current].forEach(t => {
+      if (!t?.id) t.id = "manual_closed_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+      map.set(String(t.id), t);
+    });
+
+    const merged = [...map.values()].sort((a,b) => {
+      const ad = Date.parse(a.closedAtISO || a.closedAt || 0) || 0;
+      const bd = Date.parse(b.closedAtISO || b.closedAt || 0) || 0;
+      return bd - ad;
+    });
+
+    localStorage.setItem(manualHistoryKey(mode), JSON.stringify(merged));
+    return merged;
+  } catch(e) {
+    console.warn("saveManualHistoryBackup failed", e);
+    return [];
+  }
+}
+
+function restoreManualHistoryBackup(mode = state.mode) {
+  try {
+    state.accounts ||= {};
+    state.accounts[mode] ||= { balance: mode === "DEMO" ? 100000 : 0, trades: [], closedTrades: [] };
+    state.accounts[mode].closedTrades ||= [];
+
+    const backup = getManualHistoryBackup(mode);
+    if (!backup.length) return;
+
+    const current = (state.accounts[mode].closedTrades || [])
+      .filter(t => (!t.source || t.source === "USER") && String(t.status || "").toUpperCase() === "CLOSED")
+      .map(normalizeManualClosedTrade);
+
+    const map = new Map();
+    [...backup, ...current].forEach(t => {
+      if (!t?.id) t.id = "manual_closed_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+      map.set(String(t.id), normalizeManualClosedTrade(t));
+    });
+
+    const merged = [...map.values()].sort((a,b) => {
+      const ad = Date.parse(a.closedAtISO || a.closedAt || 0) || 0;
+      const bd = Date.parse(b.closedAtISO || b.closedAt || 0) || 0;
+      return bd - ad;
+    });
+
+    const nonUserClosed = (state.accounts[mode].closedTrades || [])
+      .filter(t => (t.source && t.source !== "USER") || String(t.status || "").toUpperCase() !== "CLOSED");
+
+    state.accounts[mode].closedTrades = [...merged, ...nonUserClosed];
+    localStorage.setItem(manualHistoryKey(mode), JSON.stringify(merged));
+  } catch(e) {
+    console.warn("restoreManualHistoryBackup failed", e);
+  }
+}
+
+// Patch saveState to always include backup before saving.
+(function(){
+  if (window.__manualHistoryStabilityInstalled) return;
+  window.__manualHistoryStabilityInstalled = true;
+
+  try {
+    const oldSaveState = saveState;
+    window.saveState = saveState = function() {
+      try { saveManualHistoryBackup("DEMO"); saveManualHistoryBackup("REAL"); } catch(e) {}
+      return oldSaveState.apply(this, arguments);
+    };
+  } catch(e) {}
+
+  try {
+    const oldRender = render;
+    window.render = render = function() {
+      try { restoreManualHistoryBackup("DEMO"); restoreManualHistoryBackup("REAL"); } catch(e) {}
+      return oldRender.apply(this, arguments);
+    };
+  } catch(e) {}
+
+  window.addEventListener("load", () => {
+    setTimeout(() => {
+      try { restoreManualHistoryBackup("DEMO"); restoreManualHistoryBackup("REAL"); saveState(); renderHistory?.(); } catch(e) {}
+    }, 800);
+  });
+
+  setInterval(() => {
+    try {
+      restoreManualHistoryBackup("DEMO");
+      restoreManualHistoryBackup("REAL");
+    } catch(e) {}
+  }, 3000);
 })();

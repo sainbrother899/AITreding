@@ -4545,3 +4545,14 @@ button,
     padding:0 11px!important;
   }
 }
+
+
+/* ===== MANUAL TRADE HISTORY STABILITY FIX ===== */
+.pnl-plus,
+.plc-profit{
+  color:#00e7a8!important;
+}
+.pnl-minus,
+.plc-loss{
+  color:#ff456b!important;
+}

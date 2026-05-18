@@ -412,3 +412,17 @@ Floating Bar Size Polish:
 - No logic changes.
 - No SQL required.
 - JS syntax check: OK
+
+
+Manual History Stability Fix:
+- Manual closed trade PnL is now frozen at close time.
+- updateTradePnl() no longer recalculates CLOSED trade PnL.
+- closeTrade() now stores close price/current price and pnlFrozen=true.
+- Manual closed trades are backed up separately in localStorage per user + mode.
+- render()/saveState()/history restore from backup if state gets overwritten.
+- Manual history should no longer disappear after a short time/render refresh.
+- Patched updateTradePnl: True
+- Patched closeTrade: True
+- Patched renderHistory: True
+- No SQL required.
+- JS syntax check: OK
