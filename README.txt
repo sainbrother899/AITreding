@@ -674,3 +674,28 @@ Menu KYC Profile Referral Fix:
 - No SQL required.
 - JS syntax check: OK
 - Replaced existing menu HTML: True
+
+
+Menu Full Pages Fix:
+- Menu options now open full-page views, not small popups.
+- Added full pages for Profile, KYC, Referral, My Payment Methods, and Support.
+- My Payment Methods includes Add Method form with UPI/Bank fields and Pending status.
+- KYC page has basic submit form and pending status handling.
+- Referral page has copy link button.
+- Back button closes the full page.
+- Bottom nav remains separate for Home/Trade/Wallet/PnL/History.
+- No SQL required for this UI/local-state version.
+- JS syntax check: OK
+
+
+Menu Real Pages Final:
+- Removed temporary injected full-page panel behavior.
+- Added real HTML sections in index.html:
+  profilePage, kycPage, referralPage, paymentMethodsPage, supportPage.
+- Menu click now opens actual page sections, similar to bottom nav pages.
+- Pages are mobile-friendly and match app card style.
+- Profile/KYC/Referral/Payment Methods/Support each has proper page content.
+- My Payment Methods supports UPI/Bank add form with Pending status in local state.
+- Bottom nav pages remain Home/Trade/Wallet/PnL/History.
+- No SQL required for this local/UI version.
+- JS syntax check: OK

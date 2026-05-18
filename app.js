@@ -5267,3 +5267,331 @@ function restoreManualHistoryBackup(mode = state.mode) {
   window.addEventListener("load", () => setTimeout(mfPatchMenu, 900));
   setInterval(mfPatchMenu, 2000);
 })();
+
+
+
+
+
+/* ===== MENU REAL PAGES FINAL ===== */
+(function(){
+  const menuPageMap = {
+    profile: "profilePage",
+    kyc: "kycPage",
+    referral: "referralPage",
+    paymentMethods: "paymentMethodsPage",
+    support: "supportPage"
+  };
+  const normalPages = ["dashboard","home","trade","tradepage","wallet","pnl","history","plans","more"];
+  const menuPages = Object.values(menuPageMap);
+
+  function u(){ return state?.user || {}; }
+  function uid(){ return String(u().id || u().email || "local"); }
+  function moneyFmt(n){
+    try { if (typeof money === "function") return money(n); } catch(e){}
+    return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  }
+  function saveAll(){
+    try { saveState?.(); } catch(e){}
+    try { saveSession?.(); } catch(e){}
+  }
+  function code(){
+    const x = u();
+    return x.referralCode || x.refCode || x.code || String(x.id || x.email || "USER").slice(0,8).toUpperCase();
+  }
+  function statusBadge(s){
+    s = String(s || "PENDING").toUpperCase();
+    const cls = s === "APPROVED" ? "approved" : (s === "REJECTED" ? "rejected" : "pending");
+    return `<em class="menu-real-status ${cls}">${s}</em>`;
+  }
+  function methods(){
+    state.userPayoutMethods ||= state.payoutMethods || [];
+    return (state.userPayoutMethods || []).filter(m => String(m.userId || m.user_id || "") === uid());
+  }
+  function maskMethod(m){
+    const type = String(m.type || m.method || "").toUpperCase();
+    if (type === "UPI") return m.upi || "-";
+    const acc = String(m.accountNumber || m.account_number || "");
+    return `${m.bankName || m.bank_name || "Bank"} ${acc ? "****" + acc.slice(-4) : ""}`.trim();
+  }
+
+  function profileHtml(){
+    const x = u();
+    const name = x.name || x.full_name || x.email?.split("@")[0] || "User";
+    const email = x.email || "-";
+    const mobile = x.mobile || x.phone || "-";
+    const kyc = x.kycStatus || x.kyc_status || "PENDING";
+    return `
+      <div class="card menu-real-profile-card">
+        <div class="menu-real-avatar">${(name[0] || "U").toUpperCase()}</div>
+        <h3>${name}</h3>
+        <p>${email}</p>
+      </div>
+      <div class="card menu-real-list">
+        <div><span>Name</span><b>${name}</b></div>
+        <div><span>Email</span><b>${email}</b></div>
+        <div><span>Mobile</span><b>${mobile}</b></div>
+        <div><span>KYC Status</span>${statusBadge(kyc)}</div>
+        <div><span>User ID</span><b>${String(x.id || "-").slice(0,18)}</b></div>
+      </div>
+      <div class="card menu-real-note">Profile editing and mobile verification can be connected with backend later.</div>
+    `;
+  }
+
+  function kycHtml(){
+    const x = u();
+    const kyc = x.kycStatus || x.kyc_status || "PENDING";
+    return `
+      <div class="card menu-real-hero">
+        <span>Current KYC Status</span>
+        ${statusBadge(kyc)}
+        <small>Submit KYC details. Admin approval required.</small>
+      </div>
+      <form id="realKycForm" class="card menu-real-form">
+        <label>Full Name
+          <input name="kycName" value="${x.kycName || x.name || ""}" placeholder="Enter full name">
+        </label>
+        <label>PAN / ID Number
+          <input name="kycId" value="${x.kycId || x.kyc_id || ""}" placeholder="PAN / Aadhaar / ID number">
+        </label>
+        <label>Date of Birth
+          <input name="kycDob" type="date" value="${x.kycDob || x.kyc_dob || ""}">
+        </label>
+        <label>Address
+          <textarea name="kycAddress" placeholder="Full address">${x.kycAddress || x.kyc_address || ""}</textarea>
+        </label>
+        <button type="submit">Submit KYC for Approval</button>
+      </form>
+      <div class="card menu-real-note">Document upload/storage can be connected later. This keeps the KYC flow ready.</div>
+    `;
+  }
+
+  function referralHtml(){
+    const x = u();
+    const c = code();
+    const link = `${location.origin}${location.pathname}?ref=${encodeURIComponent(c)}`;
+    return `
+      <div class="card menu-real-ref-card">
+        <span>Your Referral Code</span>
+        <b>${c}</b>
+        <small>${link}</small>
+        <button type="button" data-copy-real-ref="${link}">Copy Referral Link</button>
+      </div>
+      <div class="card menu-real-list">
+        <div><span>Total Referrals</span><b>${Number(x.referrals || x.referral_count || 0)}</b></div>
+        <div><span>Referral Bonus</span><b>${moneyFmt(x.referralBonus || x.referral_bonus || 0)}</b></div>
+        <div><span>Status</span><b>Active</b></div>
+      </div>
+      <div class="card menu-real-note">Referral tracking will work when signup flow stores the ref code.</div>
+    `;
+  }
+
+  function paymentMethodsHtml(){
+    const list = methods();
+    return `
+      <div class="card menu-real-note strong">Add UPI or Bank Account. New method can be used only after admin approval.</div>
+      <form id="realPaymentMethodForm" class="card menu-real-form">
+        <label>Method Type
+          <select name="type" id="realPayType">
+            <option value="UPI">UPI</option>
+            <option value="BANK">Bank Account</option>
+          </select>
+        </label>
+        <label class="real-pay-upi">UPI ID
+          <input name="upi" placeholder="example@upi">
+        </label>
+        <label>Account Holder Name
+          <input name="holderName" placeholder="Account holder name">
+        </label>
+        <div class="real-pay-bank-fields">
+          <label>Bank Name
+            <input name="bankName" placeholder="Bank name">
+          </label>
+          <label>Account Number
+            <input name="accountNumber" placeholder="Account number">
+          </label>
+          <label>IFSC Code
+            <input name="ifsc" placeholder="IFSC code">
+          </label>
+        </div>
+        <button type="submit">Add Method for Approval</button>
+      </form>
+      <div class="menu-real-section-title">Saved Methods</div>
+      <div class="menu-real-methods">
+        ${list.length ? list.map(m => `
+          <div class="card menu-real-method-card">
+            <div>
+              <span>${String(m.type || m.method || "METHOD").toUpperCase()}</span>
+              <b>${maskMethod(m)}</b>
+              <small>${m.holderName || m.holder_name || "-"}</small>
+            </div>
+            ${statusBadge(m.status || "PENDING")}
+          </div>
+        `).join("") : `<div class="card menu-real-empty">No payment method added yet.</div>`}
+      </div>
+    `;
+  }
+
+  function supportHtml(){
+    return `
+      <div class="card menu-real-list">
+        <div><span>Support Ticket</span><b>Coming Soon</b></div>
+        <div><span>Email Support</span><b>support@example.com</b></div>
+        <div><span>Response Time</span><b>24 Hours</b></div>
+      </div>
+      <form class="card menu-real-form">
+        <label>Message
+          <textarea placeholder="Write your issue here"></textarea>
+        </label>
+        <button type="button">Create Support Ticket</button>
+      </form>
+    `;
+  }
+
+  function renderPage(type){
+    const id = menuPageMap[type];
+    if (!id) return;
+    const content = document.getElementById(id.replace("Page","PageContent"));
+    if (!content) return;
+    content.innerHTML =
+      type === "profile" ? profileHtml() :
+      type === "kyc" ? kycHtml() :
+      type === "referral" ? referralHtml() :
+      type === "paymentMethods" ? paymentMethodsHtml() :
+      supportHtml();
+  }
+
+  function hideNormalPages(){
+    normalPages.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove("active-page");
+      el.classList.add("force-page-hidden");
+      el.style.display = "none";
+    });
+  }
+  function showMenuPage(type){
+    const id = menuPageMap[type];
+    if (!id) return;
+    renderPage(type);
+    hideNormalPages();
+
+    menuPages.forEach(pid => {
+      const el = document.getElementById(pid);
+      if (!el) return;
+      const show = pid === id;
+      el.classList.toggle("active-page", show);
+      el.classList.toggle("force-page-hidden", !show);
+      el.style.display = show ? "block" : "none";
+    });
+
+    document.body.dataset.activePage = type;
+    document.body.classList.add("menu-real-page-open");
+    document.getElementById("topHeaderMenuPanel")?.classList.remove("show");
+    document.getElementById("menuDetailPanel")?.classList.remove("show");
+    document.getElementById("menuFullPagePanel")?.classList.remove("show");
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+  function backToHome(){
+    menuPages.forEach(pid => {
+      const el = document.getElementById(pid);
+      if (!el) return;
+      el.classList.remove("active-page");
+      el.classList.add("force-page-hidden");
+      el.style.display = "none";
+    });
+    const home = document.getElementById("dashboard") || document.getElementById("home");
+    if (home) {
+      home.classList.add("active-page");
+      home.classList.remove("force-page-hidden");
+      home.style.display = "";
+    }
+    document.body.dataset.activePage = "dashboard";
+    document.body.classList.remove("menu-real-page-open");
+    try { fixTradePageVisibility?.(); } catch(e){}
+  }
+
+  function bind(){
+    const menu = document.getElementById("topHeaderMenuPanel");
+    if (menu && menu.dataset.realPageBound !== "1") {
+      menu.dataset.realPageBound = "1";
+      menu.addEventListener("click", function(e){
+        const type = e.target?.dataset?.menuPanel;
+        if (type) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          showMenuPage(type);
+          return;
+        }
+      }, true);
+    }
+
+    document.querySelectorAll("[data-menu-back]").forEach(btn => {
+      if (btn.dataset.realBackBound === "1") return;
+      btn.dataset.realBackBound = "1";
+      btn.addEventListener("click", backToHome);
+    });
+
+    menuPages.forEach(pid => {
+      const page = document.getElementById(pid);
+      if (!page || page.dataset.realSubmitBound === "1") return;
+      page.dataset.realSubmitBound = "1";
+
+      page.addEventListener("click", function(e){
+        const copy = e.target.dataset.copyRealRef;
+        if (copy) {
+          navigator.clipboard?.writeText(copy);
+          e.target.textContent = "Copied!";
+          setTimeout(()=> e.target.textContent = "Copy Referral Link", 1200);
+        }
+      });
+
+      page.addEventListener("change", function(e){
+        if (e.target.id === "realPayType") {
+          page.classList.toggle("pay-bank-mode", e.target.value === "BANK");
+        }
+      });
+
+      page.addEventListener("submit", function(e){
+        if (e.target.id === "realKycForm") {
+          e.preventDefault();
+          const fd = new FormData(e.target);
+          state.user.kycStatus = "PENDING";
+          state.user.kycName = fd.get("kycName");
+          state.user.kycId = fd.get("kycId");
+          state.user.kycDob = fd.get("kycDob");
+          state.user.kycAddress = fd.get("kycAddress");
+          saveAll();
+          showMenuPage("kyc");
+        }
+        if (e.target.id === "realPaymentMethodForm") {
+          e.preventDefault();
+          const fd = new FormData(e.target);
+          const type = String(fd.get("type") || "UPI").toUpperCase();
+          state.userPayoutMethods ||= state.payoutMethods || [];
+          state.userPayoutMethods.unshift({
+            id: "pm_" + Date.now(),
+            userId: uid(),
+            type,
+            upi: fd.get("upi") || "",
+            holderName: fd.get("holderName") || "",
+            bankName: fd.get("bankName") || "",
+            accountNumber: fd.get("accountNumber") || "",
+            ifsc: fd.get("ifsc") || "",
+            status: "PENDING",
+            createdAt: new Date().toLocaleString()
+          });
+          state.payoutMethods = state.userPayoutMethods;
+          saveAll();
+          showMenuPage("paymentMethods");
+        }
+      });
+    });
+  }
+
+  window.openRealMenuPage = showMenuPage;
+  window.closeRealMenuPage = backToHome;
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(bind, 800));
+  window.addEventListener("load", () => setTimeout(bind, 1000));
+  setInterval(bind, 2500);
+})();
