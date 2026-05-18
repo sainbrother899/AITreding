@@ -447,3 +447,23 @@ Final Stability Pack:
 - setInterval count after pack: 21
 - Markers: {"final_pack": true, "manual_table_sql": true, "global_color": true, "floating_bar": true, "home_static": true}
 - JS syntax check: OK
+
+
+Old Home UI Removed Final:
+- Added early CSS in index.html so old Home UI does not flash on refresh before JS loads.
+- Runtime cleanup removes old Home dashboard blocks from DOM after cleanHomeMount is ready.
+- Keeps cleanHomeMount, Home AI Control, and manualOpenPositionsMount.
+- Removes old ticker/rate strips outside cleanHomeShell.
+- Bottom nav, Trade, Wallet, History, Admin logic untouched.
+- No SQL required.
+- Summary: {"early_css_added": true, "runtime_remove_added": true, "syntax": "OK"}
+
+
+Old Home Code Removed:
+- Old Home/Dashboard UI blocks removed directly from index.html where matched.
+- Removed old runtime hide/remove patch because old Home code is no longer needed.
+- Added cleanHomeMount placeholder so clean Home UI renders immediately.
+- Kept a small guard only in case old Home blocks are injected later by app render.
+- Trade / Wallet / History / Admin logic untouched.
+- No SQL required.
+- Checks: {"removed_blocks_from_index": 4, "has_cleanHomeMount": false, "has_tickerGrid_old": false, "has_demoBtn_old": false, "has_aiTradePercentGrid_old": false, "syntax": "OK"}

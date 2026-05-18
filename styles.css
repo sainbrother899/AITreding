@@ -4384,3 +4384,12 @@ button,
 /* ===== FINAL STABILITY PACK UI SAFETY ===== */
 .plc-profit,.profit,.pnl-plus,.pos{color:#00e7a8!important}
 .plc-loss,.loss,.pnl-minus,.neg{color:#ff456b!important}
+
+
+
+
+
+/* ===== OLD HOME CODE REMOVED GUARD ===== */
+body[data-user-clean-ui="true"] #cleanHomeMount{
+  display:block!important;
+}

@@ -4217,3 +4217,25 @@ function restoreManualHistoryBackup(mode = state.mode) {
   // Light sync, not heavy. Keeps cross-render stability without spamming.
   setInterval(fsSyncManualHistory, 15000);
 })();
+
+
+
+
+
+/* ===== OLD HOME CODE REMOVED GUARD ===== */
+(function(){
+  function guardOldHomeInjected(){
+    try {
+      const dash = document.getElementById("dashboard") || document.getElementById("home");
+      if (!dash) return;
+      Array.from(dash.children).forEach(child => {
+        if (["cleanHomeMount","homeAiTradeControlCard","manualOpenPositionsMount"].includes(child.id)) return;
+        const txt = child.textContent || "";
+        if (/BTC\/USDT|ETH\/USDT|SOL\/USDT|BNB\/USDT|Today PnL|Win Rate|Market Mood|Active Signal|Switch Account|AI\/AI Trades Today|AI Signal Live/i.test(txt)) {
+          child.remove();
+        }
+      });
+    } catch(e) {}
+  }
+  window.addEventListener("load", () => setTimeout(guardOldHomeInjected, 1200));
+})();
