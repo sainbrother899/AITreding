@@ -6347,29 +6347,46 @@ body[data-admin-active-section="paymentSettings"] #adminPaymentSettingsPanel{
 }
 
 
-/* ===== ADMIN PAYMENT SECTIONS STAY FIX ===== */
-.admin-pay-stay-normal-hidden{
+
+
+
+/* ===== ADMIN PAYMENT NO FLICKER FIX ===== */
+.admin-pay-normal-hidden-stable{
   display:none!important;
 }
-#adminPayoutRequestsPanel.admin-pay-stay-visible,
-#adminPaymentSettingsPanel.admin-pay-stay-visible,
+
+#adminPayoutRequestsPanel,
+#adminPaymentSettingsPanel{
+  transition:none!important;
+}
+
+#adminPayoutRequestsPanel.admin-pay-no-flicker-visible,
+#adminPaymentSettingsPanel.admin-pay-no-flicker-visible,
 #adminPayoutRequestsPanel.active-admin-pay-panel,
 #adminPaymentSettingsPanel.active-admin-pay-panel{
   display:block!important;
   visibility:visible!important;
   opacity:1!important;
 }
-body[data-admin-active-section="payoutMethods"] #adminPayoutRequestsPanel{
+
+#adminPayoutRequestsPanel.force-admin-pay-hidden,
+#adminPaymentSettingsPanel.force-admin-pay-hidden{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+}
+
+body[data-admin-active-section="payoutMethods"].admin-payment-section-open #adminPayoutRequestsPanel{
   display:block!important;
   visibility:visible!important;
   opacity:1!important;
 }
-body[data-admin-active-section="paymentSettings"] #adminPaymentSettingsPanel{
+body[data-admin-active-section="paymentSettings"].admin-payment-section-open #adminPaymentSettingsPanel{
   display:block!important;
   visibility:visible!important;
   opacity:1!important;
 }
-body[data-admin-active-section="payoutMethods"] #adminPaymentSettingsPanel,
-body[data-admin-active-section="paymentSettings"] #adminPayoutRequestsPanel{
+body[data-admin-active-section="payoutMethods"].admin-payment-section-open #adminPaymentSettingsPanel,
+body[data-admin-active-section="paymentSettings"].admin-payment-section-open #adminPayoutRequestsPanel{
   display:none!important;
 }

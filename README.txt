@@ -772,3 +772,15 @@ Admin Payment Sections Stay Fix:
 - Payout Method Requests and Payment Settings inner content remains visible.
 - No SQL required.
 - JS syntax check: OK
+
+
+Admin Payment No Flicker Fix:
+- Removed previous Admin Payment Sections Stay interval block that caused hide/unhide flicker.
+- Payment sections now open once and remain stable.
+- No fast 500ms show/hide interval.
+- Normal admin option click closes payment section.
+- Payout Method Requests / Payment Settings content should no longer blink every second.
+- Removed JS stay block count: 1
+- Removed CSS stay block count: 1
+- No SQL required.
+- JS syntax check: OK

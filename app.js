@@ -6544,7 +6544,10 @@ function restoreManualHistoryBackup(mode = state.mode) {
 })();
 
 
-/* ===== ADMIN PAYMENT SECTIONS STAY FIX ===== */
+
+
+
+/* ===== ADMIN PAYMENT NO FLICKER FIX ===== */
 (function(){
   const PAY_TABS = ["payoutMethods", "paymentSettings"];
 
@@ -6557,53 +6560,41 @@ function restoreManualHistoryBackup(mode = state.mode) {
       !!document.querySelector("[id*='admin' i], [class*='admin' i]");
   }
 
-  function payoutPanel(){ return document.getElementById("adminPayoutRequestsPanel"); }
-  function settingsPanel(){ return document.getElementById("adminPaymentSettingsPanel"); }
-
-  function currentTab(){
-    return document.body.dataset.adminActiveSection || localStorage.getItem("admin_payment_active_section") || "";
+  function panels(){
+    return {
+      payoutMethods: document.getElementById("adminPayoutRequestsPanel"),
+      paymentSettings: document.getElementById("adminPaymentSettingsPanel")
+    };
   }
 
-  function normalPanels(){
+  function normalAdminPanels(){
     return Array.from(document.querySelectorAll(
       ".admin-panel,.admin-section,.admin-page-section,.admin-tab-panel,#adminDashboard,#adminUsers,#adminDeposits,#adminWithdrawals,#adminTrades,#adminSettings"
     )).filter(el => el.id !== "adminPayoutRequestsPanel" && el.id !== "adminPaymentSettingsPanel");
   }
 
-  function forceHideNormal(){
-    normalPanels().forEach(el => {
-      el.classList.add("admin-pay-stay-normal-hidden");
-      el.style.setProperty("display", "none", "important");
-    });
+  function setInlineVisible(el, show){
+    if (!el) return;
+    el.classList.toggle("force-admin-pay-hidden", !show);
+    el.classList.toggle("active-admin-pay-panel", show);
+    el.classList.toggle("admin-pay-no-flicker-visible", show);
+    el.style.setProperty("display", show ? "block" : "none", "important");
+    el.style.setProperty("visibility", show ? "visible" : "hidden", "important");
+    el.style.setProperty("opacity", show ? "1" : "0", "important");
   }
 
-  function forceShowPaymentTab(tab){
-    if (!isAdmin() || !PAY_TABS.includes(tab)) return;
+  function openPaymentTab(tab){
+    if (!PAY_TABS.includes(tab)) return;
+    const p = panels();
 
-    const payout = payoutPanel();
-    const settings = settingsPanel();
+    // Hide normal panels once, not every second.
+    normalAdminPanels().forEach(el => {
+      el.classList.add("admin-pay-normal-hidden-stable");
+      el.style.setProperty("display", "none", "important");
+    });
 
-    forceHideNormal();
-
-    if (payout) {
-      const show = tab === "payoutMethods";
-      payout.classList.toggle("force-admin-pay-hidden", !show);
-      payout.classList.toggle("active-admin-pay-panel", show);
-      payout.classList.toggle("admin-pay-stay-visible", show);
-      payout.style.setProperty("display", show ? "block" : "none", "important");
-      payout.style.setProperty("visibility", show ? "visible" : "hidden", "important");
-      payout.style.setProperty("opacity", show ? "1" : "0", "important");
-    }
-
-    if (settings) {
-      const show = tab === "paymentSettings";
-      settings.classList.toggle("force-admin-pay-hidden", !show);
-      settings.classList.toggle("active-admin-pay-panel", show);
-      settings.classList.toggle("admin-pay-stay-visible", show);
-      settings.style.setProperty("display", show ? "block" : "none", "important");
-      settings.style.setProperty("visibility", show ? "visible" : "hidden", "important");
-      settings.style.setProperty("opacity", show ? "1" : "0", "important");
-    }
+    setInlineVisible(p.payoutMethods, tab === "payoutMethods");
+    setInlineVisible(p.paymentSettings, tab === "paymentSettings");
 
     document.querySelectorAll("[data-admin-pay-open],[data-admin-pay-tab]").forEach(btn => {
       const t = btn.dataset.adminPayOpen || btn.dataset.adminPayTab;
@@ -6611,80 +6602,78 @@ function restoreManualHistoryBackup(mode = state.mode) {
     });
 
     document.body.dataset.adminActiveSection = tab;
-    localStorage.setItem("admin_payment_active_section", tab);
+    document.body.classList.add("admin-payment-section-open");
   }
 
-  function clearPaymentLock(){
-    localStorage.removeItem("admin_payment_active_section");
-    delete document.body.dataset.adminActiveSection;
+  function closePaymentTabs(){
+    const p = panels();
 
-    document.querySelectorAll(".admin-pay-stay-normal-hidden").forEach(el => {
-      el.classList.remove("admin-pay-stay-normal-hidden");
+    normalAdminPanels().forEach(el => {
+      el.classList.remove("admin-pay-normal-hidden-stable");
       el.style.removeProperty("display");
     });
 
-    [payoutPanel(), settingsPanel()].filter(Boolean).forEach(panel => {
-      panel.classList.remove("active-admin-pay-panel", "admin-pay-stay-visible");
-      panel.classList.add("force-admin-pay-hidden");
-      panel.style.setProperty("display", "none", "important");
-    });
+    setInlineVisible(p.payoutMethods, false);
+    setInlineVisible(p.paymentSettings, false);
 
     document.querySelectorAll("[data-admin-pay-open],[data-admin-pay-tab]").forEach(btn => btn.classList.remove("active"));
+    delete document.body.dataset.adminActiveSection;
+    document.body.classList.remove("admin-payment-section-open");
   }
 
-  function bindStayButtons(){
+  function bind(){
     if (!isAdmin()) return;
 
+    // Initial state: payment panels hidden unless a button explicitly opens them.
+    if (!document.body.classList.contains("admin-payment-section-open")) {
+      const p = panels();
+      setInlineVisible(p.payoutMethods, false);
+      setInlineVisible(p.paymentSettings, false);
+    }
+
     document.querySelectorAll("[data-admin-pay-open],[data-admin-pay-tab]").forEach(btn => {
-      if (btn.dataset.payStayBound === "1") return;
-      btn.dataset.payStayBound = "1";
+      if (btn.dataset.noFlickerBound === "1") return;
+      btn.dataset.noFlickerBound = "1";
       btn.addEventListener("click", function(e){
         const tab = btn.dataset.adminPayOpen || btn.dataset.adminPayTab;
         if (!PAY_TABS.includes(tab)) return;
+
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
-        forceShowPaymentTab(tab);
-        setTimeout(() => forceShowPaymentTab(tab), 100);
-        setTimeout(() => forceShowPaymentTab(tab), 500);
+
+        // Open once and then after render tick once. No repeated interval.
+        openPaymentTab(tab);
+        requestAnimationFrame(() => openPaymentTab(tab));
+        setTimeout(() => openPaymentTab(tab), 120);
       }, true);
     });
 
-    // Normal admin buttons should clear the payment section lock.
+    // Normal admin menu should close payment section only when user intentionally clicks normal admin option.
     document.querySelectorAll("button,a,[data-tab],[data-section],[data-admin-tab]").forEach(btn => {
-      if (btn.dataset.normalAdminPayStayBound === "1") return;
+      if (btn.dataset.noFlickerNormalBound === "1") return;
       if (btn.matches("[data-admin-pay-open],[data-admin-pay-tab]")) return;
-      btn.dataset.normalAdminPayStayBound = "1";
+
+      btn.dataset.noFlickerNormalBound = "1";
       btn.addEventListener("click", function(){
-        // Ignore clicks inside payment panels.
         if (btn.closest("#adminPayoutRequestsPanel,#adminPaymentSettingsPanel,#adminPaymentQuickMenu")) return;
-        const txt = (btn.textContent || "").toLowerCase();
-        const hasAdminIntent = txt.includes("user") || txt.includes("deposit") || txt.includes("withdraw") || txt.includes("trade") || txt.includes("setting") || btn.dataset.tab || btn.dataset.section || btn.dataset.adminTab;
-        if (hasAdminIntent) clearPaymentLock();
+
+        const text = (btn.textContent || "").toLowerCase();
+        const isNormalAdmin =
+          btn.dataset.tab || btn.dataset.section || btn.dataset.adminTab ||
+          text.includes("user") || text.includes("deposit") || text.includes("withdraw") ||
+          text.includes("trade") || text.includes("dashboard") || text.includes("setting");
+
+        if (isNormalAdmin) closePaymentTabs();
       }, true);
     });
   }
 
-  function keepAlive(){
-    if (!isAdmin()) return;
-    bindStayButtons();
+  window.openAdminPaymentSectionNoFlicker = openPaymentTab;
+  window.closeAdminPaymentSectionNoFlicker = closePaymentTabs;
 
-    const tab = currentTab();
-    if (PAY_TABS.includes(tab)) {
-      forceShowPaymentTab(tab);
-    } else {
-      // keep both payment panels hidden by default, so they don't sit at bottom
-      [payoutPanel(), settingsPanel()].filter(Boolean).forEach(panel => {
-        panel.classList.add("force-admin-pay-hidden");
-        panel.style.setProperty("display", "none", "important");
-      });
-    }
-  }
-
-  window.forceShowAdminPaymentTab = forceShowPaymentTab;
-  window.clearAdminPaymentLock = clearPaymentLock;
-
-  document.addEventListener("DOMContentLoaded", () => setTimeout(keepAlive, 900));
-  window.addEventListener("load", () => setTimeout(keepAlive, 1100));
-  setInterval(keepAlive, 500);
+  document.addEventListener("DOMContentLoaded", () => setTimeout(bind, 900));
+  window.addEventListener("load", () => setTimeout(bind, 1100));
+  // Slow rebinding only for dynamically re-rendered buttons; does not toggle visibility.
+  setInterval(bind, 4000);
 })();
