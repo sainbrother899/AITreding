@@ -66,37 +66,7 @@
             <p>✅ AI-style trade signals</p>
           </div>
         </div>
-        <div class="card ai-percent-settings-card">
-          <div class="section-head">
-            <div>
-              <p class="label">AI Trade Settings</p>
-              <h2>Admin Trade Amount</h2>
-              <p class="muted small">Admin trade आपके Real Wallet के selected percentage से लगेगी.</p>
-            </div>
-          </div>
-
-          <div class="percent-grid" id="aiTradePercentGrid">
-            <button type="button" class="percent-btn" data-ai-percent="25">25%</button>
-            <button type="button" class="percent-btn" data-ai-percent="50">50%</button>
-            <button type="button" class="percent-btn" data-ai-percent="75">75%</button>
-            <button type="button" class="percent-btn" data-ai-percent="100">100%</button>
-          </div>
-
-          <div class="ai-percent-preview">
-            <span>Selected</span>
-            <b id="aiTradePercentText">25%</b>
-            <small id="aiTradeAmountPreview">AI trade amount: ₹0</small>
-          </div>
-
-          <label class="toggle-row">
-            <span>Auto Admin Trade</span>
-            <input type="checkbox" id="userAutoAdminTradeToggle" checked>
-          </label>
-        </div>
-
-
-
-        <div class="card auth-card">
+<div class="card auth-card">
           <div class="tabs">
             <button class="tab active" data-auth-tab="login">Login</button>
             <button class="tab" data-auth-tab="register">Register</button>
@@ -204,13 +174,13 @@
 
             <div id="aiTradeUsageBox" class="ai-trade-usage-box">
               <div>
-                <span>AI/Admin Trades Today</span>
+                <span>AI/AI Trades Today</span>
                 <strong><b id="aiTradeUsedText">0</b>/<b id="aiTradeLimitText">5</b></strong>
               </div>
 
               <label class="auto-trade-toggle">
                 <input id="autoTradePermission" type="checkbox" checked/>
-                <span>Allow AI/Admin Auto Trade</span>
+                <span>Allow AI Auto Trade</span>
               </label>
             </div>
 
@@ -266,6 +236,35 @@
 
       
 <section id="tradepage" class="page">
+
+        <div class="card ai-percent-settings-card">
+          <div class="section-head">
+            <div>
+              <p class="label">AI Trade Settings</p>
+              <h2>AI Trade Amount</h2>
+              <p class="muted small">AI trade आपके Real Wallet के selected percentage से लगेगी.</p>
+            </div>
+          </div>
+
+          <div class="percent-grid" id="aiTradePercentGrid">
+            <button type="button" class="percent-btn" data-ai-percent="25">25%</button>
+            <button type="button" class="percent-btn" data-ai-percent="50">50%</button>
+            <button type="button" class="percent-btn" data-ai-percent="75">75%</button>
+            <button type="button" class="percent-btn" data-ai-percent="100">100%</button>
+          </div>
+
+          <div class="ai-percent-preview">
+            <span>Selected</span>
+            <b id="aiTradePercentText">25%</b>
+            <small id="aiTradeAmountPreview">AI trade amount: ₹0</small>
+          </div>
+
+          <label class="toggle-row">
+            <span>Auto AI Trade</span>
+            <input type="checkbox" id="userAutoAdminTradeToggle" checked>
+          </label>
+        </div>
+
   <div class="pro-dashboard-shell trade-only-layout">
     <section class="card chart-card pro-trading-panel full-trade-panel">
       <div class="section-head">
@@ -424,9 +423,9 @@
           <div class="card table-card user-managed-history-card">
             <div class="section-head">
               <div>
-                <p class="label">AI/Admin Trades</p>
+                <p class="label">AI/AI Trades</p>
                 <h2>Closed AI Trade History</h2>
-                <p class="muted small">Only closed AI/Admin trades are shown here. Cancelled trades are hidden.</p>
+                <p class="muted small">Only closed AI/AI trades are shown here. Cancelled trades are hidden.</p>
               </div>
             </div>
             <div class="table-wrap">
@@ -435,7 +434,7 @@
                   <tr><th>Coin</th><th>Side</th><th>Amount</th><th>Entry</th><th>Close</th><th>PnL</th><th>Status</th></tr>
                 </thead>
                 <tbody id="userManagedTradesLog">
-                  <tr><td colspan="7" class="empty">No closed AI/Admin trades yet.</td></tr>
+                  <tr><td colspan="7" class="empty">No closed AI/AI trades yet.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -641,6 +640,6 @@
 
   <div id="toast"></div>
   <script src="config.js"></script>
-  <script src="app.js?v=percentaitrade20260518"></script>
+  <script src="app.js?v=aitradetextplacement20260518"></script>
 </body>
 </html>

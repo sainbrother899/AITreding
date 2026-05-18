@@ -217,7 +217,7 @@
           <div>
             <p class="label">Admin Command Center</p>
             <h2>AI Trading Control Panel</h2>
-            <span>Manage users, deposits, KYC, plans, trades and AI/Admin execution.</span>
+            <span>Manage users, deposits, KYC, plans, trades and AI execution.</span>
           </div>
           <div class="admin-live-card">
             <b>LIVE</b>
@@ -395,7 +395,7 @@
                   <label class="input-label">Signal Limit</label>
                   <input id="planSignalLimitInput" type="number" placeholder="50"/>
 
-                  <label class="input-label">AI/Admin Trades Per Day</label>
+                  <label class="input-label">AI/AI Trades Per Day</label>
                   <input id="planAiLimitInput" type="number" placeholder="5"/>
 
                   <label class="input-label">Features</label>
@@ -451,9 +451,9 @@
             
             <div id="adminMassTrade" class="admin-panel">
               <div class="card">
-                <p class="label">AI/Admin Mass Trade</p>
+                <p class="label">AI Mass Trade</p>
                 <h2>Open Trade For Eligible Users</h2>
-                <p class="muted small">Manual user trades unlimited हैं. यह limit सिर्फ AI/Admin trades पर apply होगी.</p>
+                <p class="muted small">Manual user trades unlimited हैं. यह limit सिर्फ AI/AI trades पर apply होगी.</p>
 
                 <label class="input-label">Coin</label>
                 <select id="massTradeCoin">
@@ -480,7 +480,7 @@
                 <input id="massTradeAmount" type="number" value="100" min="1"/>
 
                 <button id="openMassTradeBtn" class="primary-btn">Open For Eligible Users</button>
-                <p class="tiny-warning">Eligible = Auto Trade ON + plan daily AI/Admin limit available.</p>
+                <p class="tiny-warning">Eligible = Auto Trade ON + plan daily AI limit available.</p>
               </div>
 
               
@@ -506,7 +506,7 @@
 
               <div class="card table-card">
                 <div class="section-head">
-                  <div><p class="label">AI/Admin Trade Limit</p><h2>User Eligibility Preview</h2></div>
+                  <div><p class="label">AI/AI Trade Limit</p><h2>User Eligibility Preview</h2></div>
                 </div>
                 <div class="table-wrap">
                   <table>
@@ -647,6 +647,6 @@
 
   <div id="toast"></div>
   <script src="config.js"></script>
-  <script src="app.js?v=adminsessionfix20260518"></script>
+  <script src="app.js?v=aitradetextplacement20260518"></script>
 </body>
 </html>

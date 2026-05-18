@@ -149,3 +149,12 @@ Admin Refresh Session Fix:
 - User session is separated from admin session.
 - No SQL required.
 - JS syntax check: OK
+
+
+AI Trade Text + Placement Fix:
+- User-facing Admin Trade wording changed to AI Trade.
+- Auto Admin Trade changed to Auto AI Trade.
+- AI percentage settings card is placed only inside Trade page.
+- Dashboard/landing visibility is hidden for AI percentage card if duplicated by old HTML.
+- Logic untouched.
+- JS syntax check: OK

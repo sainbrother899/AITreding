@@ -1881,7 +1881,7 @@ body.demo-mode-active .real-only-nav{display:none!important}
 }
 
 
-/* ===== AI/Admin Trade Daily Limit UI ===== */
+/* ===== AI/AI Trade Daily Limit UI ===== */
 .ai-trade-usage-box{
   border:1px solid var(--line);
   background:rgba(255,255,255,.035);
@@ -3443,4 +3443,15 @@ body[data-admin-page="true"] .ghost-btn{
 }
 @media(max-width:520px){
   .percent-grid{grid-template-columns:repeat(2,1fr);}
+}
+
+
+/* AI Trade text/placement fix */
+#dashboard .ai-percent-settings-card,
+#home .ai-percent-settings-card,
+#landing .ai-percent-settings-card{
+  display:none!important;
+}
+#tradepage .ai-percent-settings-card{
+  display:block!important;
 }
