@@ -318,3 +318,13 @@ Home AI Control No-Blink + Modern Toggle:
 - 25/50/75/100 buttons remain functional.
 - No SQL required.
 - JS syntax check: OK
+
+
+AI Control Permanent Fix:
+- Removed old Trade Page Positions + Home AI Settings block that was repeatedly moving/hiding AI Control.
+- Re-added only manual open positions and big chart logic, without touching AI Control.
+- Added visibility guard so Home AI Control cannot be hidden by old classes.
+- Fixes AI Control appearing/disappearing repeatedly.
+- Previous old block removed: True
+- No SQL required.
+- JS syntax check: OK

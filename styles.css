@@ -4183,132 +4183,6 @@ body[data-user-clean-ui="true"] .table-wrap{
 }
 
 
-/* ===== TRADE PAGE OPEN POSITIONS + BIG CHART + HOME AI SETTINGS ===== */
-.big-trade-chart-card{
-  min-height:430px!important;
-}
-.big-trade-chart,
-.big-trade-chart iframe,
-.big-tradingview-frame{
-  min-height:390px!important;
-  height:390px!important;
-}
-.manual-open-positions-card{
-  margin:14px 0!important;
-  border-color:rgba(0,231,168,.18)!important;
-}
-.manual-open-positions-list{
-  display:grid;
-  gap:12px;
-}
-.manual-position-card{
-  border:1px solid rgba(118,158,236,.16);
-  background:rgba(255,255,255,.035);
-  border-radius:18px;
-  padding:14px;
-}
-.manual-position-card.buy{
-  border-color:rgba(0,231,168,.22);
-}
-.manual-position-card.sell{
-  border-color:rgba(255,69,107,.22);
-}
-.position-top{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
-  margin-bottom:12px;
-}
-.position-top b{
-  display:block;
-  color:var(--clean-text,#f4f7ff);
-  font-size:18px;
-  margin-bottom:4px;
-}
-.position-top span{
-  color:var(--clean-muted,#9fb2d0);
-  font-size:13px;
-}
-.position-top strong{
-  font-size:18px;
-  white-space:nowrap;
-}
-.position-top strong.pos{
-  color:var(--clean-green,#00e7a8);
-}
-.position-top strong.neg{
-  color:var(--clean-red,#ff456b);
-}
-.position-grid{
-  display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
-  gap:8px;
-  margin-bottom:12px;
-}
-.position-grid div{
-  border:1px solid rgba(255,255,255,.08);
-  background:rgba(0,0,0,.12);
-  border-radius:14px;
-  padding:10px;
-}
-.position-grid span{
-  display:block;
-  color:var(--clean-muted,#9fb2d0);
-  font-size:11px;
-  margin-bottom:5px;
-}
-.position-grid b{
-  color:var(--clean-text,#f4f7ff);
-  font-size:13px;
-}
-.close-position-btn{
-  width:100%;
-  min-height:46px;
-  border:0;
-  border-radius:14px;
-  background:linear-gradient(135deg,#ff456b,#ff7b54);
-  color:white;
-  font-weight:900;
-  cursor:pointer;
-}
-.home-ai-settings-card{
-  margin-top:14px!important;
-  order:99!important;
-}
-.trade-page-ai-settings-card{
-  display:none!important;
-}
-.clean-home-shell .home-ai-settings-card{
-  display:block!important;
-}
-@media(max-width:700px){
-  .big-trade-chart-card{
-    min-height:440px!important;
-  }
-  .big-trade-chart,
-  .big-trade-chart iframe,
-  .big-tradingview-frame{
-    min-height:400px!important;
-    height:400px!important;
-  }
-  .position-grid{
-    grid-template-columns:1fr 1fr;
-  }
-}
-@media(max-width:430px){
-  .position-top{
-    flex-direction:column;
-  }
-  .position-grid{
-    grid-template-columns:1fr;
-  }
-}
-
-
-
-
-
 /* ===== HOME AI CONTROL NO BLINK + MODERN TOGGLE ===== */
 .no-blink-ai-control{
   display:block!important;
@@ -4434,4 +4308,98 @@ body[data-user-clean-ui="true"] .table-wrap{
   .home-ai-percent-grid{
     grid-template-columns:repeat(2,minmax(0,1fr))!important;
   }
+}
+
+
+/* ===== TRADE PAGE OPEN POSITIONS + BIG CHART ONLY ===== */
+.big-trade-chart-card{ min-height:430px!important; }
+.big-trade-chart,
+.big-trade-chart iframe,
+.big-tradingview-frame{
+  min-height:390px!important;
+  height:390px!important;
+}
+.manual-open-positions-card{
+  margin:14px 0!important;
+  border-color:rgba(0,231,168,.18)!important;
+}
+.manual-open-positions-list{ display:grid; gap:12px; }
+.manual-position-card{
+  border:1px solid rgba(118,158,236,.16);
+  background:rgba(255,255,255,.035);
+  border-radius:18px;
+  padding:14px;
+}
+.manual-position-card.buy{ border-color:rgba(0,231,168,.22); }
+.manual-position-card.sell{ border-color:rgba(255,69,107,.22); }
+.position-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+.position-top b{
+  display:block;
+  color:var(--clean-text,#f4f7ff);
+  font-size:18px;
+  margin-bottom:4px;
+}
+.position-top span{ color:var(--clean-muted,#9fb2d0); font-size:13px; }
+.position-top strong{ font-size:18px; white-space:nowrap; }
+.position-top strong.pos{ color:var(--clean-green,#00e7a8); }
+.position-top strong.neg{ color:var(--clean-red,#ff456b); }
+.position-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+  margin-bottom:12px;
+}
+.position-grid div{
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(0,0,0,.12);
+  border-radius:14px;
+  padding:10px;
+}
+.position-grid span{
+  display:block;
+  color:var(--clean-muted,#9fb2d0);
+  font-size:11px;
+  margin-bottom:5px;
+}
+.position-grid b{ color:var(--clean-text,#f4f7ff); font-size:13px; }
+.close-position-btn{
+  width:100%;
+  min-height:46px;
+  border:0;
+  border-radius:14px;
+  background:linear-gradient(135deg,#ff456b,#ff7b54);
+  color:white;
+  font-weight:900;
+  cursor:pointer;
+}
+
+/* Permanent AI control must never be hidden by old trade-page rules */
+#homeAiTradeControlCard.no-blink-ai-control{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
+#homeAiTradeControlCard.no-blink-ai-control.trade-page-ai-settings-card,
+#homeAiTradeControlCard.no-blink-ai-control.old-ai-control-hidden{
+  display:block!important;
+}
+@media(max-width:700px){
+  .big-trade-chart-card{ min-height:440px!important; }
+  .big-trade-chart,
+  .big-trade-chart iframe,
+  .big-tradingview-frame{
+    min-height:400px!important;
+    height:400px!important;
+  }
+  .position-grid{ grid-template-columns:1fr 1fr; }
+}
+@media(max-width:430px){
+  .position-top{ flex-direction:column; }
+  .position-grid{ grid-template-columns:1fr; }
 }

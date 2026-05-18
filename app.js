@@ -3382,218 +3382,6 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
 })();
 
 
-/* ===== TRADE PAGE OPEN POSITIONS + BIG CHART + HOME AI SETTINGS ===== */
-(function(){
-  function tpIsUser(){
-    return state?.user && state.user.role !== "admin";
-  }
-  function tpMoney(n){
-    try { if (typeof money === "function") return money(n); } catch(e){}
-    return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
-  }
-  function tpUsd(n){
-    try { if (typeof usd === "function") return usd(n); } catch(e){}
-    return "$" + Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
-  }
-  function tpPrice(coin){
-    try { if (typeof priceOf === "function") return Number(priceOf(coin) || 0); } catch(e){}
-    return Number(state?.prices?.[coin]?.price || 0);
-  }
-  function tpMode(){
-    return state?.mode || "DEMO";
-  }
-  function tpAccount(){
-    const mode = tpMode();
-    state.accounts = state.accounts || {};
-    state.accounts[mode] = state.accounts[mode] || { balance: mode === "DEMO" ? 100000 : 0, trades: [], closedTrades: [] };
-    state.accounts[mode].trades = state.accounts[mode].trades || [];
-    state.accounts[mode].closedTrades = state.accounts[mode].closedTrades || [];
-    return state.accounts[mode];
-  }
-  function tpUpdatePnl(t){
-    try {
-      if (typeof updateTradePnl === "function") return updateTradePnl(t);
-    } catch(e){}
-    const current = tpPrice(t.coin);
-    t.current = current;
-    const diff = t.side === "SELL" ? Number(t.entry) - current : current - Number(t.entry);
-    t.pnl = (diff / Number(t.entry || 1)) * Number(t.amount || 0) * Number(t.leverage || 1);
-    return t.pnl;
-  }
-
-  function tpCreatePositionsMount(){
-    const tradePage = document.getElementById("tradepage") || document.getElementById("trade") || document.querySelector('[data-page="trade"]')?.closest(".page");
-    if (!tradePage) return null;
-
-    let mount = document.getElementById("manualOpenPositionsMount");
-    if (!mount) {
-      mount = document.createElement("div");
-      mount.id = "manualOpenPositionsMount";
-      mount.className = "card manual-open-positions-card";
-      mount.innerHTML = `
-        <div class="section-head clean-section-head">
-          <div>
-            <p class="label">Live Trades</p>
-            <h2>Open Positions</h2>
-            <p class="muted small">User manual trades यहाँ दिखेंगी. Close button से position बंद करें.</p>
-          </div>
-        </div>
-        <div id="manualOpenPositionsList" class="manual-open-positions-list">
-          <div class="clean-empty-card">No open positions.</div>
-        </div>
-      `;
-
-      const chart = document.getElementById("crypto_live_chart") || document.getElementById("tradingViewChart") || document.getElementById("chartContainer");
-      const chartCard = chart?.closest(".card") || chart?.parentElement;
-      if (chartCard && chartCard.parentNode) {
-        chartCard.parentNode.insertBefore(mount, chartCard.nextSibling);
-      } else {
-        tradePage.prepend(mount);
-      }
-    }
-    return mount;
-  }
-
-  function tpRenderOpenPositions(){
-    if (!tpIsUser()) return;
-    const mount = tpCreatePositionsMount();
-    if (!mount) return;
-
-    const list = document.getElementById("manualOpenPositionsList");
-    if (!list) return;
-
-    const acc = tpAccount();
-    const trades = (acc.trades || []).filter(t => String(t.status || "OPEN").toUpperCase() === "OPEN" && (!t.source || t.source === "USER"));
-
-    if (!trades.length) {
-      list.innerHTML = `<div class="clean-empty-card">No open positions.</div>`;
-      return;
-    }
-
-    list.innerHTML = trades.map(t => {
-      tpUpdatePnl(t);
-      const side = String(t.side || "BUY").toUpperCase();
-      const pnl = Number(t.pnl || 0);
-      const current = Number(t.current || tpPrice(t.coin));
-      return `<div class="manual-position-card ${side === "SELL" ? "sell" : "buy"}">
-        <div class="position-top">
-          <div>
-            <b>${String(t.coin || "BTCUSDT").replace("USDT","/USDT")}</b>
-            <span>${side} • ${Number(t.leverage || 1)}x • ${tpMode()}</span>
-          </div>
-          <strong class="${pnl >= 0 ? "pos" : "neg"}">${tpMoney(pnl)}</strong>
-        </div>
-        <div class="position-grid">
-          <div><span>Amount</span><b>${tpMoney(t.amount)}</b></div>
-          <div><span>Entry</span><b>${tpUsd(t.entry)}</b></div>
-          <div><span>Live Price</span><b>${tpUsd(current)}</b></div>
-          <div><span>Status</span><b>OPEN</b></div>
-        </div>
-        <button type="button" class="close-position-btn" onclick="closeTrade('${t.id}','${tpMode()}')">Close Trade</button>
-      </div>`;
-    }).join("");
-  }
-
-  function tpMoveAiSettingsHome(){
-    if (!tpIsUser()) return;
-
-    const dashboard = document.getElementById("dashboard") || document.getElementById("home") || document.querySelector(".page.active-page") || document.getElementById("appPage");
-    if (!dashboard) return;
-
-    let card = document.getElementById("aiTradePercentGrid")?.closest(".card");
-    if (!card) {
-      const holder = document.createElement("div");
-      holder.className = "card ai-percent-settings-card home-ai-settings-card";
-      holder.innerHTML = `
-        <div class="section-head">
-          <div>
-            <p class="label">AI Trade Control</p>
-            <h2>AI Trade Amount</h2>
-            <p class="muted small">AI trade आपके Real Wallet के selected percentage से लगेगी.</p>
-          </div>
-        </div>
-        <div class="percent-grid" id="aiTradePercentGrid">
-          <button type="button" class="percent-btn" data-ai-percent="25">25%</button>
-          <button type="button" class="percent-btn" data-ai-percent="50">50%</button>
-          <button type="button" class="percent-btn" data-ai-percent="75">75%</button>
-          <button type="button" class="percent-btn" data-ai-percent="100">100%</button>
-        </div>
-        <div class="ai-percent-preview">
-          <span>Selected</span>
-          <b id="aiTradePercentText">25%</b>
-          <small id="aiTradeAmountPreview">AI trade amount: ₹0</small>
-        </div>
-        <label class="toggle-row">
-          <span>Auto AI Trade</span>
-          <input type="checkbox" id="userAutoAdminTradeToggle" checked>
-        </label>
-      `;
-      card = holder;
-    }
-
-    card.classList.add("home-ai-settings-card");
-    card.classList.remove("trade-page-ai-settings-card");
-
-    const cleanShell = document.getElementById("cleanHomeShell");
-    const mount = cleanShell || dashboard;
-
-    if (card.parentElement !== mount) {
-      mount.appendChild(card);
-    }
-  }
-
-  function tpMarkChartBig(){
-    const charts = [
-      document.getElementById("crypto_live_chart"),
-      document.getElementById("tradingViewChart"),
-      document.getElementById("chartContainer")
-    ].filter(Boolean);
-
-    charts.forEach(chart => {
-      chart.classList.add("big-trade-chart");
-      chart.closest(".card")?.classList.add("big-trade-chart-card");
-    });
-
-    // Also enlarge TradingView iframe if present.
-    document.querySelectorAll("iframe").forEach(frame => {
-      const src = frame.getAttribute("src") || "";
-      if (src.includes("tradingview") || src.includes("widgetembed")) {
-        frame.classList.add("big-tradingview-frame");
-        frame.closest(".card")?.classList.add("big-trade-chart-card");
-      }
-    });
-  }
-
-  function tpHideAiSettingsOnTradeIfNeeded(){
-    // Since card is moved to home, just mark if it appears inside trade page accidentally.
-    const tradePage = document.getElementById("tradepage") || document.getElementById("trade");
-    const card = document.getElementById("aiTradePercentGrid")?.closest(".card");
-    if (tradePage && card && tradePage.contains(card)) {
-      card.classList.add("trade-page-ai-settings-card");
-    }
-  }
-
-  function tpRun(){
-    try {
-      tpMarkChartBig();
-      tpRenderOpenPositions();
-      tpMoveAiSettingsHome();
-      tpHideAiSettingsOnTradeIfNeeded();
-      document.body.classList.add("trade-position-fix-ready");
-    } catch(e) {
-      console.warn("Trade positions/chart fix skipped", e);
-    }
-  }
-
-  document.addEventListener("DOMContentLoaded", () => setTimeout(tpRun, 400));
-  window.addEventListener("load", () => setTimeout(tpRun, 600));
-  setInterval(tpRun, 1000);
-})();
-
-
-
-
-
 /* ===== HOME AI CONTROL NO BLINK + MODERN TOGGLE ===== */
 (function(){
   let aiCardMountedOnce = false;
@@ -3785,4 +3573,161 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
 
   // Slow interval only updates values, does not rebuild or move card.
   setInterval(() => nbUpdateOnly(false), 3000);
+})();
+
+
+/* ===== TRADE PAGE OPEN POSITIONS + BIG CHART ONLY ===== */
+(function(){
+  function posIsUser(){ return state?.user && state.user.role !== "admin"; }
+  function posMoney(n){
+    try { if (typeof money === "function") return money(n); } catch(e){}
+    return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  }
+  function posUsd(n){
+    try { if (typeof usd === "function") return usd(n); } catch(e){}
+    return "$" + Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  }
+  function posPrice(coin){
+    try { if (typeof priceOf === "function") return Number(priceOf(coin) || 0); } catch(e){}
+    return Number(state?.prices?.[coin]?.price || 0);
+  }
+  function posMode(){ return state?.mode || "DEMO"; }
+  function posAccount(){
+    const mode = posMode();
+    state.accounts = state.accounts || {};
+    state.accounts[mode] = state.accounts[mode] || { balance: mode === "DEMO" ? 100000 : 0, trades: [], closedTrades: [] };
+    state.accounts[mode].trades = state.accounts[mode].trades || [];
+    state.accounts[mode].closedTrades = state.accounts[mode].closedTrades || [];
+    return state.accounts[mode];
+  }
+  function posUpdatePnl(t){
+    try { if (typeof updateTradePnl === "function") return updateTradePnl(t); } catch(e){}
+    const current = posPrice(t.coin);
+    t.current = current;
+    const diff = t.side === "SELL" ? Number(t.entry) - current : current - Number(t.entry);
+    t.pnl = (diff / Number(t.entry || 1)) * Number(t.amount || 0) * Number(t.leverage || 1);
+    return t.pnl;
+  }
+
+  function posTradePage(){
+    return document.getElementById("tradepage") || document.getElementById("trade") || document.querySelector('[data-page="trade"]')?.closest(".page");
+  }
+
+  function posCreateMount(){
+    const tradePage = posTradePage();
+    if (!tradePage) return null;
+
+    let mount = document.getElementById("manualOpenPositionsMount");
+    if (!mount) {
+      mount = document.createElement("div");
+      mount.id = "manualOpenPositionsMount";
+      mount.className = "card manual-open-positions-card";
+      mount.innerHTML = `
+        <div class="section-head clean-section-head">
+          <div>
+            <p class="label">Live Trades</p>
+            <h2>Open Positions</h2>
+            <p class="muted small">User manual trades यहाँ दिखेंगी. Close button से position बंद करें.</p>
+          </div>
+        </div>
+        <div id="manualOpenPositionsList" class="manual-open-positions-list">
+          <div class="clean-empty-card">No open positions.</div>
+        </div>
+      `;
+
+      const chart = document.getElementById("crypto_live_chart") || document.getElementById("tradingViewChart") || document.getElementById("chartContainer");
+      const chartCard = chart?.closest(".card") || chart?.parentElement;
+      if (chartCard && chartCard.parentNode) chartCard.parentNode.insertBefore(mount, chartCard.nextSibling);
+      else tradePage.prepend(mount);
+    }
+    return mount;
+  }
+
+  function posRender(){
+    if (!posIsUser()) return;
+    const mount = posCreateMount();
+    if (!mount) return;
+
+    const list = document.getElementById("manualOpenPositionsList");
+    if (!list) return;
+
+    const acc = posAccount();
+    const trades = (acc.trades || []).filter(t => String(t.status || "OPEN").toUpperCase() === "OPEN" && (!t.source || t.source === "USER"));
+
+    if (!trades.length) {
+      list.innerHTML = `<div class="clean-empty-card">No open positions.</div>`;
+      return;
+    }
+
+    list.innerHTML = trades.map(t => {
+      posUpdatePnl(t);
+      const side = String(t.side || "BUY").toUpperCase();
+      const pnl = Number(t.pnl || 0);
+      const current = Number(t.current || posPrice(t.coin));
+      return `<div class="manual-position-card ${side === "SELL" ? "sell" : "buy"}">
+        <div class="position-top">
+          <div>
+            <b>${String(t.coin || "BTCUSDT").replace("USDT","/USDT")}</b>
+            <span>${side} • ${Number(t.leverage || 1)}x • ${posMode()}</span>
+          </div>
+          <strong class="${pnl >= 0 ? "pos" : "neg"}">${posMoney(pnl)}</strong>
+        </div>
+        <div class="position-grid">
+          <div><span>Amount</span><b>${posMoney(t.amount)}</b></div>
+          <div><span>Entry</span><b>${posUsd(t.entry)}</b></div>
+          <div><span>Live Price</span><b>${posUsd(current)}</b></div>
+          <div><span>Status</span><b>OPEN</b></div>
+        </div>
+        <button type="button" class="close-position-btn" onclick="closeTrade('${t.id}','${posMode()}')">Close Trade</button>
+      </div>`;
+    }).join("");
+  }
+
+  function posBigChart(){
+    const charts = [
+      document.getElementById("crypto_live_chart"),
+      document.getElementById("tradingViewChart"),
+      document.getElementById("chartContainer")
+    ].filter(Boolean);
+
+    charts.forEach(chart => {
+      chart.classList.add("big-trade-chart");
+      chart.closest(".card")?.classList.add("big-trade-chart-card");
+    });
+
+    document.querySelectorAll("iframe").forEach(frame => {
+      const src = frame.getAttribute("src") || "";
+      if (src.includes("tradingview") || src.includes("widgetembed")) {
+        frame.classList.add("big-tradingview-frame");
+        frame.closest(".card")?.classList.add("big-trade-chart-card");
+      }
+    });
+  }
+
+  function posRun(){
+    try {
+      posBigChart();
+      posRender();
+    } catch(e) { console.warn("Positions/chart only skipped", e); }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(posRun, 400));
+  window.addEventListener("load", () => setTimeout(posRun, 600));
+  setInterval(posRun, 1200);
+})();
+
+
+/* ===== AI CONTROL VISIBILITY GUARD ===== */
+(function(){
+  function keepAiControlVisible(){
+    const card = document.getElementById("homeAiTradeControlCard");
+    if (!card) return;
+    card.classList.remove("old-ai-control-hidden");
+    card.classList.remove("trade-page-ai-settings-card");
+    card.style.display = "";
+    card.style.visibility = "";
+    card.style.opacity = "";
+  }
+  window.addEventListener("load", () => setTimeout(keepAiControlVisible, 800));
+  setInterval(keepAiControlVisible, 1500);
 })();
