@@ -3162,3 +3162,161 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
   window.addEventListener("load", applyStableLayout);
   setInterval(applyStableLayout, 2500);
 })();
+
+
+/* ===== HOME HEADER + ACCOUNT CLEANUP FIX ===== */
+(function(){
+  function hcIsUserPage(){
+    return state?.user && state.user.role !== "admin";
+  }
+
+  function hcEnsureLogout(){
+    if (!hcIsUserPage()) return;
+
+    const header = document.querySelector(".app-header, header, .top-header, .brand-row") || document.getElementById("appPage")?.firstElementChild;
+    if (!header) return;
+
+    let btn = document.getElementById("premiumLogoutBtn");
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.id = "premiumLogoutBtn";
+      btn.type = "button";
+      btn.className = "premium-logout-btn";
+      btn.textContent = "Logout";
+      btn.addEventListener("click", function(){
+        try {
+          if (typeof logout === "function") logout();
+          else {
+            localStorage.removeItem("ai_user_session_v1");
+            localStorage.removeItem("ai_admin_session_v1");
+            location.reload();
+          }
+        } catch(e) {
+          localStorage.removeItem("ai_user_session_v1");
+          localStorage.removeItem("ai_admin_session_v1");
+          location.reload();
+        }
+      });
+      header.appendChild(btn);
+    }
+  }
+
+  function hcFindHelloCard(){
+    const cards = Array.from(document.querySelectorAll(".card"));
+    return cards.find(c => /Hello,\s*/i.test(c.textContent || "") && /Welcome back/i.test(c.textContent || ""));
+  }
+
+  function hcMoveHelloUp(){
+    if (!hcIsUserPage()) return;
+
+    const hello = hcFindHelloCard();
+    if (!hello || hello.dataset.movedTop === "1") return;
+
+    const dashboard = document.getElementById("dashboard") || document.querySelector(".active-page") || hello.parentElement;
+    if (!dashboard) return;
+
+    const firstCard = dashboard.querySelector(".card");
+    if (firstCard && firstCard !== hello) {
+      dashboard.insertBefore(hello, firstCard);
+    } else {
+      dashboard.prepend(hello);
+    }
+
+    hello.dataset.movedTop = "1";
+    hello.classList.add("premium-hello-top-card");
+  }
+
+  function hcCleanAccountDuplicate(){
+    if (!hcIsUserPage()) return;
+
+    // Hide the large separate Switch Account buttons/text but keep balance cards.
+    const all = Array.from(document.querySelectorAll("*"));
+    all.forEach(el => {
+      const t = (el.textContent || "").trim();
+      if (t === "Switch Account") {
+        el.classList.add("hide-switch-account-text");
+      }
+    });
+
+    const demoBtn = document.getElementById("demoBtn");
+    const realBtn = document.getElementById("realBtn");
+    if (demoBtn && realBtn) {
+      const row = demoBtn.closest(".action-row") || demoBtn.parentElement;
+      if (row) row.classList.add("hide-duplicate-account-buttons");
+    }
+
+    // Make the balance cards clickable instead of showing duplicate switch buttons.
+    const demoBal = document.getElementById("mockDemoBalance");
+    const realBal = document.getElementById("mockRealBalance");
+    const demoCard = demoBal?.closest(".card, .account-card, div");
+    const realCard = realBal?.closest(".card, .account-card, div");
+
+    if (demoCard && !demoCard.dataset.accountClick) {
+      demoCard.dataset.accountClick = "1";
+      demoCard.classList.add("clickable-account-card");
+      demoCard.addEventListener("click", function(){
+        document.getElementById("demoBtn")?.click();
+      });
+    }
+    if (realCard && !realCard.dataset.accountClick) {
+      realCard.dataset.accountClick = "1";
+      realCard.classList.add("clickable-account-card");
+      realCard.addEventListener("click", function(){
+        document.getElementById("realBtn")?.click();
+      });
+    }
+
+    demoCard?.classList.toggle("active-account-card", state.mode === "DEMO");
+    realCard?.classList.toggle("active-account-card", state.mode === "REAL");
+  }
+
+  function hcHideAiTradesToday(){
+    if (!hcIsUserPage()) return;
+
+    const cards = Array.from(document.querySelectorAll(".card"));
+    cards.forEach(card => {
+      const txt = card.textContent || "";
+      if (
+        /AI\/AI Trades Today/i.test(txt) ||
+        (/AI Trades Today/i.test(txt) && /Allow AI Auto Trade/i.test(txt)) ||
+        (/0\/5|1\/5|2\/5|3\/5|4\/5|5\/5/.test(txt) && /Allow AI Auto Trade/i.test(txt))
+      ) {
+        card.classList.add("hide-ai-trades-today-card");
+      }
+    });
+  }
+
+  function hcTickerLineFix(){
+    const tickers = document.querySelectorAll("#tickerGrid > *, .ticker-grid > *, .ticker-card");
+    tickers.forEach(card => {
+      card.classList.add("stable-readable-ticker");
+    });
+  }
+
+  function hcShortWalletNote(){
+    document.querySelectorAll(".muted, .wallet-note, p").forEach(el => {
+      const txt = el.textContent || "";
+      if (txt.includes("Deposit approval") || txt.includes("Deposit approve") || txt.includes("Deposit approval के बाद")) {
+        el.textContent = "Approved deposit Real Wallet में add होगा। Open trade PnL live update होगा।";
+      }
+    });
+  }
+
+  function hcRun(){
+    try {
+      hcEnsureLogout();
+      hcMoveHelloUp();
+      hcCleanAccountDuplicate();
+      hcHideAiTradesToday();
+      hcTickerLineFix();
+      hcShortWalletNote();
+      document.body.classList.add("home-cleanup-ready");
+    } catch(e) {
+      console.warn("Home cleanup skipped", e);
+    }
+  }
+
+  window.addEventListener("load", () => setTimeout(hcRun, 400));
+  document.addEventListener("DOMContentLoaded", () => setTimeout(hcRun, 400));
+  setInterval(hcRun, 1500);
+})();

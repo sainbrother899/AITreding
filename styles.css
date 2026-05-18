@@ -4104,3 +4104,92 @@ body[data-premium-ui="true"] .active-page{
     padding:10px!important;
   }
 }
+
+
+/* ===== HOME HEADER + ACCOUNT CLEANUP FIX ===== */
+.premium-logout-btn{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:42px!important;
+  padding:0 16px!important;
+  border-radius:999px!important;
+  border:1px solid rgba(255,255,255,.12)!important;
+  background:rgba(255,255,255,.06)!important;
+  color:#f4f7ff!important;
+  font-weight:900!important;
+  font-size:14px!important;
+  cursor:pointer!important;
+  margin-left:auto!important;
+  white-space:nowrap!important;
+}
+
+.premium-hello-top-card{
+  order:-20!important;
+  margin-top:14px!important;
+}
+
+.hide-switch-account-text,
+.hide-duplicate-account-buttons,
+.hide-ai-trades-today-card{
+  display:none!important;
+}
+
+.clickable-account-card{
+  cursor:pointer!important;
+  transition:border-color .18s ease, box-shadow .18s ease!important;
+}
+
+.active-account-card{
+  border-color:rgba(0,231,168,.72)!important;
+  box-shadow:0 0 0 2px rgba(0,231,168,.08), 0 0 28px rgba(0,231,168,.18)!important;
+}
+
+.stable-readable-ticker{
+  min-height:88px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:center!important;
+  align-items:flex-start!important;
+  gap:4px!important;
+}
+
+.stable-readable-ticker b,
+.stable-readable-ticker strong{
+  display:block!important;
+  width:100%!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+
+.stable-readable-ticker span,
+.stable-readable-ticker em,
+.stable-readable-ticker small{
+  display:block!important;
+  white-space:nowrap!important;
+}
+
+@media(max-width:700px){
+  .premium-logout-btn{
+    position:absolute!important;
+    top:18px!important;
+    right:14px!important;
+    min-height:38px!important;
+    padding:0 12px!important;
+    font-size:12px!important;
+    z-index:20!important;
+  }
+
+  body.home-cleanup-ready .app-header,
+  body.home-cleanup-ready header,
+  body.home-cleanup-ready .top-header,
+  body.home-cleanup-ready .brand-row{
+    position:relative!important;
+    padding-right:86px!important;
+  }
+
+  .premium-hello-top-card{
+    margin-top:10px!important;
+  }
+}

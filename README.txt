@@ -262,3 +262,16 @@ Premium UI Stable Layout Fix:
 - No logic/Supabase changes.
 - No SQL required.
 - JS syntax check: OK
+
+
+Home Header + Account Cleanup:
+- Logout button is forced visible in user header.
+- Hello/Welcome card moves to top of dashboard.
+- Duplicate Demo/Real switch buttons and Switch Account text hidden.
+- Demo/Real balance cards become clickable.
+- AI/AI Trades Today card hidden.
+- Ticker cards get readable line spacing.
+- Wallet long note shortened.
+- No logic/Supabase changes.
+- No SQL required.
+- JS syntax check: OK
