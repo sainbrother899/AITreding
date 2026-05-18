@@ -235,9 +235,9 @@
             <button class="admin-tab" data-admin-tab="adminPlans">◇ Plans</button>
             <button class="admin-tab" data-admin-tab="adminPlanEditor">✎ Plan Edit</button>
             <button class="admin-tab" data-admin-tab="adminKyc">✓ KYC</button>
-            <button class="admin-tab" data-admin-tab="adminTrades">⇅ Trades</button>
-            <button class="admin-tab" data-admin-tab="adminMassTrade">AI Mass</button>
-            <button class="admin-tab" data-admin-tab="adminManagedTrade">▦ Managed</button>
+            
+            <button class="admin-tab" data-admin-tab="adminMassTrade">⇅ Bulk AI Trade</button>
+            <button class="admin-tab" data-admin-tab="adminManagedTrade">▤ Open AI Trades</button>
             <button class="admin-tab" data-admin-tab="adminReferrals">⤴ Referral</button>
           </div>
 
@@ -450,9 +450,16 @@
 
             
             <div id="adminMassTrade" class="admin-panel">
+
+              <div class="card bulk-ai-simple-note">
+                <p class="label">Simple AI Trade System</p>
+                <h3>Bulk AI Trade + Open AI Trades</h3>
+                <p class="muted small">Admin सिर्फ Bulk AI Trade open करेगा. Close/Cancel के लिए Open AI Trades tab use करें. Single AI Trade option hidden है.</p>
+              </div>
+
               <div class="card">
-                <p class="label">AI Mass Trade</p>
-                <h2>Open Trade For Eligible Users</h2>
+                <p class="label">Bulk AI Trade</p>
+                <h2>Open Bulk AI Trade</h2>
                 <p class="muted small">Manual user trades unlimited हैं. यह limit सिर्फ AI/AI trades पर apply होगी.</p>
 
                 <label class="input-label">Coin</label>
@@ -479,18 +486,18 @@
                 <label class="input-label">Trade Amount</label>
                 <input id="massTradeAmount" type="number" value="100" min="1"/>
 
-                <button id="openMassTradeBtn" class="primary-btn">Open For Eligible Users</button>
+                <button id="openMassTradeBtn" class="primary-btn">Open Bulk AI Trade</button>
                 <p class="tiny-warning">Eligible = Auto Trade ON + plan daily AI limit available.</p>
               </div>
 
               
               <div class="card">
-                <p class="label">Close AI Mass Trade</p>
-                <h2>Close Open Mass Trades</h2>
+                <p class="label">Close Bulk AI Trade</p>
+                <h2>Close Open AI Trades</h2>
 
-                <label class="input-label">Open Mass Trade</label>
+                <label class="input-label">Open AI Trade</label>
                 <select id="massCloseTradeSelect">
-                  <option value="ALL">All Open AI Mass Trades</option>
+                  <option value="ALL">All Open Bulk AI Trades</option>
                 </select>
 
                 <label class="input-label">Close Price</label>
@@ -521,8 +528,8 @@
             <div id="adminManagedTrade" class="admin-panel">
               <div class="admin-two-grid">
                 <div class="card">
-                  <p class="label">Managed Trade Control</p>
-                  <h2>Open Trade Manually</h2>
+                  <p class="label">Single AI Trade</p>
+                  <h2>Single AI Trade Disabled</h2>
                   <p class="muted small">Admin entry price manually डालकर user/all users के लिए managed trade open कर सकता है.</p>
 
                   <label class="input-label">Target User</label>
@@ -557,17 +564,17 @@
                   <label class="input-label">Entry Price</label>
                   <input id="managedEntryPrice" type="number" placeholder="Example: 78450"/>
 
-                  <button id="openManagedTradeBtn" class="primary-btn">Open Managed Trade</button>
-                  <p class="tiny-warning">यह managed simulation trade है. Profit/loss close price से calculate होगा.</p>
+                  <button id="openManagedTradeBtn" class="primary-btn">Open AI Trade</button>
+                  <p class="tiny-warning">यह AI simulation trade है. Profit/loss close price से calculate होगा.</p>
                 </div>
 
                 <div class="card">
-                  <p class="label">Close Managed Trade</p>
+                  <p class="label">Open AI Trades</p>
                   <h2>Set Close Price</h2>
 
-                  <label class="input-label">Open Managed Trade</label>
+                  <label class="input-label">Open AI Trade</label>
                   <select id="managedTradeSelect">
-                    <option value="">Select open managed trade</option>
+                    <option value="">Select open AI trade</option>
                   </select>
 
                   <label class="input-label">Close Price</label>
@@ -581,19 +588,19 @@
 
               <div class="card table-card">
                 <div class="section-head">
-                  <div><p class="label">Managed Trades</p><h2>Open / Closed History</h2></div>
+                  <div><p class="label">Open AI Trades</p><h2>Open / Closed AI Trade History</h2></div>
                 </div>
                 <div class="table-wrap">
                   <table>
                     <thead><tr><th>User</th><th>Coin</th><th>Side</th><th>Amount</th><th>Entry</th><th>Close</th><th>PnL</th><th>Status</th><th>Action</th></tr></thead>
-                    <tbody id="managedTradesLog"><tr><td colspan="9" class="empty">No managed trades.</td></tr></tbody>
+                    <tbody id="managedTradesLog"><tr><td colspan="9" class="empty">No AI trades.</td></tr></tbody>
                   </table>
                 </div>
               </div>
 
               <div class="card table-card">
                 <div class="section-head">
-                  <div><p class="label">AI Mass Trades</p><h2>Open / Closed Mass Trade History</h2></div>
+                  <div><p class="label">Bulk AI Trades</p><h2>Bulk AI Trade History</h2></div>
                 </div>
                 <div class="table-wrap">
                   <table>
@@ -647,6 +654,6 @@
 
   <div id="toast"></div>
   <script src="config.js"></script>
-  <script src="app.js?v=aitradetextplacement20260518"></script>
+  <script src="app.js?v=adminbulkopenonly20260518"></script>
 </body>
 </html>

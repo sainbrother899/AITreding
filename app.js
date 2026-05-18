@@ -2586,3 +2586,64 @@ document.addEventListener("click", function(e){
     return false;
   }
 }, true);
+
+
+/* ===== ADMIN BULK + OPEN AI TRADES ONLY FIX ===== */
+function adminBulkOpenOnlyFix() {
+  try {
+    // Rename tabs cleanly
+    const massTab = document.querySelector('[data-admin-tab="adminMassTrade"]');
+    if (massTab) massTab.textContent = "⇅ Bulk AI Trade";
+
+    const managedTab = document.querySelector('[data-admin-tab="adminManagedTrade"]');
+    if (managedTab) managedTab.textContent = "▤ Open AI Trades";
+
+    // Hide generic Trades tab to reduce confusion
+    const tradesTab = document.querySelector('[data-admin-tab="adminTrades"]');
+    if (tradesTab) tradesTab.style.display = "none";
+
+    const tradesPanel = document.getElementById("adminTrades");
+    if (tradesPanel) tradesPanel.style.display = "none";
+
+    // In Open AI Trades panel, hide the old single trade form. Keep close/cancel + history.
+    const openPanel = document.getElementById("adminManagedTrade");
+    if (openPanel) {
+      const cards = openPanel.querySelectorAll(".admin-two-grid > .card");
+      if (cards[0]) cards[0].classList.add("hide-single-ai-card");
+      if (cards[1]) {
+        const label = cards[1].querySelector(".label");
+        const h2 = cards[1].querySelector("h2");
+        if (label) label.textContent = "Open AI Trades";
+        if (h2) h2.textContent = "Close / Cancel AI Trade";
+      }
+      openPanel.querySelectorAll(".section-head .label").forEach(el => {
+        if (/Managed|Mass/i.test(el.textContent)) el.textContent = "Open AI Trades";
+      });
+      openPanel.querySelectorAll(".section-head h2").forEach(el => {
+        if (/History/i.test(el.textContent)) el.textContent = "Open / Closed AI Trade History";
+      });
+    }
+
+    // In Bulk AI Trade panel, hide old close block because close/cancel is handled in Open AI Trades tab.
+    const bulkPanel = document.getElementById("adminMassTrade");
+    if (bulkPanel) {
+      const cards = Array.from(bulkPanel.querySelectorAll(":scope > .card"));
+      cards.forEach(card => {
+        const text = card.textContent || "";
+        if (/Close Open|Close Selected|Close All Open|massClosePrice|massCloseTradeSelect/i.test(text)) {
+          card.classList.add("hide-bulk-close-card");
+        }
+      });
+
+      const label = bulkPanel.querySelector(".label");
+      const h2 = bulkPanel.querySelector("h2");
+      if (label && /Mass|AI/i.test(label.textContent)) label.textContent = "Bulk AI Trade";
+      if (h2 && /Open/i.test(h2.textContent)) h2.textContent = "Open Bulk AI Trade";
+    }
+  } catch(e) {
+    console.warn("Admin bulk/open cleanup failed", e);
+  }
+}
+
+setInterval(adminBulkOpenOnlyFix, 1000);
+window.addEventListener("load", () => setTimeout(adminBulkOpenOnlyFix, 500));

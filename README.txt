@@ -158,3 +158,15 @@ AI Trade Text + Placement Fix:
 - Dashboard/landing visibility is hidden for AI percentage card if duplicated by old HTML.
 - Logic untouched.
 - JS syntax check: OK
+
+
+Admin Bulk/Open Only Update:
+- Admin trade area simplified to only two options:
+  1) Bulk AI Trade
+  2) Open AI Trades
+- Generic Trades tab hidden.
+- Old Single/Managed trade form hidden.
+- Bulk panel close block hidden; close/cancel is handled in Open AI Trades.
+- User side untouched.
+- No SQL required.
+- JS syntax check: OK

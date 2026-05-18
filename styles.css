@@ -3455,3 +3455,28 @@ body[data-admin-page="true"] .ghost-btn{
 #tradepage .ai-percent-settings-card{
   display:block!important;
 }
+
+
+/* ===== ADMIN BULK + OPEN AI TRADES ONLY UI ===== */
+body[data-admin-page="true"] [data-admin-tab="adminTrades"],
+body[data-admin-page="true"] #adminTrades{
+  display:none!important;
+}
+body[data-admin-page="true"] #adminManagedTrade .hide-single-ai-card,
+body[data-admin-page="true"] #adminManagedTrade .admin-two-grid > .card:first-child{
+  display:none!important;
+}
+body[data-admin-page="true"] #adminMassTrade .hide-bulk-close-card{
+  display:none!important;
+}
+body[data-admin-page="true"] #adminManagedTrade .admin-two-grid{
+  grid-template-columns:1fr!important;
+}
+.bulk-ai-simple-note{
+  margin-bottom:14px!important;
+  border:1px solid rgba(0,229,155,.16)!important;
+  background:rgba(0,229,155,.055)!important;
+}
+.bulk-ai-simple-note h3{
+  margin:4px 0 6px!important;
+}
