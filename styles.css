@@ -3291,3 +3291,27 @@ td:has(> .liq-badge){}
   color:var(--text,#fff);
   font-size:12px;
 }
+
+
+/* Plan buy wallet hint */
+.plan-wallet-hint{
+  margin-bottom:14px!important;
+  border:1px solid rgba(0,229,155,.16)!important;
+  background:rgba(0,229,155,.055)!important;
+}
+.plan-wallet-hint span{
+  display:block;
+  color:var(--muted,#8ca2c0);
+  font-size:12px;
+  margin-bottom:5px;
+}
+.plan-wallet-hint b{
+  display:block;
+  color:var(--green,#00e59b);
+  font-size:20px;
+  margin-bottom:5px;
+}
+.plan-wallet-hint small{
+  color:var(--text,#fff);
+  font-size:12px;
+}

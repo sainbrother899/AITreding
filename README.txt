@@ -105,3 +105,14 @@ Admin Trade Advanced Options Update:
 - Admin managed PnL calculation now supports leverage.
 - No SQL required.
 - JS syntax check: OK
+
+
+Plan Buy From Wallet Update:
+- User plan purchase now deducts plan price from Real Wallet.
+- If wallet balance is insufficient, plan purchase is blocked.
+- Plan becomes active immediately after wallet deduction.
+- wallet_ledger entry type = PLAN_PURCHASE with negative amount.
+- payment_requests history is saved as PAID/WALLET.
+- User profile plan is updated in Supabase.
+- SQL patch included for missing columns.
+- JS syntax check: OK

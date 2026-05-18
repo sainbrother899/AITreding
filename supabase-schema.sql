@@ -182,3 +182,14 @@ drop index if exists public.idx_deposit_requests_unique_txn;
 create unique index if not exists idx_deposit_requests_unique_txn
 on public.deposit_requests(txn)
 where txn is not null and txn ~ '^[0-9]{12}$';
+
+
+
+-- Plan buy from wallet support
+alter table public.wallet_ledger add column if not exists note text;
+alter table public.payment_requests add column if not exists user_email text;
+alter table public.payment_requests add column if not exists plan_id text;
+alter table public.payment_requests add column if not exists plan_name text;
+alter table public.payment_requests add column if not exists amount numeric default 0;
+alter table public.payment_requests add column if not exists status text default 'PENDING';
+alter table public.profiles add column if not exists plan text default 'Free';

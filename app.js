@@ -1750,3 +1750,179 @@ function patchMassAdvancedBridge() {
   }
 }
 setInterval(patchMassAdvancedBridge, 1000);
+
+
+/* ===== PLAN BUY FROM WALLET FIX ===== */
+function planWalletUserId() {
+  try {
+    if (typeof userKey === "function") return userKey();
+  } catch(e) {}
+  return String(state?.user?.id || state?.user?.email || "local");
+}
+
+function planWalletBalance() {
+  try {
+    if (typeof realWallet === "function") return Number(realWallet(planWalletUserId()) || 0);
+  } catch(e) {}
+
+  const uid = planWalletUserId();
+  const deposits = (state.depositRequests || [])
+    .filter(d => String(d.userId || d.user_id || "") === String(uid) && String(d.status || "").toUpperCase() === "APPROVED")
+    .reduce((a, d) => a + Number(d.amount || 0), 0);
+
+  const ledger = (state.walletLedger || [])
+    .filter(l => String(l.userId || l.user_id || "") === String(uid))
+    .reduce((a, l) => a + Number(l.amount || 0), 0);
+
+  return Math.max(0, deposits + ledger);
+}
+
+function planByIdOrName(id) {
+  return (state.plans || []).find(p =>
+    String(p.id || "").toLowerCase() === String(id || "").toLowerCase() ||
+    String(p.name || "").toLowerCase() === String(id || "").toLowerCase()
+  );
+}
+
+function planExpiryDate(duration) {
+  const d = new Date();
+  const text = String(duration || "30 days").toLowerCase();
+  const num = Number((text.match(/\d+/) || [30])[0]);
+  if (text.includes("year")) d.setDate(d.getDate() + (num * 365));
+  else if (text.includes("month")) d.setMonth(d.getMonth() + num);
+  else d.setDate(d.getDate() + num);
+  return d.toISOString();
+}
+
+async function buyPlanFromWallet(planId) {
+  if (!state.user || state.user.role === "admin") {
+    alert("Please login as user.");
+    return;
+  }
+
+  const plan = planByIdOrName(planId);
+  if (!plan) {
+    alert("Plan not found.");
+    return;
+  }
+
+  const price = Number(plan.price || 0);
+  const balance = planWalletBalance();
+
+  if (price > 0 && balance < price) {
+    alert("Wallet balance कम है. पहले deposit approve करवाओ. Required: " + (typeof money === "function" ? money(price) : price));
+    return;
+  }
+
+  const oldPlan = state.user.plan || "Free";
+  state.user.plan = plan.name || plan.id || "Free";
+  state.user.planId = plan.id || "";
+  state.user.planActivatedAt = new Date().toISOString();
+  state.user.planExpiresAt = planExpiryDate(plan.duration);
+
+  const u = (state.users || []).find(x =>
+    String(x.id || "") === String(state.user.id || "") ||
+    String(x.email || "").toLowerCase() === String(state.user.email || "").toLowerCase()
+  );
+  if (u) {
+    u.plan = state.user.plan;
+    u.planId = state.user.planId;
+    u.planActivatedAt = state.user.planActivatedAt;
+    u.planExpiresAt = state.user.planExpiresAt;
+  }
+
+  if (price > 0) {
+    const led = {
+      id: "led_plan_" + Date.now(),
+      userId: state.user.id || planWalletUserId(),
+      type: "PLAN_PURCHASE",
+      amount: -Math.abs(price),
+      note: `Plan purchase: ${state.user.plan}`
+    };
+    state.walletLedger = state.walletLedger || [];
+    state.walletLedger.unshift(led);
+
+    if (typeof supabaseClient !== "undefined" && supabaseClient) {
+      try {
+        await supabaseClient.from("wallet_ledger").insert({
+          user_id: led.userId,
+          type: "PLAN_PURCHASE",
+          amount: led.amount,
+          note: led.note
+        });
+      } catch(e) {
+        console.warn("Plan wallet ledger save failed", e);
+      }
+    }
+  }
+
+  // Keep a payment/request history as PAID, not pending.
+  const req = {
+    id: "plan_" + Date.now(),
+    userId: state.user.id || planWalletUserId(),
+    userEmail: state.user.email || "",
+    planId: plan.id || "",
+    planName: state.user.plan,
+    amount: price,
+    status: "PAID",
+    method: "WALLET",
+    createdAt: new Date().toLocaleString()
+  };
+  state.paymentRequests = state.paymentRequests || [];
+  state.paymentRequests.unshift(req);
+
+  if (typeof supabaseClient !== "undefined" && supabaseClient) {
+    try {
+      await supabaseClient.from("payment_requests").insert({
+        user_id: req.userId,
+        user_email: req.userEmail,
+        plan_id: req.planId,
+        plan_name: req.planName,
+        amount: req.amount,
+        status: "PAID"
+      });
+    } catch(e) {
+      console.warn("Plan payment history save failed", e);
+    }
+
+    try {
+      await supabaseClient.from("profiles").update({
+        plan: state.user.plan
+      }).eq("id", state.user.id);
+    } catch(e) {
+      console.warn("Profile plan update failed", e);
+    }
+  }
+
+  try { saveSession?.(); } catch(e) {}
+  try { saveState?.(); } catch(e) {}
+  try { render?.(); } catch(e) {}
+
+  alert(`Plan active ho gaya: ${state.user.plan}. Wallet se ${price ? (typeof money === "function" ? money(price) : price) : "₹0"} deduct hua.`);
+}
+
+// Override old requestPlan: अब pending request नहीं, wallet से direct buy.
+function requestPlan(id) {
+  return buyPlanFromWallet(id);
+}
+
+window.requestPlan = requestPlan;
+window.buyPlanFromWallet = buyPlanFromWallet;
+
+function renderPlanWalletBalanceHint() {
+  try {
+    const grid = document.getElementById("dynamicPlansGrid");
+    if (!grid) return;
+    if (!document.getElementById("planWalletHint")) {
+      const hint = document.createElement("div");
+      hint.id = "planWalletHint";
+      hint.className = "card plan-wallet-hint";
+      hint.innerHTML = `<span>Wallet Balance</span><b id="planWalletBalanceText">₹0</b><small>Plan buy करने पर amount wallet से auto deduct होगा.</small>`;
+      grid.parentNode.insertBefore(hint, grid);
+    }
+    const el = document.getElementById("planWalletBalanceText");
+    if (el) el.textContent = typeof money === "function" ? money(planWalletBalance()) : String(planWalletBalance());
+  } catch(e) {}
+}
+setInterval(renderPlanWalletBalanceHint, 1500);
+window.addEventListener("load", () => setTimeout(renderPlanWalletBalanceHint, 800));
