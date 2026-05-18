@@ -48,12 +48,9 @@ No dep_ ID + Cache Fix:
 - JS syntax check: OK
 
 
-Chart + Withdrawal Fix:
-- Added chart fallback so chart area does not remain blank.
-- Pair change triggers chart/fallback refresh.
-- Withdrawal formula updated:
-  withdrawable = min(approved deposit, completed trade volume) + positive profit/bonus - approved withdrawals - pending withdrawals.
-- Wallet page gets automatic withdrawal breakdown card.
-- Minimum withdrawal ₹1000 validation kept.
+Stable Restore:
+- Removed chart/withdrawal patch that caused blank balance/history/live rates.
+- Restored last stable working core.
+- Added cache-bust app.js?v=stableRestore20260518.
 - No SQL required.
 - JS syntax check: OK
