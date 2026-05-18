@@ -891,3 +891,23 @@ Payment Method Select Stable Fix:
 - UPI field hides when Bank Account is selected.
 - Design/layout/sidebar/header untouched.
 - JS syntax check: OK
+
+
+Payment Method Limit + Warning Fix:
+- User can add maximum 2 UPI IDs and 2 Bank Accounts.
+- Add button is disabled when selected method type limit is reached.
+- Warning text changed to: YOUR PAYMENT METHOD NAME SHOULD MATCH KYC NAME. DON'T USE OTHER ACCOUNT. IF YOU USE OTHER ACCOUNT, YOUR ACCOUNT MAY BE SUSPENDED.
+- Existing design/layout/sidebar/header untouched.
+- JS syntax check: OK
+
+
+Payment Method Combined Strong Fix:
+- Removed earlier weaker payment select/limit scripts to avoid conflicts.
+- Fixes Bank Account selection resetting back to UPI.
+- Preserves selected payment type with localStorage + mutation observer + renderer patch.
+- Adds max limit: 2 UPI IDs and 2 Bank Accounts.
+- Blocks submit when selected type limit is reached.
+- Replaces/adds warning text:
+  YOUR PAYMENT METHOD NAME SHOULD MATCH KYC NAME. DON'T USE OTHER ACCOUNT. IF YOU USE OTHER ACCOUNT, YOUR ACCOUNT MAY BE SUSPENDED.
+- Design/layout/sidebar/header untouched.
+- JS syntax check: OK

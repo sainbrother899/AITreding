@@ -7452,160 +7452,338 @@ function restoreManualHistoryBackup(mode = state.mode) {
 })();
 
 
-/* ===== PAYMENT METHOD SELECT STABLE FIX ===== */
+
+
+
+/* ===== PAYMENT METHOD COMBINED STRONG FIX ===== */
 (function(){
-  let selectedPayType = localStorage.getItem("selected_payment_method_type") || "UPI";
-  let userTouchedPaymentForm = false;
+  const MAX_UPI = 2;
+  const MAX_BANK = 2;
+  const WARN = "YOUR PAYMENT METHOD NAME SHOULD MATCH KYC NAME. DON'T USE OTHER ACCOUNT. IF YOU USE OTHER ACCOUNT, YOUR ACCOUNT MAY BE SUSPENDED.";
+
+  let selectedType = (localStorage.getItem("pm_selected_type_v2") || "UPI").toUpperCase();
+  let userEditing = false;
+  let lastFormSignature = "";
+
+  function getUser(){
+    return state?.user || {};
+  }
+
+  function uid(){
+    const u = getUser();
+    return String(u.id || u.email || "local");
+  }
 
   function page(){
-    return document.getElementById("paymentMethodsPage");
+    return document.getElementById("paymentMethodsPage") ||
+      document.querySelector("[id*='payment' i][id*='method' i]");
   }
 
-  function selectEl(){
+  function contentRoot(){
+    const p = page();
+    return document.getElementById("paymentMethodsPageContent") ||
+      p?.querySelector(".menu-real-content") ||
+      p ||
+      document.body;
+  }
+
+  function findForm(){
+    const p = page();
+    return p?.querySelector("#securePaymentMethodForm,#realPaymentMethodForm,#menuPaymentMethodForm,form");
+  }
+
+  function findSelect(){
+    const p = page();
     return document.getElementById("securePayType") ||
       document.getElementById("realPayType") ||
-      document.querySelector("#paymentMethodsPage select[name='type']");
+      p?.querySelector("select[name='type']") ||
+      p?.querySelector("select");
   }
 
-  function applyType(type){
-    type = String(type || selectedPayType || "UPI").toUpperCase();
-    selectedPayType = type;
-    localStorage.setItem("selected_payment_method_type", type);
+  function allMethods(){
+    const list = state?.userPayoutMethods || state?.payoutMethods || [];
+    const id = uid();
+    return (list || []).filter(m => {
+      const mid = String(m.userId || m.user_id || "");
+      return !mid || mid === id;
+    });
+  }
+
+  function methodType(m){
+    return String(m.type || m.method || m.method_type || "").toUpperCase();
+  }
+
+  function countType(type){
+    type = String(type || "").toUpperCase();
+    return allMethods().filter(m => methodType(m) === type).length;
+  }
+
+  function canAdd(type){
+    type = String(type || selectedType || "UPI").toUpperCase();
+    return type === "BANK" ? countType("BANK") < MAX_BANK : countType("UPI") < MAX_UPI;
+  }
+
+  function limitText(type){
+    type = String(type || selectedType || "UPI").toUpperCase();
+    return type === "BANK" ? `You can add only ${MAX_BANK} bank accounts.` : `You can add only ${MAX_UPI} UPI IDs.`;
+  }
+
+  function setType(type){
+    type = String(type || "UPI").toUpperCase();
+    selectedType = type === "BANK" ? "BANK" : "UPI";
+    localStorage.setItem("pm_selected_type_v2", selectedType);
 
     const p = page();
-    const sel = selectEl();
+    const sel = findSelect();
 
-    if (sel && sel.value !== type) sel.value = type;
+    if (sel && String(sel.value).toUpperCase() !== selectedType) {
+      sel.value = selectedType;
+    }
 
     if (p) {
-      p.classList.toggle("pay-bank-mode", type === "BANK");
-      p.classList.toggle("payment-bank-selected", type === "BANK");
-      p.dataset.selectedPayType = type;
+      p.classList.toggle("pay-bank-mode", selectedType === "BANK");
+      p.classList.toggle("payment-bank-selected", selectedType === "BANK");
+      p.dataset.selectedPaymentType = selectedType;
     }
 
-    document.querySelectorAll("#paymentMethodsPage .secure-pay-bank-fields,#paymentMethodsPage .real-pay-bank-fields,#paymentMethodsPage .pay-bank-fields").forEach(el => {
-      el.style.setProperty("display", type === "BANK" ? "grid" : "none", "important");
+    const root = p || document;
+    root.querySelectorAll(".secure-pay-bank-fields,.real-pay-bank-fields,.pay-bank-fields,[data-bank-fields]").forEach(el => {
+      el.style.setProperty("display", selectedType === "BANK" ? "grid" : "none", "important");
     });
-
-    document.querySelectorAll("#paymentMethodsPage .secure-pay-upi,#paymentMethodsPage .real-pay-upi,.pay-upi-field").forEach(el => {
-      el.style.setProperty("display", type === "BANK" ? "none" : "grid", "important");
+    root.querySelectorAll(".secure-pay-upi,.real-pay-upi,.pay-upi-field,[data-upi-field]").forEach(el => {
+      el.style.setProperty("display", selectedType === "BANK" ? "none" : "grid", "important");
     });
   }
 
-  function protectCurrentFormValues(){
-    const p = page();
-    if (!p || !p.classList.contains("active-page")) return;
-
-    const form = p.querySelector("#securePaymentMethodForm,#realPaymentMethodForm,#menuPaymentMethodForm");
-    if (!form) return;
-
-    if (userTouchedPaymentForm) {
-      // Mark form as user editing; render functions should not reset it.
-      form.dataset.userEditing = "1";
-    }
-
-    applyType(selectedPayType);
-  }
-
-  function bind(){
+  function replaceWarningText(){
     const p = page();
     if (!p) return;
 
-    const sel = selectEl();
-    if (sel && sel.dataset.payTypeStableBound !== "1") {
-      sel.dataset.payTypeStableBound = "1";
-      sel.value = selectedPayType;
-      sel.addEventListener("change", function(){
-        userTouchedPaymentForm = true;
-        applyType(sel.value);
+    // Direct text nodes replacement through likely note elements
+    const selectors = [
+      ".pay-sec-note span",
+      ".pay-sec-note",
+      ".menu-payment-note",
+      ".menu-real-note",
+      ".menu-full-note",
+      ".card"
+    ];
+
+    p.querySelectorAll(selectors.join(",")).forEach(el => {
+      if (el.querySelector("input,select,textarea")) return;
+      const txt = (el.textContent || "");
+      if (/Payment method holder name|locked with your KYC|Add UPI or Bank Account|admin approval|KYC Approved/i.test(txt)) {
+        const b = el.querySelector("b");
+        const span = el.querySelector("span");
+        if (b && /KYC Approved|KYC Required/i.test(b.textContent || "")) {
+          b.textContent = "Payment Method Warning";
+        }
+        if (span) {
+          span.textContent = WARN;
+        } else {
+          el.textContent = WARN;
+        }
+      }
+    });
+
+    // If no visible warning exists, add one above form using existing card class.
+    const form = findForm();
+    if (form && !p.querySelector(".pm-strong-warning")) {
+      const div = document.createElement("div");
+      div.className = "card pm-strong-warning";
+      div.textContent = WARN;
+      form.insertAdjacentElement("beforebegin", div);
+    }
+  }
+
+  function ensureLimitNote(){
+    const form = findForm();
+    if (!form) return;
+
+    let note = form.querySelector(".pm-combined-limit-note");
+    if (!note) {
+      note = document.createElement("div");
+      note.className = "pm-combined-limit-note";
+      const btn = form.querySelector("button[type='submit'],button");
+      if (btn) btn.insertAdjacentElement("beforebegin", note);
+      else form.appendChild(note);
+    }
+
+    const type = selectedType;
+    const upi = countType("UPI");
+    const bank = countType("BANK");
+    const ok = canAdd(type);
+
+    note.innerHTML = `<span>Limit: UPI ${upi}/${MAX_UPI} • Bank ${bank}/${MAX_BANK}</span>${ok ? `<small>${WARN}</small>` : `<b>${limitText(type)}</b>`}`;
+
+    const btn = form.querySelector("button[type='submit'],button");
+    if (btn) {
+      btn.disabled = !ok;
+      btn.classList.toggle("pm-combined-disabled", !ok);
+      if (!ok) {
+        btn.dataset.oldText = btn.dataset.oldText || btn.textContent || "";
+        btn.textContent = limitText(type);
+      } else if (btn.dataset.oldText) {
+        btn.textContent = btn.dataset.oldText;
+        delete btn.dataset.oldText;
+      }
+    }
+  }
+
+  function formSignature(){
+    const p = page();
+    if (!p) return "";
+    return p.innerHTML.length + "|" + (findSelect()?.value || "") + "|" + countType("UPI") + "|" + countType("BANK");
+  }
+
+  function bindForm(){
+    const p = page();
+    if (!p) return;
+
+    const sel = findSelect();
+    if (sel && sel.dataset.pmCombinedBound !== "1") {
+      sel.dataset.pmCombinedBound = "1";
+      sel.value = selectedType;
+      sel.addEventListener("change", function(e){
+        userEditing = true;
+        setType(e.target.value);
+        ensureLimitNote();
       }, true);
     }
 
     p.querySelectorAll("input,select,textarea").forEach(inp => {
-      if (inp.dataset.payFormTouchBound === "1") return;
-      inp.dataset.payFormTouchBound = "1";
+      if (inp.dataset.pmCombinedTouchBound === "1") return;
+      inp.dataset.pmCombinedTouchBound = "1";
       inp.addEventListener("input", () => {
-        userTouchedPaymentForm = true;
-        const s = selectEl();
-        if (s) applyType(s.value);
+        userEditing = true;
+        const s = findSelect();
+        if (s) setType(s.value);
+        ensureLimitNote();
       }, true);
       inp.addEventListener("change", () => {
-        userTouchedPaymentForm = true;
-        const s = selectEl();
-        if (s) applyType(s.value);
+        userEditing = true;
+        const s = findSelect();
+        if (s) setType(s.value);
+        ensureLimitNote();
       }, true);
     });
-
-    applyType(selectedPayType);
   }
 
-  // Patch old payment render if present: don't let it reset select while user is editing.
-  function patchOldRender(){
-    try {
-      if (window.__paymentMethodSelectRenderPatched) return;
-      window.__paymentMethodSelectRenderPatched = true;
+  function patchRenderers(){
+    if (window.__pmCombinedRenderPatched) return;
+    window.__pmCombinedRenderPatched = true;
 
-      if (typeof window.applyPaymentKycAdminApproval === "function") {
-        const old = window.applyPaymentKycAdminApproval;
-        window.applyPaymentKycAdminApproval = function(){
-          const p = page();
-          const editing = userTouchedPaymentForm && p && p.classList.contains("active-page");
-          if (editing) {
-            protectCurrentFormValues();
-            return;
-          }
-          const r = old.apply(this, arguments);
-          setTimeout(() => {
-            bind();
-            applyType(selectedPayType);
-          }, 50);
-          return r;
-        };
-      }
-    } catch(e){}
+    // Older script re-renders Payment Methods and resets select to UPI.
+    if (typeof window.applyPaymentKycAdminApproval === "function") {
+      const old = window.applyPaymentKycAdminApproval;
+      window.applyPaymentKycAdminApproval = function(){
+        const p = page();
+        if (userEditing && p && p.classList.contains("active-page")) {
+          setType(selectedType);
+          replaceWarningText();
+          ensureLimitNote();
+          return;
+        }
+        const r = old.apply(this, arguments);
+        setTimeout(run, 80);
+        return r;
+      };
+    }
+
+    // If real menu page opener re-renders content, reapply after it.
+    if (typeof window.openRealMenuPage === "function") {
+      const oldOpen = window.openRealMenuPage;
+      window.openRealMenuPage = function(type){
+        const r = oldOpen.apply(this, arguments);
+        if (type === "paymentMethods") {
+          userEditing = false;
+          setTimeout(run, 150);
+          setTimeout(run, 600);
+        }
+        return r;
+      };
+    }
   }
+
+  function run(){
+    patchRenderers();
+    const p = page();
+    if (!p) return;
+
+    const sig = formSignature();
+    bindForm();
+    setType(selectedType);
+    replaceWarningText();
+    ensureLimitNote();
+    lastFormSignature = sig;
+  }
+
+  document.addEventListener("submit", function(e){
+    const form = e.target;
+    if (!form || !["securePaymentMethodForm","realPaymentMethodForm","menuPaymentMethodForm"].includes(form.id)) return;
+
+    const sel = findSelect();
+    if (sel) setType(sel.value);
+
+    if (!canAdd(selectedType)) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      alert(limitText(selectedType));
+      run();
+      return;
+    }
+
+    // Ensure submitted type matches preserved selected type.
+    let input = form.querySelector("input[name='type'][type='hidden']");
+    if (!input) {
+      input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "type";
+      form.appendChild(input);
+    }
+    input.value = selectedType;
+
+    setTimeout(() => {
+      userEditing = false;
+      run();
+    }, 1000);
+  }, true);
 
   document.addEventListener("click", function(e){
     const txt = (e.target?.textContent || "").toLowerCase();
     if (txt.includes("payment method") || txt.includes("payment methods")) {
-      userTouchedPaymentForm = false;
-      setTimeout(() => {
-        bind();
-        applyType(selectedPayType);
-      }, 450);
-      setTimeout(() => {
-        bind();
-        applyType(selectedPayType);
-      }, 1000);
+      userEditing = false;
+      setTimeout(run, 300);
+      setTimeout(run, 900);
+      setTimeout(run, 1600);
     }
   }, true);
 
-  document.addEventListener("submit", function(e){
-    if (e.target?.id === "securePaymentMethodForm" || e.target?.id === "realPaymentMethodForm" || e.target?.id === "menuPaymentMethodForm") {
-      const s = selectEl();
-      if (s) {
-        selectedPayType = String(s.value || "UPI").toUpperCase();
-        localStorage.setItem("selected_payment_method_type", selectedPayType);
-      }
-      // After submit, allow re-render to update saved methods.
-      setTimeout(() => { userTouchedPaymentForm = false; }, 800);
-    }
-  }, true);
+  // Mutation observer on payment page: if old code re-renders, reapply immediately.
+  function observe(){
+    const p = page();
+    if (!p || p.dataset.pmCombinedObserved === "1") return;
+    p.dataset.pmCombinedObserved = "1";
+    const mo = new MutationObserver(() => {
+      setTimeout(run, 20);
+    });
+    mo.observe(p, { childList:true, subtree:true });
+  }
 
-  window.applyPaymentMethodSelectedType = applyType;
+  window.applyPaymentMethodCombinedStrongFix = run;
 
   document.addEventListener("DOMContentLoaded", () => {
-    setTimeout(patchOldRender, 600);
-    setTimeout(bind, 900);
+    setTimeout(run, 900);
+    setTimeout(observe, 1000);
   });
   window.addEventListener("load", () => {
-    setTimeout(patchOldRender, 700);
-    setTimeout(bind, 1000);
+    setTimeout(run, 1000);
+    setTimeout(observe, 1200);
   });
 
   setInterval(() => {
-    patchOldRender();
-    bind();
-    protectCurrentFormValues();
-  }, 1500);
+    run();
+    observe();
+  }, 1200);
 })();
