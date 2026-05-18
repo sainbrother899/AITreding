@@ -4715,15 +4715,6 @@ body[data-user-clean-ui="true"] [data-page="trade"] .action-row button{
   display:none!important;
 }
 
-/* Hide duplicate custom chart top rows outside actual TradingView chart */
-.clean-chart-only-card > .row,
-.clean-chart-only-card > .chart-top,
-.clean-chart-only-card > .timeframes,
-.clean-chart-only-card > .tf-row,
-.clean-chart-only-card > .market-row{
-  display:none!important;
-}
-
 /* Keep actual chart area and make it use the freed space */
 .clean-expanded-chart-card,
 .trade-chart-bigger-card.clean-expanded-chart-card{
@@ -4802,4 +4793,41 @@ body[data-user-clean-ui="true"] #tradepage .action-row{
     min-height:542px!important;
     height:542px!important;
   }
+}
+
+
+/* ===== ORDER BOOK + TRADE FEED RESTORE FIX ===== */
+.force-show-order-feed{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  height:auto!important;
+  min-height:auto!important;
+  overflow:visible!important;
+}
+
+/* Keep only exact timeframe buttons hidden */
+.hide-outer-timeframe{
+  display:none!important;
+}
+
+/* Do NOT hide generic .row/.market-row on chart card anymore, because Order Book/Trade Feed can use same row classes */
+.clean-chart-only-card > .row,
+.clean-chart-only-card > .market-row,
+.clean-chart-only-card > .chart-top,
+.clean-chart-only-card > .timeframes,
+.clean-chart-only-card > .tf-row{
+  display:revert!important;
+}
+
+/* But exact rows that were marked as duplicate by JS remain hidden unless they are Order/Feed */
+.hide-empty-timeframe-row:not(.force-show-order-feed),
+.hide-outer-chart-ui:not(.force-show-order-feed){
+  display:none!important;
+}
+
+/* Order Book and Trade Feed cards should look normal below order ticket/chart */
+body[data-user-clean-ui="true"] #trade .force-show-order-feed.card,
+body[data-user-clean-ui="true"] #tradepage .force-show-order-feed.card{
+  margin-top:12px!important;
 }

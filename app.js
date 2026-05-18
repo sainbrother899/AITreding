@@ -4456,3 +4456,83 @@ function restoreManualHistoryBackup(mode = state.mode) {
   window.addEventListener("load", () => setTimeout(cleanTradePage, 700));
   setInterval(cleanTradePage, 2500);
 })();
+
+
+/* ===== ORDER BOOK + TRADE FEED RESTORE FIX ===== */
+(function(){
+  function restoreOrderBookFeed(){
+    try {
+      const tradePage = document.getElementById("trade") || document.getElementById("tradepage") || document.querySelector('[data-page="trade"]');
+      if (!tradePage) return;
+
+      // Restore Order Book and Trade Feed cards/sections if previous cleanup hid them.
+      Array.from(tradePage.querySelectorAll("*")).forEach(el => {
+        const txt = (el.textContent || "").trim();
+        if (/^(Order Book|Trade Feed)$/i.test(txt) || /Order Book/i.test(txt) || /Trade Feed/i.test(txt)) {
+          let card = el.closest(".card") || el.closest("section") || el.parentElement;
+          while (card && card !== tradePage && card.textContent && card.textContent.length < 80) {
+            card = card.parentElement;
+          }
+          const target = el.closest(".card") || el.closest("section") || el.parentElement;
+          if (target) {
+            target.classList.remove("hide-outer-chart-ui","hide-empty-timeframe-row","hide-outer-timeframe");
+            target.classList.add("force-show-order-feed");
+            target.style.display = "";
+            target.style.visibility = "";
+            target.style.opacity = "";
+          }
+          el.classList.remove("hide-outer-chart-ui","hide-empty-timeframe-row","hide-outer-timeframe");
+          el.classList.add("force-show-order-feed");
+          el.style.display = "";
+          el.style.visibility = "";
+          el.style.opacity = "";
+        }
+      });
+
+      // If known log containers exist, force their parent cards visible.
+      [
+        "orderBookLog",
+        "tradeFeedLog",
+        "orderBook",
+        "tradeFeed",
+        "liveTradeFeed",
+        "orderBookBody",
+        "tradeFeedBody"
+      ].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const card = el.closest(".card") || el.parentElement;
+        if (card) {
+          card.classList.remove("hide-outer-chart-ui","hide-empty-timeframe-row","hide-outer-timeframe");
+          card.classList.add("force-show-order-feed");
+          card.style.display = "";
+          card.style.visibility = "";
+          card.style.opacity = "";
+        }
+      });
+
+      // Hide only exact timeframe buttons above chart, not full rows/cards that may include feed/book.
+      const chart = document.getElementById("crypto_live_chart") || document.getElementById("tradingViewChart") || document.getElementById("chartContainer") || document.querySelector("iframe[src*='tradingview'], iframe[src*='widgetembed']");
+      if (chart) {
+        const card = chart.closest(".card") || chart.parentElement;
+        if (card) {
+          card.querySelectorAll("button,a,span").forEach(el => {
+            if (el.closest("#crypto_live_chart,#tradingViewChart,#chartContainer")) return;
+            const t = (el.textContent || "").trim();
+            if (/^(1m|5m|15m|30m|1H|4H|D)$/i.test(t)) {
+              el.classList.add("hide-outer-timeframe");
+            }
+          });
+        }
+      }
+
+      document.body.classList.add("order-feed-restored");
+    } catch(e) {
+      console.warn("Order book/feed restore skipped", e);
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(restoreOrderBookFeed, 600));
+  window.addEventListener("load", () => setTimeout(restoreOrderBookFeed, 800));
+  setInterval(restoreOrderBookFeed, 2500);
+})();

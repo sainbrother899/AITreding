@@ -517,3 +517,12 @@ SyntaxError: Invalid regular expression flags
 Syntax Fix:
 - Fixed regex escape for Buy/Sell order title.
 - JS syntax check: OK
+
+
+Order Book + Trade Feed Restore Fix:
+- Restored Order Book and Trade Feed sections if previous cleanup hid them.
+- Removed overly broad CSS that hid generic chart card rows.
+- Only exact duplicate timeframe buttons stay hidden.
+- Chart cleanup, order title, SIM warning removal remain.
+- No SQL required.
+- JS syntax check: OK
