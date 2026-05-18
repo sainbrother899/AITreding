@@ -275,3 +275,17 @@ Home Header + Account Cleanup:
 - No logic/Supabase changes.
 - No SQL required.
 - JS syntax check: OK
+
+
+User UI Structure Clean Rebuild:
+- Removed previous dynamic patch blocks that caused duplicate/moving layout.
+- User home now gets a fixed clean shell:
+  Header + direct Logout, Hello/Account Mode, clean ticker cards, stat cards, AI signal card.
+- Original home clutter is hidden only in dashboard area.
+- Demo/Real duplicate buttons removed from visible UI; account cards are clickable.
+- AI/AI Trades Today card removed from home view.
+- Wallet note shortened.
+- Tables converted to mobile card lists for history/deposit/withdrawal while keeping desktop tables.
+- Admin/Supabase/trade/deposit logic untouched.
+- No SQL required.
+- JS syntax check: OK

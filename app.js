@@ -3115,208 +3115,268 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
 
 
 
-/* ===== PREMIUM UI STABLE LAYOUT FIX ===== */
+
+
+
+/* ===== USER UI STRUCTURE CLEAN REBUILD ===== */
 (function(){
-  function stableMoney(n){
-    try { if (typeof money === "function") return money(n); } catch(e){}
-    return "₹" + Number(n || 0).toLocaleString("en-IN", {maximumFractionDigits:2});
+  const CLEAN_UI_VERSION = "user-clean-v1";
+
+  function uiMoney(n){
+    try { if (typeof money === "function") return money(n); } catch(e) {}
+    return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
   }
-
-  function applyStableLayout(){
-    try{
-      document.body.classList.add("stable-premium-ui");
-
-      // Mark existing tables for mobile card fallback, but do not move DOM repeatedly.
-      ["userManagedTradesLog","userManualTradesLog","userDepositLog","userWithdrawalLog"].forEach(id=>{
-        const tbody = document.getElementById(id);
-        if (tbody) tbody.closest(".card")?.classList.add("stable-table-card");
-      });
-
-      // Shorten long wallet note without changing structure.
-      document.querySelectorAll(".muted, .wallet-note").forEach(el=>{
-        const text = el.textContent || "";
-        if (text.includes("Deposit approval") || text.includes("Deposit approve")) {
-          el.textContent = "Approved deposits are added to Real Wallet. Open trade PnL updates live.";
-        }
-      });
-
-      // Hide only the old big duplicate switch buttons if present, but do not create a replacement card.
-      const demoBtn = document.getElementById("demoBtn");
-      const realBtn = document.getElementById("realBtn");
-      if (demoBtn && realBtn) {
-        const row = demoBtn.closest(".action-row") || demoBtn.parentElement;
-        if (row) row.classList.add("stable-compact-account-switch");
-      }
-
-      // Make existing AI percent card stable
-      document.getElementById("aiTradePercentGrid")?.closest(".card")?.classList.add("stable-ai-percent-card");
-
-      // Add bottom safe padding, no DOM insertion.
-      document.body.classList.add("stable-bottom-safe");
-    }catch(e){
-      console.warn("Stable layout apply failed", e);
-    }
+  function uiUsd(n){
+    try { if (typeof usd === "function") return usd(n); } catch(e) {}
+    return "$" + Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
   }
-
-  document.addEventListener("DOMContentLoaded", applyStableLayout);
-  window.addEventListener("load", applyStableLayout);
-  setInterval(applyStableLayout, 2500);
-})();
-
-
-/* ===== HOME HEADER + ACCOUNT CLEANUP FIX ===== */
-(function(){
-  function hcIsUserPage(){
+  function uiPrice(coin){
+    try { if (typeof priceOf === "function") return Number(priceOf(coin) || 0); } catch(e) {}
+    return Number(state?.prices?.[coin]?.price || 0);
+  }
+  function uiRealWallet(){
+    try { if (typeof realWallet === "function") return Number(realWallet() || 0); } catch(e) {}
+    return Number(state?.accounts?.REAL?.balance || 0);
+  }
+  function uiDemoWallet(){
+    return Number(state?.accounts?.DEMO?.balance || 100000);
+  }
+  function uiUserName(){
+    return state?.user?.name || state?.user?.email?.split("@")[0] || "User";
+  }
+  function uiInitial(){
+    return (uiUserName()[0] || "U").toUpperCase();
+  }
+  function uiIsUser(){
     return state?.user && state.user.role !== "admin";
   }
+  function uiMode(){
+    return state?.mode || "DEMO";
+  }
+  function uiTodayPnl(){
+    try {
+      const real = state?.accounts?.REAL || {};
+      const demo = state?.accounts?.DEMO || {};
+      const acc = state?.mode === "REAL" ? real : demo;
+      const open = (acc.trades || []).reduce((a,t)=>a+Number(t.pnl||0),0);
+      const closed = (acc.closedTrades || []).reduce((a,t)=>a+Number(t.pnl||0),0);
+      const managed = (state.managedTrades || [])
+        .filter(t => String(t.userId || t.user_id || "") === String(state.user?.id || state.user?.email || ""))
+        .reduce((a,t)=>a+Number(t.pnl||0),0);
+      return open + closed + managed;
+    } catch(e) { return 0; }
+  }
+  function uiAiLimit(){
+    try { if (typeof aiLimitForUser === "function") return aiLimitForUser(state.user); } catch(e) {}
+    return 5;
+  }
+  function uiAiUsed(){
+    try { if (typeof aiUsed === "function") return aiUsed(state.user); } catch(e) {}
+    return 0;
+  }
+  function uiSignal(){
+    const sig = state?.signal || state?.activeSignal || {};
+    const side = sig.side || sig.action || "BUY";
+    const coin = sig.coin || "BTCUSDT";
+    return { side, coin };
+  }
 
-  function hcEnsureLogout(){
-    if (!hcIsUserPage()) return;
+  function uiLogout(){
+    try {
+      if (typeof logout === "function") return logout();
+    } catch(e) {}
+    try {
+      state.user = null;
+      localStorage.removeItem("ai_user_session_v1");
+      localStorage.removeItem("ai_admin_session_v1");
+      localStorage.removeItem("ai_session");
+    } catch(e) {}
+    location.reload();
+  }
+  window.uiLogout = uiLogout;
 
-    const header = document.querySelector(".app-header, header, .top-header, .brand-row") || document.getElementById("appPage")?.firstElementChild;
-    if (!header) return;
-
-    let btn = document.getElementById("premiumLogoutBtn");
-    if (!btn) {
-      btn = document.createElement("button");
-      btn.id = "premiumLogoutBtn";
-      btn.type = "button";
-      btn.className = "premium-logout-btn";
-      btn.textContent = "Logout";
-      btn.addEventListener("click", function(){
-        try {
-          if (typeof logout === "function") logout();
-          else {
-            localStorage.removeItem("ai_user_session_v1");
-            localStorage.removeItem("ai_admin_session_v1");
-            location.reload();
-          }
-        } catch(e) {
-          localStorage.removeItem("ai_user_session_v1");
-          localStorage.removeItem("ai_admin_session_v1");
-          location.reload();
-        }
-      });
-      header.appendChild(btn);
+  function uiSwitchMode(mode){
+    try {
+      if (mode === "DEMO") document.getElementById("demoBtn")?.click();
+      if (mode === "REAL") document.getElementById("realBtn")?.click();
+      state.mode = mode;
+      if (typeof saveState === "function") saveState();
+      if (typeof render === "function") render();
+    } catch(e) {
+      state.mode = mode;
     }
+    setTimeout(uiRenderHomeShell, 60);
+  }
+  window.uiSwitchMode = uiSwitchMode;
+
+  function uiShellHtml(){
+    const sig = uiSignal();
+    const coins = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT"];
+    const mode = uiMode();
+    const used = uiAiUsed(), limit = uiAiLimit();
+    const progress = Math.min(100, Math.max(0, (used / (limit || 5))*100));
+    return `
+      <section id="cleanHomeShell" class="clean-home-shell">
+        <div class="clean-header-card">
+          <div class="clean-brand-badge">AI</div>
+          <div class="clean-brand-title">
+            <h1>AI Trading Assistant</h1>
+            <p>Live AI signal dashboard</p>
+          </div>
+          <button class="clean-logout-btn" type="button" onclick="uiLogout()">Logout</button>
+        </div>
+
+        <div class="clean-welcome-card card">
+          <div class="clean-welcome-top">
+            <div>
+              <p class="label">Welcome Back</p>
+              <h2>Hello, ${uiUserName()}</h2>
+            </div>
+            <div class="clean-avatar">${uiInitial()}</div>
+          </div>
+
+          <div class="clean-account-mode">
+            <button type="button" class="clean-account-pill ${mode==="DEMO" ? "active" : ""}" onclick="uiSwitchMode('DEMO')">
+              <span>Demo Account</span>
+              <b>${uiMoney(uiDemoWallet())}</b>
+            </button>
+            <button type="button" class="clean-account-pill ${mode==="REAL" ? "active" : ""}" onclick="uiSwitchMode('REAL')">
+              <span>Real Account</span>
+              <b>${uiMoney(uiRealWallet())}</b>
+            </button>
+          </div>
+        </div>
+
+        <div class="clean-market-grid">
+          ${coins.map(c=>{
+            const ch = Number(state?.prices?.[c]?.change || 0);
+            return `<div class="clean-market-card">
+              <b>${c.replace("USDT","/USDT")}</b>
+              <span>${uiUsd(uiPrice(c))}</span>
+              <em class="${ch>=0?'pos':'neg'}">${ch.toFixed(2)}%</em>
+            </div>`;
+          }).join("")}
+        </div>
+
+        <div class="clean-stats-grid">
+          <div class="clean-stat-card"><span>Today PnL</span><b class="${uiTodayPnl()>=0?'pos':'neg'}">${uiMoney(uiTodayPnl())}</b></div>
+          <div class="clean-stat-card"><span>Win Rate</span><b>${state?.winRate || "0"}%</b></div>
+          <div class="clean-stat-card"><span>Market Mood</span><b>${state?.marketMood || "Neutral"}</b></div>
+          <div class="clean-stat-card"><span>Active Signal</span><b>${sig.side}</b></div>
+        </div>
+
+        <div class="clean-ai-signal-card card">
+          <div class="clean-live-dot"></div>
+          <div class="clean-ai-main">
+            <p class="label">AI Signal Live</p>
+            <h2>${sig.side} ${String(sig.coin || "BTCUSDT").replace("USDT","/USDT")}</h2>
+            <p>AI trend confirmation active.</p>
+          </div>
+          <div class="clean-confidence">82%</div>
+          <div class="clean-signal-grid">
+            <div><span>Entry</span><b>Market</b></div>
+            <div><span>Target</span><b>${sig.target ? uiUsd(sig.target) : "-"}</b></div>
+            <div><span>Stop Loss</span><b>${sig.stopLoss ? uiUsd(sig.stopLoss) : "-"}</b></div>
+            <div><span>Expires</span><b>30m</b></div>
+          </div>
+        </div>
+      </section>
+    `;
   }
 
-  function hcFindHelloCard(){
-    const cards = Array.from(document.querySelectorAll(".card"));
-    return cards.find(c => /Hello,\s*/i.test(c.textContent || "") && /Welcome back/i.test(c.textContent || ""));
+  function uiGetDashboard(){
+    return document.getElementById("dashboard") ||
+      document.getElementById("home") ||
+      document.querySelector('[data-page="home"]') ||
+      document.querySelector(".page.active-page") ||
+      document.getElementById("appPage");
   }
 
-  function hcMoveHelloUp(){
-    if (!hcIsUserPage()) return;
+  function uiRenderHomeShell(){
+    if (!uiIsUser()) return;
+    const dash = uiGetDashboard();
+    if (!dash) return;
 
-    const hello = hcFindHelloCard();
-    if (!hello || hello.dataset.movedTop === "1") return;
-
-    const dashboard = document.getElementById("dashboard") || document.querySelector(".active-page") || hello.parentElement;
-    if (!dashboard) return;
-
-    const firstCard = dashboard.querySelector(".card");
-    if (firstCard && firstCard !== hello) {
-      dashboard.insertBefore(hello, firstCard);
+    let shell = document.getElementById("cleanHomeShell");
+    if (!shell) {
+      shell = document.createElement("div");
+      shell.id = "cleanHomeMount";
+      dash.prepend(shell);
     } else {
-      dashboard.prepend(hello);
+      shell = shell.parentElement;
     }
+    shell.innerHTML = uiShellHtml();
 
-    hello.dataset.movedTop = "1";
-    hello.classList.add("premium-hello-top-card");
-  }
-
-  function hcCleanAccountDuplicate(){
-    if (!hcIsUserPage()) return;
-
-    // Hide the large separate Switch Account buttons/text but keep balance cards.
-    const all = Array.from(document.querySelectorAll("*"));
-    all.forEach(el => {
-      const t = (el.textContent || "").trim();
-      if (t === "Switch Account") {
-        el.classList.add("hide-switch-account-text");
-      }
-    });
-
-    const demoBtn = document.getElementById("demoBtn");
-    const realBtn = document.getElementById("realBtn");
-    if (demoBtn && realBtn) {
-      const row = demoBtn.closest(".action-row") || demoBtn.parentElement;
-      if (row) row.classList.add("hide-duplicate-account-buttons");
-    }
-
-    // Make the balance cards clickable instead of showing duplicate switch buttons.
-    const demoBal = document.getElementById("mockDemoBalance");
-    const realBal = document.getElementById("mockRealBalance");
-    const demoCard = demoBal?.closest(".card, .account-card, div");
-    const realCard = realBal?.closest(".card, .account-card, div");
-
-    if (demoCard && !demoCard.dataset.accountClick) {
-      demoCard.dataset.accountClick = "1";
-      demoCard.classList.add("clickable-account-card");
-      demoCard.addEventListener("click", function(){
-        document.getElementById("demoBtn")?.click();
-      });
-    }
-    if (realCard && !realCard.dataset.accountClick) {
-      realCard.dataset.accountClick = "1";
-      realCard.classList.add("clickable-account-card");
-      realCard.addEventListener("click", function(){
-        document.getElementById("realBtn")?.click();
-      });
-    }
-
-    demoCard?.classList.toggle("active-account-card", state.mode === "DEMO");
-    realCard?.classList.toggle("active-account-card", state.mode === "REAL");
-  }
-
-  function hcHideAiTradesToday(){
-    if (!hcIsUserPage()) return;
-
-    const cards = Array.from(document.querySelectorAll(".card"));
-    cards.forEach(card => {
-      const txt = card.textContent || "";
+    // Hide original home clutter only in dashboard area. Other pages remain untouched.
+    Array.from(dash.children).forEach(child => {
+      if (child.id === "cleanHomeMount") return;
+      const txt = child.textContent || "";
       if (
-        /AI\/AI Trades Today/i.test(txt) ||
-        (/AI Trades Today/i.test(txt) && /Allow AI Auto Trade/i.test(txt)) ||
-        (/0\/5|1\/5|2\/5|3\/5|4\/5|5\/5/.test(txt) && /Allow AI Auto Trade/i.test(txt))
+        /BTC\/USDT|ETH\/USDT|SOL\/USDT|BNB\/USDT|Today PnL|Win Rate|Market Mood|Active Signal|Hello,|Switch Account|AI\/AI Trades Today|AI Signal Live/i.test(txt)
       ) {
-        card.classList.add("hide-ai-trades-today-card");
+        child.classList.add("clean-home-hidden-old");
       }
     });
+    document.body.classList.add("clean-user-ui-ready");
   }
 
-  function hcTickerLineFix(){
-    const tickers = document.querySelectorAll("#tickerGrid > *, .ticker-grid > *, .ticker-card");
-    tickers.forEach(card => {
-      card.classList.add("stable-readable-ticker");
-    });
-  }
-
-  function hcShortWalletNote(){
+  function uiShortWalletNote(){
     document.querySelectorAll(".muted, .wallet-note, p").forEach(el => {
-      const txt = el.textContent || "";
-      if (txt.includes("Deposit approval") || txt.includes("Deposit approve") || txt.includes("Deposit approval के बाद")) {
+      const t = el.textContent || "";
+      if (/Deposit approval|Deposit approve|Deposit approval के बाद/i.test(t)) {
         el.textContent = "Approved deposit Real Wallet में add होगा। Open trade PnL live update होगा।";
       }
     });
   }
 
-  function hcRun(){
-    try {
-      hcEnsureLogout();
-      hcMoveHelloUp();
-      hcCleanAccountDuplicate();
-      hcHideAiTradesToday();
-      hcTickerLineFix();
-      hcShortWalletNote();
-      document.body.classList.add("home-cleanup-ready");
-    } catch(e) {
-      console.warn("Home cleanup skipped", e);
+  function uiCreateCardsFromTable(tbodyId, mountId, type){
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    const table = tbody.closest("table");
+    const wrap = table?.closest(".table-wrap") || table?.parentElement;
+    if (!wrap) return;
+
+    let mount = document.getElementById(mountId);
+    if (!mount) {
+      mount = document.createElement("div");
+      mount.id = mountId;
+      mount.className = "clean-mobile-list";
+      wrap.parentNode.insertBefore(mount, wrap.nextSibling);
     }
+
+    const headers = Array.from(table.querySelectorAll("thead th")).map(th => th.textContent.trim());
+    const rows = Array.from(tbody.querySelectorAll("tr")).filter(r => !r.querySelector(".empty"));
+
+    if (!rows.length) {
+      mount.innerHTML = `<div class="clean-empty-card">No records yet.</div>`;
+      return;
+    }
+
+    mount.innerHTML = rows.map(row => {
+      const cells = Array.from(row.children).map(td => td.textContent.trim());
+      return `<div class="clean-record-card">
+        ${cells.map((c,i)=>`<p><span>${headers[i] || ("Field " + (i+1))}</span><b>${c || "-"}</b></p>`).join("")}
+      </div>`;
+    }).join("");
   }
 
-  window.addEventListener("load", () => setTimeout(hcRun, 400));
-  document.addEventListener("DOMContentLoaded", () => setTimeout(hcRun, 400));
-  setInterval(hcRun, 1500);
+  function uiMobileTableCards(){
+    uiCreateCardsFromTable("userManagedTradesLog", "cleanAiHistoryList", "ai");
+    uiCreateCardsFromTable("userManualTradesLog", "cleanManualHistoryList", "manual");
+    uiCreateCardsFromTable("userDepositLog", "cleanDepositList", "deposit");
+    uiCreateCardsFromTable("userWithdrawalLog", "cleanWithdrawList", "withdraw");
+  }
+
+  function uiRun(){
+    try {
+      uiRenderHomeShell();
+      uiShortWalletNote();
+      uiMobileTableCards();
+      document.body.classList.add("clean-bottom-safe");
+    } catch(e) { console.warn("Clean UI structure skipped", e); }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(uiRun, 300));
+  window.addEventListener("load", () => setTimeout(uiRun, 500));
+  setInterval(uiRun, 1500);
 })();
