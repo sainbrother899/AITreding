@@ -860,3 +860,25 @@ Admin KYC Stable Renderer Fix:
 - No new page, no overlay, no sidebar/header/layout design changes.
 - KYC rows still load from Supabase DB and approve/reject updates DB.
 - JS syntax check: OK
+
+
+Admin KYC Duplicate Rows Fix:
+- Same user/email KYC rows are de-duplicated in admin KYC table.
+- If any request for that user is APPROVED, the approved row is shown.
+- If none are approved, the latest row is shown.
+- Prevents multiple repeated rows from previous test submissions.
+- Existing admin KYC design/layout unchanged.
+- Approve button becomes disabled text when row is already approved.
+- JS syntax check: OK
+
+
+KYC Approve Reject Lock Fix:
+- Admin KYC row action buttons are hidden/locked after APPROVED or REJECTED.
+- This prevents repeatedly changing KYC status from the same row.
+- User KYC page behavior:
+  - APPROVED: form hidden, shows "Your KYC Approved" card only.
+  - PENDING: form hidden, shows under-review card.
+  - REJECTED: form remains available for resubmission.
+- Submit is blocked if user is already APPROVED or PENDING.
+- Design/layout/sidebar/header untouched; only KYC state logic and small status cards added.
+- JS syntax check: OK

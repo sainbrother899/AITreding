@@ -6901,6 +6901,55 @@ function restoreManualHistoryBackup(mode = state.mode) {
     return `<span class="akstable-status ${cls}">${s}</span>`;
   }
 
+
+  function kycSortTime(row){
+    const raw = row.raw || {};
+    const v = raw.reviewed_at || raw.submitted_at || raw.created_at || raw.createdAt || row.submittedAt || "";
+    const t = Date.parse(v);
+    return Number.isFinite(t) ? t : 0;
+  }
+
+  function dedupeKycRows(rows){
+    const groups = new Map();
+
+    (rows || []).forEach(row => {
+      const raw = row.raw || {};
+      const key = String(
+        row.user ||
+        raw.user_email ||
+        raw.email ||
+        raw.user_id ||
+        raw.userId ||
+        row.name ||
+        row.id
+      ).toLowerCase().trim();
+
+      const current = groups.get(key);
+      if (!current) {
+        groups.set(key, row);
+        return;
+      }
+
+      const rowApproved = String(row.status || "").toUpperCase() === "APPROVED";
+      const curApproved = String(current.status || "").toUpperCase() === "APPROVED";
+
+      // If any request is approved for same user, show the approved one.
+      if (rowApproved && !curApproved) {
+        groups.set(key, row);
+        return;
+      }
+
+      // If both same approval state, show latest by timestamp/id.
+      if (rowApproved === curApproved) {
+        const rowTime = kycSortTime(row) || Number(row.id || 0);
+        const curTime = kycSortTime(current) || Number(current.id || 0);
+        if (rowTime > curTime) groups.set(key, row);
+      }
+    });
+
+    return Array.from(groups.values());
+  }
+
   function findKycBody(){
     const byId = document.getElementById("kycRequestsLog");
     if (byId) return byId;
@@ -6960,20 +7009,24 @@ function restoreManualHistoryBackup(mode = state.mode) {
         }
       } catch(e){}
 
-      kycRowsCache = (res.data || []).map(r => {
+      const mappedKycRows = (res.data || []).map(r => {
         const id = String(val(r, ["id"], ""));
         const docs = r.documents || {};
         const docCount = Object.keys(docs || {}).length + (docsById[id] || []).length;
         return {
+          raw: r,
           id,
           user: val(r, ["user_email","email","user_id","userId"], "-"),
           name: val(r, ["full_name","name","kyc_name"], "-"),
           docType: val(r, ["doc_type","document_type"], "KYC"),
           docNo: val(r, ["doc_number","document_number","kyc_id"], "-"),
           files: docCount ? `${docCount} file${docCount > 1 ? "s" : ""}` : "Uploaded",
-          status: val(r, ["status"], "PENDING")
+          status: val(r, ["status"], "PENDING"),
+          submittedAt: val(r, ["submitted_at","created_at","createdAt"], "")
         };
       });
+
+      kycRowsCache = dedupeKycRows(mappedKycRows);
 
       state.kycRequests = kycRowsCache.map(r => ({
         id: r.id,
@@ -7011,7 +7064,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
           <td>${r.files}</td>
           <td>${statusHtml(r.status)}</td>
           <td>
-            <button type="button" class="akstable-action approve" data-akstable-approve="${r.id}">Approve</button>
+            ${String(r.status || "").toUpperCase() === "APPROVED" ? `<button type="button" class="akstable-action approve" disabled>Approved</button>` : `<button type="button" class="akstable-action approve" data-akstable-approve="${r.id}">Approve</button>`}
             <button type="button" class="akstable-action reject" data-akstable-reject="${r.id}">Reject</button>
           </td>
         </tr>
@@ -7027,7 +7080,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
         <span>${r.files}</span>
         <span>${statusHtml(r.status)}</span>
         <span>
-          <button type="button" class="akstable-action approve" data-akstable-approve="${r.id}">Approve</button>
+          ${String(r.status || "").toUpperCase() === "APPROVED" ? `<button type="button" class="akstable-action approve" disabled>Approved</button>` : `<button type="button" class="akstable-action approve" data-akstable-approve="${r.id}">Approve</button>`}
           <button type="button" class="akstable-action reject" data-akstable-reject="${r.id}">Reject</button>
         </span>
       </div>
@@ -7117,4 +7170,283 @@ function restoreManualHistoryBackup(mode = state.mode) {
 
   // Slow DB sync only. No DOM rewrite unless data actually changed.
   setInterval(() => refreshFromDb(false), 30000);
+})();
+
+
+/* ===== KYC APPROVE REJECT LOCK FIX ===== */
+(function(){
+  let lastUserKycStatus = "";
+
+  function klClient(){
+    try {
+      if (window.supabaseClient) return window.supabaseClient;
+      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
+    } catch(e){}
+    return null;
+  }
+
+  function klUser(){
+    return state?.user || {};
+  }
+
+  function klUid(){
+    const u = klUser();
+    return String(u.id || u.email || "local");
+  }
+
+  function klEmail(){
+    return String(klUser().email || "");
+  }
+
+  function klIsAdmin(){
+    return location.pathname.toLowerCase().includes("admin") ||
+      state?.user?.role === "admin" ||
+      !!document.getElementById("adminPage") ||
+      !!document.getElementById("adminApp") ||
+      !!document.querySelector(".admin-shell,.admin-layout,.admin-sidebar");
+  }
+
+  function klStatusRank(s){
+    s = String(s || "PENDING").toUpperCase();
+    if (s === "APPROVED") return 3;
+    if (s === "PENDING") return 2;
+    if (s === "REJECTED") return 1;
+    return 0;
+  }
+
+  function klTime(row){
+    const v = row.reviewed_at || row.submitted_at || row.created_at || row.createdAt || "";
+    const t = Date.parse(v);
+    return Number.isFinite(t) ? t : Number(row.id || 0) || 0;
+  }
+
+  function klPickRelevant(rows){
+    if (!rows || !rows.length) return null;
+
+    // Approved always wins, otherwise latest pending/rejected.
+    return rows.slice().sort((a,b) => {
+      const ra = klStatusRank(a.status);
+      const rb = klStatusRank(b.status);
+      if (ra !== rb) return rb - ra;
+      return klTime(b) - klTime(a);
+    })[0];
+  }
+
+  async function klLoadUserKyc(){
+    const sb = klClient();
+    const u = klUser();
+    if (!sb || !u) return null;
+
+    let rows = [];
+    try {
+      const id = klUid();
+      const email = klEmail();
+
+      let q = sb.from("kyc_requests").select("*");
+      if (email && id && email !== id) {
+        q = q.or(`user_id.eq.${id},user_email.eq.${email},email.eq.${email}`);
+      } else {
+        q = q.eq("user_id", id);
+      }
+
+      const res = await q;
+      if (res.error) {
+        // fallback: load all and filter in browser for old schemas
+        const all = await sb.from("kyc_requests").select("*");
+        if (all.error) throw all.error;
+        rows = (all.data || []).filter(r => {
+          return String(r.user_id || "") === id ||
+            String(r.user_email || "") === email ||
+            String(r.email || "") === email;
+        });
+      } else {
+        rows = res.data || [];
+      }
+    } catch(e) {
+      console.warn("User KYC status load skipped", e);
+      return null;
+    }
+
+    const picked = klPickRelevant(rows);
+    if (picked) {
+      state.user.kycStatus = picked.status || "PENDING";
+      state.user.kycName = picked.full_name || picked.name || state.user.kycName || state.user.name;
+      state.user.kycRejectReason = picked.reject_reason || picked.reason || "";
+      try { saveState?.(); } catch(e){}
+      try { saveSession?.(); } catch(e){}
+    }
+    return picked;
+  }
+
+  function klApprovedCard(name){
+    return `
+      <div class="card kyc-final-card approved">
+        <div class="kyc-final-icon">✓</div>
+        <h3>Your KYC Approved</h3>
+        <p>Your identity verification is approved. You do not need to submit KYC again.</p>
+        <div><span>Name</span><b>${name || "Verified User"}</b></div>
+      </div>
+    `;
+  }
+
+  function klPendingCard(){
+    return `
+      <div class="card kyc-final-card pending">
+        <div class="kyc-final-icon">⏳</div>
+        <h3>KYC Under Review</h3>
+        <p>Your KYC documents have been submitted. Please wait for admin approval.</p>
+      </div>
+    `;
+  }
+
+  function klRejectedNote(reason){
+    return `
+      <div class="card kyc-final-card rejected">
+        <div class="kyc-final-icon">!</div>
+        <h3>KYC Rejected</h3>
+        <p>Your previous KYC was rejected. Please check details and submit again.</p>
+        ${reason ? `<small>Reason: ${reason}</small>` : ""}
+      </div>
+    `;
+  }
+
+  async function klApplyUserKycState(){
+    const page = document.getElementById("kycPage");
+    if (!page || !page.classList.contains("active-page")) return;
+
+    const content = document.getElementById("kycPageContent") || page.querySelector(".menu-real-content") || page;
+    if (!content) return;
+
+    const dbRow = await klLoadUserKyc();
+    const status = String((dbRow?.status || state?.user?.kycStatus || "")).toUpperCase();
+    const name = dbRow?.full_name || dbRow?.name || state?.user?.kycName || state?.user?.name || "";
+
+    lastUserKycStatus = status;
+
+    const form = page.querySelector("#realKycForm, #menuKycForm");
+    let existing = page.querySelector("#kycFinalStateCardWrap");
+
+    if (status === "APPROVED") {
+      if (!existing) {
+        existing = document.createElement("div");
+        existing.id = "kycFinalStateCardWrap";
+        content.prepend(existing);
+      }
+      existing.innerHTML = klApprovedCard(name);
+      if (form) form.style.setProperty("display", "none", "important");
+      page.querySelectorAll("#kycDocumentUploadBlock").forEach(x => x.style.setProperty("display","none","important"));
+      return;
+    }
+
+    if (status === "PENDING") {
+      if (!existing) {
+        existing = document.createElement("div");
+        existing.id = "kycFinalStateCardWrap";
+        content.prepend(existing);
+      }
+      existing.innerHTML = klPendingCard();
+      if (form) form.style.setProperty("display", "none", "important");
+      page.querySelectorAll("#kycDocumentUploadBlock").forEach(x => x.style.setProperty("display","none","important"));
+      return;
+    }
+
+    if (status === "REJECTED") {
+      if (!existing) {
+        existing = document.createElement("div");
+        existing.id = "kycFinalStateCardWrap";
+        content.prepend(existing);
+      }
+      existing.innerHTML = klRejectedNote(dbRow?.reject_reason || state?.user?.kycRejectReason || "");
+      if (form) form.style.removeProperty("display");
+      page.querySelectorAll("#kycDocumentUploadBlock").forEach(x => x.style.removeProperty("display"));
+      return;
+    }
+
+    if (existing) existing.remove();
+    if (form) form.style.removeProperty("display");
+  }
+
+  function klLockAdminActions(){
+    if (!klIsAdmin()) return;
+
+    const rows = document.querySelectorAll("tr[data-akstable-row], .akstable-grid-row, tr[data-ek-kyc-row], .ek-kyc-grid-row");
+    rows.forEach(row => {
+      const txt = (row.textContent || "").toUpperCase();
+      if (!txt.includes("APPROVED") && !txt.includes("REJECTED")) return;
+
+      const actionCell = row.querySelector("td:last-child, span:last-child") || row;
+      if (!actionCell) return;
+
+      const isApproved = txt.includes("APPROVED");
+      const isRejected = txt.includes("REJECTED");
+
+      actionCell.querySelectorAll("button[data-akstable-approve],button[data-akstable-reject],button[data-ek-approve],button[data-ek-reject],.akstable-action,.ek-kyc-action").forEach(btn => {
+        btn.style.setProperty("display", "none", "important");
+      });
+
+      if (!actionCell.querySelector(".kyc-action-locked")) {
+        const lock = document.createElement("span");
+        lock.className = "kyc-action-locked";
+        lock.textContent = isApproved ? "Locked" : (isRejected ? "Closed" : "Locked");
+        actionCell.appendChild(lock);
+      }
+    });
+  }
+
+  function klPatchAdminStatusUpdate(){
+    if (!klIsAdmin()) return;
+
+    document.addEventListener("click", function(e){
+      const isAction = e.target?.dataset?.akstableApprove ||
+        e.target?.dataset?.akstableReject ||
+        e.target?.dataset?.ekApprove ||
+        e.target?.dataset?.ekReject;
+
+      if (!isAction) return;
+
+      // After existing handler updates DB/table, lock actions.
+      setTimeout(klLockAdminActions, 700);
+      setTimeout(klLockAdminActions, 1600);
+    }, true);
+  }
+
+  function klBind(){
+    document.addEventListener("submit", function(e){
+      if (e.target?.id === "realKycForm" || e.target?.id === "menuKycForm") {
+        const st = String(lastUserKycStatus || state?.user?.kycStatus || "").toUpperCase();
+        if (st === "APPROVED" || st === "PENDING") {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          alert(st === "APPROVED" ? "Your KYC is already approved." : "Your KYC is already under review.");
+        }
+      }
+    }, true);
+
+    document.addEventListener("click", function(e){
+      const txt = (e.target?.textContent || "").toLowerCase();
+      if (txt.includes("kyc")) setTimeout(klApplyUserKycState, 800);
+    }, true);
+
+    klPatchAdminStatusUpdate();
+  }
+
+  window.applyUserKycFinalState = klApplyUserKycState;
+  window.lockAdminKycFinalActions = klLockAdminActions;
+
+  if (!window.__kycApproveRejectLockBound) {
+    window.__kycApproveRejectLockBound = true;
+    klBind();
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(klApplyUserKycState, 1400);
+    setTimeout(klLockAdminActions, 1600);
+  });
+  window.addEventListener("load", () => {
+    setTimeout(klApplyUserKycState, 1500);
+    setTimeout(klLockAdminActions, 1800);
+  });
+
+  setInterval(klLockAdminActions, 3000);
 })();

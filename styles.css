@@ -6551,3 +6551,68 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
   padding:18px 22px!important;
   color:#9fb2d0!important;
 }
+
+
+/* ===== KYC APPROVE REJECT LOCK FIX ===== */
+.kyc-final-card{
+  text-align:center!important;
+  padding:18px!important;
+  margin-bottom:12px!important;
+}
+.kyc-final-icon{
+  width:62px!important;
+  height:62px!important;
+  border-radius:50%!important;
+  display:grid!important;
+  place-items:center!important;
+  margin:0 auto 10px!important;
+  font-size:30px!important;
+  font-weight:950!important;
+}
+.kyc-final-card.approved .kyc-final-icon{
+  background:rgba(0,231,168,.15)!important;
+  color:#00e7a8!important;
+}
+.kyc-final-card.pending .kyc-final-icon{
+  background:rgba(248,189,122,.15)!important;
+  color:#f8bd7a!important;
+}
+.kyc-final-card.rejected .kyc-final-icon{
+  background:rgba(255,69,107,.15)!important;
+  color:#ff456b!important;
+}
+.kyc-final-card h3{
+  margin:0 0 8px!important;
+  color:#f4f7ff!important;
+  font-size:22px!important;
+}
+.kyc-final-card p,
+.kyc-final-card small{
+  color:#9fb2d0!important;
+  line-height:1.45!important;
+}
+.kyc-final-card div:not(.kyc-final-icon){
+  display:flex!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+  margin-top:12px!important;
+  padding-top:10px!important;
+  border-top:1px solid rgba(255,255,255,.08)!important;
+}
+.kyc-final-card span{
+  color:#9fb2d0!important;
+}
+.kyc-final-card b{
+  color:#f4f7ff!important;
+}
+.kyc-action-locked{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:34px!important;
+  border-radius:10px!important;
+  padding:0 12px!important;
+  color:#9fb2d0!important;
+  background:rgba(255,255,255,.06)!important;
+  font-weight:850!important;
+}
