@@ -308,3 +308,13 @@ Home AI Control Visible Fix:
 - Auto AI Trade toggle updates user setting.
 - No SQL required.
 - JS syntax check: OK
+
+
+Home AI Control No-Blink + Modern Toggle:
+- Removed blinking force-render block.
+- AI Control card is created/mounted once only.
+- Updates are value-only every 3 seconds, no DOM rebuild.
+- Auto AI Trade checkbox replaced with modern toggle switch UI.
+- 25/50/75/100 buttons remain functional.
+- No SQL required.
+- JS syntax check: OK
