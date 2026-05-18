@@ -338,3 +338,26 @@ AI Control Home Only Final Fix:
 - Modern toggle retained.
 - No SQL required.
 - JS syntax check: OK
+
+
+AI Control Old Code Removed:
+- Removed old AI Control HTML card from index.html.
+- Removed old AI Control JS blocks and CSS blocks.
+- Added one clean Home-only AI Control implementation.
+- Old aiTradePercentGrid in index: False
+- app aiTradePercentGrid references: 1 (only defensive cleanup expected)
+- app homeAiTradeControlCard refs: 4
+- Removed HTML blocks count: 1
+- No SQL required.
+- JS syntax check: OK
+
+
+Old UI Code Cleaned:
+- Removed old useless UI patch blocks from app.js.
+- Removed old AI Control HTML/card from index.html if present.
+- Removed obsolete CSS patch blocks.
+- Kept core logic, Supabase, trade, wallet, deposit, admin features untouched.
+- Kept one clean Home-only AI Control implementation.
+- Verification: {'index_has_old_ai_grid': False, 'app_old_ai_grid_refs': 1, 'app_old_ui_markers_left': [], 'css_old_markers_left': [], 'removed_js_blocks': ['Admin mass trade advanced field bridge', 'Admin page guest/demo guard'], 'removed_css_blocks': ['ADMIN BULK LEVERAGE FORCE VISIBLE UI'], 'removed_func_count': 0, 'removed_html_count': 0}
+- No SQL required.
+- JS syntax check: OK
