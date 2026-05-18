@@ -833,3 +833,12 @@ KYC Bigint ID Fix:
 - This matches existing kyc_requests.id bigint column.
 - No new SQL required for this fix.
 - JS syntax check: OK
+
+
+KYC RLS + Storage Upload Fix:
+- Storage upload no longer uses upsert:true. It now uses upsert:false.
+- This avoids needing broad SELECT/UPDATE policies on storage.objects.
+- KYC document file_url no longer depends on public URL; file_path is saved for later signed URL admin view.
+- Included SQL: supabase-rls-temporary-testing-fix.sql
+- That SQL temporarily disables RLS on app tables for testing and keeps Storage insert-only.
+- JS syntax check: OK

@@ -6590,7 +6590,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
     if (!file || !file.name) return null;
     const safeName = file.name.replace(/[^\w.\-]+/g, "_");
     const path = `${dbcUid()}/${kycId}/${key}_${Date.now()}_${safeName}`;
-    const up = await client.storage.from(KYC_BUCKET).upload(path, file, { upsert: true });
+    const up = await client.storage.from(KYC_BUCKET).upload(path, file, { upsert: false });
     if (up.error) throw up.error;
     const pub = client.storage.from(KYC_BUCKET).getPublicUrl(path);
     return {
@@ -6790,7 +6790,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
           setTimeout(dbcInjectKycDocs, 400);
         } catch(err) {
           console.error(err);
-          alert("KYC DB upload failed: " + (err.message || err));
+          alert("KYC DB upload failed: " + (err.message || err) + (err.details ? "\nDetails: " + err.details : "") + (err.hint ? "\nHint: " + err.hint : ""));
         } finally {
           if (btn) { btn.disabled = false; btn.textContent = old || "Submit KYC Documents for Approval"; }
         }
