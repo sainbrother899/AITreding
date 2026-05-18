@@ -4704,3 +4704,102 @@ body[data-user-clean-ui="true"] [data-page="trade"] .action-row button{
     gap:10px!important;
   }
 }
+
+
+/* ===== TRADE PAGE CLEAN CHART + ORDER TEXT ===== */
+.hide-outer-timeframe,
+.hide-empty-timeframe-row,
+.hide-outer-chart-ui,
+.hide-sim-badge,
+.hide-simulation-warning{
+  display:none!important;
+}
+
+/* Hide duplicate custom chart top rows outside actual TradingView chart */
+.clean-chart-only-card > .row,
+.clean-chart-only-card > .chart-top,
+.clean-chart-only-card > .timeframes,
+.clean-chart-only-card > .tf-row,
+.clean-chart-only-card > .market-row{
+  display:none!important;
+}
+
+/* Keep actual chart area and make it use the freed space */
+.clean-expanded-chart-card,
+.trade-chart-bigger-card.clean-expanded-chart-card{
+  min-height:610px!important;
+  padding:8px!important;
+}
+
+.clean-expanded-chart,
+.clean-expanded-chart iframe,
+.clean-expanded-chart-card iframe,
+.trade-chart-bigger-frame.clean-expanded-chart{
+  width:100%!important;
+  min-height:585px!important;
+  height:585px!important;
+  border-radius:20px!important;
+  overflow:hidden!important;
+}
+
+/* Order ticket polish */
+.clean-order-title{
+  letter-spacing:-.025em!important;
+}
+
+body[data-user-clean-ui="true"] #trade .card,
+body[data-user-clean-ui="true"] #tradepage .card{
+  overflow:hidden!important;
+}
+
+/* Remove extra bottom warning space after buttons */
+body[data-user-clean-ui="true"] #trade .hide-simulation-warning,
+body[data-user-clean-ui="true"] #tradepage .hide-simulation-warning{
+  margin:0!important;
+  padding:0!important;
+  height:0!important;
+}
+
+/* Compact order ticket spacing */
+body[data-user-clean-ui="true"] #trade input,
+body[data-user-clean-ui="true"] #trade select,
+body[data-user-clean-ui="true"] #tradepage input,
+body[data-user-clean-ui="true"] #tradepage select{
+  min-height:52px!important;
+}
+
+body[data-user-clean-ui="true"] #trade .action-row,
+body[data-user-clean-ui="true"] #tradepage .action-row{
+  margin-top:10px!important;
+  margin-bottom:0!important;
+}
+
+@media(max-width:700px){
+  .clean-expanded-chart-card,
+  .trade-chart-bigger-card.clean-expanded-chart-card{
+    min-height:585px!important;
+    padding:6px!important;
+  }
+  .clean-expanded-chart,
+  .clean-expanded-chart iframe,
+  .clean-expanded-chart-card iframe,
+  .trade-chart-bigger-frame.clean-expanded-chart{
+    min-height:565px!important;
+    height:565px!important;
+  }
+}
+
+@media(max-width:430px){
+  .clean-expanded-chart-card,
+  .trade-chart-bigger-card.clean-expanded-chart-card{
+    min-height:560px!important;
+    padding:5px!important;
+  }
+  .clean-expanded-chart,
+  .clean-expanded-chart iframe,
+  .clean-expanded-chart-card iframe,
+  .trade-chart-bigger-frame.clean-expanded-chart{
+    min-height:542px!important;
+    height:542px!important;
+  }
+}

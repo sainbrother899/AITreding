@@ -494,3 +494,26 @@ Trade Cards Wider Fix:
 - Home/Wallet/Admin unchanged.
 - No SQL required.
 - JS syntax check: OK
+
+
+Trade Page Clean Chart + Order:
+- Removed/hid duplicate custom timeframe row above chart.
+- Removed/hid duplicate outer live price/rate above chart.
+- Chart uses freed space and is larger.
+- "Place Simulation Order" changed to "Place Buy/Sell Order".
+- SIM badge hidden.
+- Removed "Simulation only. Real exchange order/API is not connected." warning.
+- Order ticket spacing compacted.
+- No SQL required.
+- JS syntax check: /mnt/data/AI-Trading-Trade-Page-Clean-Chart-Order/app.js:4399
+        if (/^Place Buy/Sell Order$/i.test(txt)) {
+            ^
+
+SyntaxError: Invalid regular expression flags
+[90m    at wrapSafe (node:internal/modules/cjs/loader:1662:18)[39m
+[90m    at checkSyntax (node:internal/main/check_syntax:
+
+
+Syntax Fix:
+- Fixed regex escape for Buy/Sell order title.
+- JS syntax check: OK

@@ -4384,3 +4384,75 @@ function restoreManualHistoryBackup(mode = state.mode) {
   window.addEventListener("load", () => setTimeout(makeTradeChartBigger, 700));
   setInterval(makeTradeChartBigger, 2500);
 })();
+
+
+/* ===== TRADE PAGE CLEAN CHART + ORDER TEXT ===== */
+(function(){
+  function cleanTradePage(){
+    try {
+      const tradePage = document.getElementById("trade") || document.getElementById("tradepage") || document.querySelector('[data-page="trade"]');
+      if (!tradePage) return;
+
+      // Replace user-facing order ticket title.
+      Array.from(tradePage.querySelectorAll("h1,h2,h3,b,strong,div,p,span")).forEach(el => {
+        const txt = (el.textContent || "").trim();
+        if (/^Place (Simulation|Buy\/Sell) Order$/i.test(txt)) {
+          el.textContent = "Place Buy/Sell Order";
+          el.classList.add("clean-order-title");
+        }
+        if (/^SIM$/i.test(txt)) {
+          const badge = el.closest("button,.badge,.pill,span,div");
+          if (badge) badge.classList.add("hide-sim-badge");
+        }
+        if (/Simulation only\.?\s*Real exchange order\/API is not connected\.?/i.test(txt)) {
+          el.classList.add("hide-simulation-warning");
+        }
+      });
+
+      // Find chart card
+      const chart = document.getElementById("crypto_live_chart") || document.getElementById("tradingViewChart") || document.getElementById("chartContainer") || document.querySelector("iframe[src*='tradingview'], iframe[src*='widgetembed']");
+      if (chart) {
+        const card = chart.closest(".card") || chart.parentElement;
+        if (card) {
+          card.classList.add("clean-chart-only-card");
+
+          // Hide duplicate custom timeframe buttons above chart, but not inside iframe/chart itself.
+          Array.from(card.querySelectorAll("button, a, span, div")).forEach(el => {
+            if (el.closest("#crypto_live_chart,#tradingViewChart,#chartContainer") || el.closest("iframe")) return;
+            const t = (el.textContent || "").trim();
+            if (/^(1m|5m|15m|30m|1H|4H|D)$/i.test(t)) {
+              el.classList.add("hide-outer-timeframe");
+              el.parentElement?.classList.add("hide-empty-timeframe-row");
+            }
+          });
+
+          // Hide outer coin selector / duplicate live price area above TradingView.
+          Array.from(card.children).forEach(child => {
+            if (child.contains(chart) || child === chart) return;
+            const txt = (child.textContent || "").trim();
+            const hasTf = /\b(1m|5m|15m|30m|1H|4H|D)\b/i.test(txt);
+            const hasPrice = /\$\s*\d/.test(txt) || /BTC\/USDT|Live TradingView Chart/i.test(txt);
+            const isHeader = /REAL ACCOUNT|TRADING|LIVE|candles|BTC\/USDT/i.test(txt);
+            if ((hasTf || hasPrice || isHeader) && txt.length < 250) {
+              child.classList.add("hide-outer-chart-ui");
+            }
+          });
+        }
+      }
+
+      // Make chart bigger after removing top controls.
+      document.querySelectorAll("#crypto_live_chart,#tradingViewChart,#chartContainer,iframe[src*='tradingview'],iframe[src*='widgetembed']").forEach(el => {
+        el.classList.add("clean-expanded-chart");
+        el.closest(".card")?.classList.add("clean-expanded-chart-card");
+      });
+
+      document.body.classList.add("trade-clean-chart-order-ready");
+    } catch(e) {
+      console.warn("Trade clean chart/order skipped", e);
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(cleanTradePage, 500));
+  window.addEventListener("load", () => setTimeout(cleanTradePage, 700));
+  setInterval(cleanTradePage, 2500);
+})();
