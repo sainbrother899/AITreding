@@ -249,3 +249,16 @@ Premium Mobile UI Polish:
 - Logic/Supabase/Admin functionality untouched.
 - No SQL required.
 - JS syntax check: OK
+
+
+Premium UI Stable Layout Fix:
+- Removed previous dynamic UI insertion that caused layout jumping/shifting.
+- Added stable CSS-only polish.
+- Fixed page width and overflow-x.
+- Bottom nav fixed safely without overlap.
+- Tables scroll only inside their own container.
+- Cards have stable spacing and no layout animation.
+- Ticker grid stable.
+- No logic/Supabase changes.
+- No SQL required.
+- JS syntax check: OK

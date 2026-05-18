@@ -3112,236 +3112,53 @@ setInterval(adminUsersAliasBridge, 700);
 window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
 
 
-/* ===== PREMIUM MOBILE UI POLISH ===== */
+
+
+
+/* ===== PREMIUM UI STABLE LAYOUT FIX ===== */
 (function(){
-  function pMoney(n){
+  function stableMoney(n){
     try { if (typeof money === "function") return money(n); } catch(e){}
     return "₹" + Number(n || 0).toLocaleString("en-IN", {maximumFractionDigits:2});
   }
-  function pUsd(n){
-    try { if (typeof usd === "function") return usd(n); } catch(e){}
-    return "$" + Number(n || 0).toLocaleString("en-US", {maximumFractionDigits:2});
-  }
-  function pCoinPrice(coin){
-    try { if (typeof priceOf === "function") return Number(priceOf(coin)||0); } catch(e){}
-    return Number(state?.prices?.[coin]?.price || 0);
-  }
-  function pWallet(){
-    try { if (typeof realWallet === "function") return Number(realWallet() || 0); } catch(e){}
-    return Number(state?.accounts?.REAL?.balance || 0);
-  }
-  function pDemo(){
-    return Number(state?.accounts?.DEMO?.balance || 100000);
-  }
-  function pMode(){
-    return state?.mode || "DEMO";
-  }
-  function pEnsureHomePolish(){
-    if (!state || state.user?.role === "admin") return;
 
-    // Compact premium ticker cards
-    const tick = document.getElementById("tickerGrid");
-    if (tick && !tick.dataset.premiumTicker) {
-      tick.dataset.premiumTicker = "1";
-      tick.classList.add("premium-ticker-grid");
-    }
-    if (tick) {
-      const coins = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT"];
-      tick.innerHTML = coins.map(c => {
-        const price = pCoinPrice(c);
-        const ch = Number(state?.prices?.[c]?.change || 0);
-        return `<div class="premium-ticker-card">
-          <div class="ticker-icon">${c.slice(0,1)}</div>
-          <div><b>${c.replace("USDT","/USDT")}</b><span>${pUsd(price)}</span></div>
-          <em class="${ch>=0?'pos':'neg'}">${ch.toFixed(2)}%</em>
-        </div>`;
-      }).join("");
-    }
+  function applyStableLayout(){
+    try{
+      document.body.classList.add("stable-premium-ui");
 
-    // Premium account mode card replacement/overlay
-    let anchor = document.getElementById("premiumAccountModeCard");
-    const homePage = document.getElementById("dashboard") || document.querySelector(".active-page") || document.getElementById("appPage");
-    const userBox = document.getElementById("mockDemoBalance")?.closest(".card") || document.getElementById("mockDemoBalance")?.parentElement?.parentElement;
-    if (!anchor && homePage && document.getElementById("mockDemoBalance") && document.getElementById("mockRealBalance")) {
-      anchor = document.createElement("div");
-      anchor.id = "premiumAccountModeCard";
-      anchor.className = "card premium-account-mode-card";
-      anchor.innerHTML = `
-        <div class="premium-card-head">
-          <div><p class="label">Account Mode</p><h2 id="premiumActiveModeTitle">Real Account</h2></div>
-          <span id="premiumActiveModeBadge">Active</span>
-        </div>
-        <div class="premium-account-grid">
-          <button id="premiumDemoSwitch" type="button" class="premium-account-mini">
-            <span>Demo Account</span><b id="premiumDemoBalance">₹1,00,000</b>
-          </button>
-          <button id="premiumRealSwitch" type="button" class="premium-account-mini">
-            <span>Real Account</span><b id="premiumRealBalance">₹0</b>
-          </button>
-        </div>
-      `;
-      if (userBox && userBox.parentNode) userBox.parentNode.insertBefore(anchor, userBox.nextSibling);
-      else homePage.prepend(anchor);
-
-      anchor.querySelector("#premiumDemoSwitch")?.addEventListener("click", () => {
-        document.getElementById("demoBtn")?.click();
-        state.mode = "DEMO"; try{ saveState?.(); render?.(); }catch(e){}
+      // Mark existing tables for mobile card fallback, but do not move DOM repeatedly.
+      ["userManagedTradesLog","userManualTradesLog","userDepositLog","userWithdrawalLog"].forEach(id=>{
+        const tbody = document.getElementById(id);
+        if (tbody) tbody.closest(".card")?.classList.add("stable-table-card");
       });
-      anchor.querySelector("#premiumRealSwitch")?.addEventListener("click", () => {
-        document.getElementById("realBtn")?.click();
-        state.mode = "REAL"; try{ saveState?.(); render?.(); }catch(e){}
-      });
-    }
-    if (anchor) {
-      const mode = pMode();
-      const demo = pDemo();
-      const real = pWallet();
-      const title = document.getElementById("premiumActiveModeTitle");
-      const badge = document.getElementById("premiumActiveModeBadge");
-      const db = document.getElementById("premiumDemoBalance");
-      const rb = document.getElementById("premiumRealBalance");
-      if (title) title.textContent = mode === "REAL" ? "Real Account" : "Demo Account";
-      if (badge) badge.textContent = "Active: " + (mode === "REAL" ? "Real Account" : "Demo Account");
-      if (db) db.textContent = pMoney(demo);
-      if (rb) rb.textContent = pMoney(real);
-      document.getElementById("premiumDemoSwitch")?.classList.toggle("active", mode === "DEMO");
-      document.getElementById("premiumRealSwitch")?.classList.toggle("active", mode === "REAL");
-    }
 
-    // Hide old duplicate account switch buttons without breaking clicks because premium uses old btns.
-    document.getElementById("demoBtn")?.closest(".action-row")?.classList.add("premium-hide-old-switch");
-    document.getElementById("demoBtn")?.parentElement?.classList.add("premium-hide-old-switch");
-
-    // AI trades card: progress bar
-    const aiText = document.getElementById("aiTradeUsedText");
-    const aiLimit = document.getElementById("aiTradeLimitText");
-    if (aiText && aiLimit && !document.getElementById("premiumAiProgress")) {
-      const wrap = aiText.closest(".card") || aiText.parentElement?.parentElement;
-      if (wrap) {
-        const prog = document.createElement("div");
-        prog.id = "premiumAiProgress";
-        prog.className = "premium-ai-progress";
-        prog.innerHTML = `<span></span>`;
-        wrap.appendChild(prog);
-      }
-    }
-    const progBar = document.querySelector("#premiumAiProgress span");
-    if (progBar && aiText && aiLimit) {
-      const used = Number(aiText.textContent || 0), limit = Number(aiLimit.textContent || 5);
-      progBar.style.width = Math.min(100, Math.max(0, used / (limit || 5) * 100)) + "%";
-    }
-  }
-
-  function rowsToCards(tableId, containerId, type){
-    const tbody = document.getElementById(tableId);
-    if (!tbody) return;
-    const table = tbody.closest("table");
-    const wrap = table?.parentElement;
-    if (!wrap) return;
-
-    let container = document.getElementById(containerId);
-    if (!container) {
-      container = document.createElement("div");
-      container.id = containerId;
-      container.className = "premium-mobile-card-list";
-      wrap.parentNode.insertBefore(container, wrap.nextSibling);
-    }
-
-    const rows = Array.from(tbody.querySelectorAll("tr")).filter(r => !r.querySelector(".empty"));
-    if (!rows.length) {
-      container.innerHTML = `<div class="premium-empty-card">No records found.</div>`;
-      return;
-    }
-
-    container.innerHTML = rows.map(row => {
-      const cells = Array.from(row.children).map(td => td.textContent.trim()).filter(Boolean);
-      if (type === "aiHistory" || type === "manualHistory") {
-        return `<div class="premium-history-card">
-          <div><b>${cells[0] || "Trade"}</b><span class="${(cells[1]||'').includes('SELL')?'sell':'buy'}">${cells[1] || "-"}</span></div>
-          <p>Amount <strong>${cells[2] || "-"}</strong></p>
-          <p>Entry <strong>${cells[3] || "-"}</strong></p>
-          <p>Exit / PnL <strong>${cells.slice(4).join(" • ") || "-"}</strong></p>
-        </div>`;
-      }
-      if (type === "deposit") {
-        return `<div class="premium-history-card">
-          <div><b>${cells[0] || "Deposit"}</b><span class="buy">${cells[2] || cells[3] || "Status"}</span></div>
-          <p>UTR / TXN <strong>${cells[1] || "-"}</strong></p>
-          <p>Date <strong>${cells[3] || "-"}</strong></p>
-        </div>`;
-      }
-      if (type === "withdraw") {
-        return `<div class="premium-history-card">
-          <div><b>${cells[0] || "Withdrawal"}</b><span>${cells[2] || "Status"}</span></div>
-          <p>Method <strong>${cells[1] || "-"}</strong></p>
-          <p>Account / Date <strong>${cells.slice(2).join(" • ") || "-"}</strong></p>
-        </div>`;
-      }
-      return `<div class="premium-history-card">${cells.map(c=>`<p>${c}</p>`).join("")}</div>`;
-    }).join("");
-  }
-
-  function pEnsureMobileCards(){
-    rowsToCards("userManagedTradesLog", "premiumAiHistoryCards", "aiHistory");
-    rowsToCards("userManualTradesLog", "premiumManualHistoryCards", "manualHistory");
-    rowsToCards("userDepositLog", "premiumDepositCards", "deposit");
-    rowsToCards("userWithdrawalLog", "premiumWithdrawCards", "withdraw");
-  }
-
-  function pEnsurePnlDashboard(){
-    const pnlPage = document.getElementById("pnl") || document.getElementById("pnlPage") || document.querySelector('[data-page="pnl"]')?.closest(".page");
-    if (!pnlPage || document.getElementById("premiumPnlDashboard")) return;
-    const card = document.createElement("div");
-    card.id = "premiumPnlDashboard";
-    card.className = "card premium-pnl-dashboard";
-    card.innerHTML = `
-      <div class="premium-card-head">
-        <div><p class="label">Performance</p><h2>PnL Overview</h2></div>
-        <select id="premiumPnlRange"><option>This Week</option><option>This Month</option></select>
-      </div>
-      <div class="premium-pnl-grid">
-        <div><span>PnL Trend</span><b id="premiumPnlTrend">₹0</b><div class="mini-chart"><i></i><i></i><i></i><i></i><i></i></div></div>
-        <div><span>Win Breakdown</span><b id="premiumWinCircle">0%</b><small id="premiumWinText">No trades</small></div>
-      </div>
-    `;
-    pnlPage.appendChild(card);
-  }
-
-  function pUpdatePnlDashboard(){
-    const total = document.getElementById("totalPnlMetric")?.textContent || "₹0";
-    const win = document.getElementById("winRateMetric")?.textContent || "0%";
-    const t = document.getElementById("premiumPnlTrend");
-    const w = document.getElementById("premiumWinCircle");
-    const wt = document.getElementById("premiumWinText");
-    if (t) t.textContent = total;
-    if (w) w.textContent = win;
-    if (wt) wt.textContent = "AI + Manual trades";
-  }
-
-  function pBottomSafe(){
-    document.body.classList.add("premium-bottom-safe");
-  }
-
-  function pPolish(){
-    try {
-      pBottomSafe();
-      pEnsureHomePolish();
-      pEnsureMobileCards();
-      pEnsurePnlDashboard();
-      pUpdatePnlDashboard();
-
-      // Short wallet note
-      document.querySelectorAll(".wallet-note, .muted").forEach(el => {
-        if ((el.textContent || "").includes("Deposit approval")) {
+      // Shorten long wallet note without changing structure.
+      document.querySelectorAll(".muted, .wallet-note").forEach(el=>{
+        const text = el.textContent || "";
+        if (text.includes("Deposit approval") || text.includes("Deposit approve")) {
           el.textContent = "Approved deposits are added to Real Wallet. Open trade PnL updates live.";
         }
       });
-    } catch(e) {
-      console.warn("Premium polish skipped", e);
+
+      // Hide only the old big duplicate switch buttons if present, but do not create a replacement card.
+      const demoBtn = document.getElementById("demoBtn");
+      const realBtn = document.getElementById("realBtn");
+      if (demoBtn && realBtn) {
+        const row = demoBtn.closest(".action-row") || demoBtn.parentElement;
+        if (row) row.classList.add("stable-compact-account-switch");
+      }
+
+      // Make existing AI percent card stable
+      document.getElementById("aiTradePercentGrid")?.closest(".card")?.classList.add("stable-ai-percent-card");
+
+      // Add bottom safe padding, no DOM insertion.
+      document.body.classList.add("stable-bottom-safe");
+    }catch(e){
+      console.warn("Stable layout apply failed", e);
     }
   }
 
-  setInterval(pPolish, 1200);
-  window.addEventListener("load", () => setTimeout(pPolish, 500));
-  document.addEventListener("DOMContentLoaded", () => setTimeout(pPolish, 500));
+  document.addEventListener("DOMContentLoaded", applyStableLayout);
+  window.addEventListener("load", applyStableLayout);
+  setInterval(applyStableLayout, 2500);
 })();
