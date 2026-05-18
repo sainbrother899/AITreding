@@ -957,3 +957,17 @@ User My Payment Methods Clean Final:
 - KYC name locked in holder field.
 - Saves locally and tries DB upsert into user_payout_methods.
 - JS syntax check: OK
+
+
+User Payment Methods Old Code Removed Final:
+- Removed previous user-side payment method patch blocks.
+- Renamed old payment form IDs/select IDs so old event handlers don't catch them.
+- Neutralized only old paymentMethodsPage renderer path; chart/trade/home/wallet/P&L/history untouched.
+- One final clean payment renderer now controls My Payment Methods.
+- UPI/Bank selection stable.
+- Warning only once.
+- Max 2 UPI IDs + max 2 Bank Accounts.
+- KYC name locked as account holder.
+- Saves local + upserts to user_payout_methods.
+- Removed payment markers: [{"marker": "USER MY PAYMENT METHODS CLEAN FINAL", "js": 1, "css": 1}]
+- JS syntax check: OK
