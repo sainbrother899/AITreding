@@ -682,7 +682,7 @@ function openManualTrade(side) {
   if (state.mode === "REAL" && amount > realWallet()) return toast("Wallet balance कम है.");
   const t = {
     id: "tr_" + Date.now(), userId: state.user?.id, userEmail: state.user?.email, coin, side,
-    amount, entry: priceOf(coin), current: priceOf(coin), leverage: Number($("leverageSelect")?.value || 1),
+    amount, entry: priceOf(coin), current: priceOf(coin), leverage: getLeverageSafe(),
     orderType: $("orderType")?.value || "MARKET", status: "OPEN", source: "USER", openedAt: new Date().toLocaleString()
   };
   acc.trades.unshift(t);
@@ -1390,3 +1390,10 @@ window.addEventListener("load", function() {
 // Chart iframe itself remains real TradingView and is not rebuilt every second.
 setInterval(fastPricePnlRefresh, 1000);
 setInterval(renderTradeFeedRealFix, 1600);
+
+
+/* ===== LEVERAGE 2000X FIX ===== */
+function getLeverageSafe() {
+  const raw = Number(document.getElementById("leverageSelect")?.value || 1);
+  return Math.min(2000, Math.max(1, raw || 1));
+}

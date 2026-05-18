@@ -74,3 +74,11 @@ Real Chart + Fast PnL Fix:
 - Order book and trade feed still populate, but chart is real TradingView.
 - No SQL required.
 - JS syntax check: OK
+
+
+Leverage 2000x Update:
+- Leverage dropdown now includes 1x, 5x, 10x, 25x, 50x, 100x, 250x, 500x, 1000x, 1500x, 2000x.
+- Trade PnL calculation uses selected leverage.
+- Safety max leverage set to 2000x.
+- No SQL required.
+- JS syntax check: OK
