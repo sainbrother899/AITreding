@@ -383,3 +383,14 @@ Home Rate Live + Static Shell Fix:
 - AI Control remains stable outside rebuilt shell.
 - No SQL required.
 - JS syntax check: OK
+
+
+Floating Live Position Bar:
+- One-line floating manual position bar added above bottom nav.
+- Shows only when user has open manual/live trade.
+- Shows coin, BUY/SELL, leverage, total live PnL, and Close button.
+- Profit is green everywhere; loss is red everywhere.
+- Multiple open trades show Positions count and total PnL.
+- AI/admin trades are not user-closeable from this bar.
+- No SQL required.
+- JS syntax check: OK

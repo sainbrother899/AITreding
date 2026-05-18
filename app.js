@@ -3814,3 +3814,128 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
     updateCleanHomeRates();
   }, 1000);
 })();
+
+
+/* ===== FLOATING LIVE POSITION BAR ===== */
+(function(){
+  function flIsUser(){
+    return state?.user && state.user.role !== "admin";
+  }
+  function flMoney(n){
+    try { if (typeof money === "function") return money(n); } catch(e){}
+    return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  }
+  function flPrice(coin){
+    try { if (typeof priceOf === "function") return Number(priceOf(coin) || 0); } catch(e){}
+    return Number(state?.prices?.[coin]?.price || 0);
+  }
+  function flMode(){
+    return state?.mode || "DEMO";
+  }
+  function flAccount(){
+    const mode = flMode();
+    state.accounts = state.accounts || {};
+    state.accounts[mode] = state.accounts[mode] || { balance: mode === "DEMO" ? 100000 : 0, trades: [], closedTrades: [] };
+    state.accounts[mode].trades = state.accounts[mode].trades || [];
+    return state.accounts[mode];
+  }
+  function flUpdatePnl(t){
+    try {
+      if (typeof updateTradePnl === "function") return updateTradePnl(t);
+    } catch(e){}
+    const current = flPrice(t.coin);
+    t.current = current;
+    const diff = String(t.side || "BUY").toUpperCase() === "SELL" ? Number(t.entry) - current : current - Number(t.entry);
+    t.pnl = (diff / Number(t.entry || 1)) * Number(t.amount || 0) * Number(t.leverage || 1);
+    return t.pnl;
+  }
+  function flOpenManualTrades(){
+    if (!flIsUser()) return [];
+    const acc = flAccount();
+    return (acc.trades || []).filter(t => {
+      const st = String(t.status || "OPEN").toUpperCase();
+      return st === "OPEN" && (!t.source || String(t.source).toUpperCase() === "USER");
+    });
+  }
+  function flEnsureBar(){
+    let bar = document.getElementById("floatingLivePositionBar");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "floatingLivePositionBar";
+      bar.className = "floating-live-position-bar";
+      bar.innerHTML = `
+        <div class="flp-left">
+          <b id="flpCoin">BTC/USDT</b>
+          <span id="flpSideLev">BUY 1x</span>
+        </div>
+        <strong id="flpPnl">₹0</strong>
+        <button type="button" id="flpCloseBtn">Close</button>
+      `;
+      document.body.appendChild(bar);
+      bar.querySelector("#flpCloseBtn")?.addEventListener("click", function(e){
+        e.preventDefault();
+        const id = bar.dataset.tradeId;
+        if (!id) return;
+        try {
+          if (typeof closeTrade === "function") closeTrade(id, flMode());
+        } catch(err) {
+          console.warn("floating close failed", err);
+        }
+        setTimeout(flRender, 150);
+      });
+    }
+    return bar;
+  }
+  function flRender(){
+    try {
+      if (!flIsUser()) return;
+      const bar = flEnsureBar();
+      const trades = flOpenManualTrades();
+
+      if (!trades.length) {
+        bar.classList.remove("show");
+        bar.dataset.tradeId = "";
+        return;
+      }
+
+      trades.forEach(flUpdatePnl);
+      const first = trades[0];
+      const totalPnl = trades.reduce((a,t)=>a+Number(t.pnl || 0),0);
+      const pnlClass = totalPnl >= 0 ? "profit" : "loss";
+
+      bar.dataset.tradeId = first.id || "";
+
+      const coin = String(first.coin || "BTCUSDT").replace("USDT","/USDT");
+      const side = String(first.side || "BUY").toUpperCase();
+      const lev = Number(first.leverage || 1) + "x";
+
+      const coinEl = document.getElementById("flpCoin");
+      const sideEl = document.getElementById("flpSideLev");
+      const pnlEl = document.getElementById("flpPnl");
+
+      if (coinEl) coinEl.textContent = trades.length > 1 ? `Positions ${trades.length}` : coin;
+      if (sideEl) sideEl.textContent = trades.length > 1 ? `${flMode()} • Open` : `${side} ${lev}`;
+      if (pnlEl) {
+        pnlEl.textContent = flMoney(totalPnl);
+        pnlEl.classList.toggle("profit", totalPnl >= 0);
+        pnlEl.classList.toggle("loss", totalPnl < 0);
+      }
+
+      bar.classList.toggle("profit", totalPnl >= 0);
+      bar.classList.toggle("loss", totalPnl < 0);
+      bar.classList.add("show");
+    } catch(e) {
+      console.warn("Floating live position render skipped", e);
+    }
+  }
+
+  window.renderFloatingLivePositionBar = flRender;
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(flRender, 600));
+  window.addEventListener("load", () => setTimeout(flRender, 800));
+
+  setInterval(function(){
+    try { if (typeof fetchPrices === "function") fetchPrices(); } catch(e){}
+    flRender();
+  }, 1000);
+})();
