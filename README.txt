@@ -82,3 +82,14 @@ Leverage 2000x Update:
 - Safety max leverage set to 2000x.
 - No SQL required.
 - JS syntax check: OK
+
+
+Auto Liquidation Update:
+- Open manual trades are checked every 1 second.
+- If loss reaches trade amount, trade auto closes as LIQUIDATED.
+- Final PnL is capped at -trade amount.
+- Extra negative wallet balance is prevented.
+- REAL liquidation loss is saved into wallet_ledger as TRADE_PNL.
+- DEMO liquidation also moves trade to history.
+- No SQL required.
+- JS syntax check: OK

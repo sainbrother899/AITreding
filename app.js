@@ -1397,3 +1397,116 @@ function getLeverageSafe() {
   const raw = Number(document.getElementById("leverageSelect")?.value || 1);
   return Math.min(2000, Math.max(1, raw || 1));
 }
+
+
+/* ===== AUTO LIQUIDATION FIX ===== */
+function liquidationUserId() {
+  try {
+    if (typeof userKey === "function") return userKey();
+  } catch(e) {}
+  return String(state?.user?.id || state?.user?.email || "local");
+}
+
+async function ledgerLiquidationLoss(trade) {
+  if (!trade || state.mode !== "REAL" || !state.user) return;
+  const uid = state.user.id || liquidationUserId();
+
+  const already = (state.walletLedger || []).some(l =>
+    String(l.tradeId || l.trade_id || "") === String(trade.id) ||
+    String(l.note || "").includes(String(trade.id))
+  );
+  if (already) return;
+
+  const row = {
+    id: "led_liq_" + Date.now() + "_" + Math.random().toString(16).slice(2),
+    userId: uid,
+    type: "TRADE_PNL",
+    amount: -Math.abs(Number(trade.amount || 0)),
+    note: "Liquidation loss " + trade.id,
+    tradeId: trade.id
+  };
+
+  state.walletLedger = state.walletLedger || [];
+  state.walletLedger.unshift(row);
+
+  if (typeof supabaseClient !== "undefined" && supabaseClient) {
+    try {
+      await supabaseClient.from("wallet_ledger").insert({
+        user_id: uid,
+        type: "TRADE_PNL",
+        amount: row.amount,
+        note: row.note
+      });
+    } catch(e) {
+      console.warn("Liquidation ledger save failed", e);
+    }
+  }
+}
+
+async function liquidateTradeByIndex(acc, index) {
+  const t = acc.trades[index];
+  if (!t || String(t.status || "OPEN").toUpperCase() !== "OPEN") return false;
+
+  t.status = "LIQUIDATED";
+  t.pnl = -Math.abs(Number(t.amount || 0));
+  t.current = t.current || t.close || t.entry;
+  t.close = t.current;
+  t.closedAt = new Date().toLocaleString();
+  t.liquidatedAt = t.closedAt;
+
+  acc.trades.splice(index, 1);
+  acc.closedTrades = acc.closedTrades || [];
+  acc.closedTrades.unshift(t);
+
+  await ledgerLiquidationLoss(t);
+  return true;
+}
+
+async function checkAutoLiquidation() {
+  try {
+    if (!state?.accounts) return;
+
+    const modes = ["DEMO", "REAL"];
+    let changed = false;
+
+    for (const mode of modes) {
+      const acc = state.accounts[mode];
+      if (!acc || !Array.isArray(acc.trades)) continue;
+
+      for (let i = acc.trades.length - 1; i >= 0; i--) {
+        const t = acc.trades[i];
+        if (!t || String(t.status || "OPEN").toUpperCase() !== "OPEN") continue;
+
+        try {
+          if (typeof updateTradePnl === "function") updateTradePnl(t);
+        } catch(e) {}
+
+        const amount = Math.abs(Number(t.amount || 0));
+        const pnl = Number(t.pnl || 0);
+
+        if (amount > 0 && pnl <= -amount) {
+          const oldMode = state.mode;
+          state.mode = mode;
+          const ok = await liquidateTradeByIndex(acc, i);
+          state.mode = oldMode;
+          if (ok) changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      try { saveState?.(); } catch(e) {}
+      try { render?.(); } catch(e) {}
+      try { toast?.("Trade liquidated: loss reached trade amount."); } catch(e) {}
+    }
+  } catch(e) {
+    console.warn("Auto liquidation check failed", e);
+  }
+}
+
+// Patch updateTradePnl display clamp: open trade loss can show below, but liquidation will close it.
+// Patch closeTrade to avoid extra close on liquidated is handled by status check.
+setInterval(checkAutoLiquidation, 1000);
+window.addEventListener("load", function(){
+  setTimeout(checkAutoLiquidation, 1200);
+});

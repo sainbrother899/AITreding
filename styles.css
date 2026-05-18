@@ -3248,3 +3248,19 @@ body.real-mode-active .pro-bottom-nav .nav-btn[data-page="wallet"]{
   .real-fill-row{grid-template-columns:.65fr 1fr 1fr;font-size:11px;}
   .real-fill-row small{display:none;}
 }
+
+
+/* Auto liquidation status */
+td:has(> .liq-badge){}
+.liq-badge,
+.status-liquidated{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:4px 8px;
+  border-radius:999px;
+  background:rgba(255,77,109,.14);
+  color:var(--red,#ff4d6d);
+  font-weight:900;
+  font-size:11px;
+}
