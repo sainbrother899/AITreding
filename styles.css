@@ -5011,392 +5011,224 @@ body[data-active-page="more"] #more{
 }
 
 
-
-
-
-/* ===== PC DESKTOP COMPLETE FIX ===== */
-/* Desktop-only complete reset. Mobile below 900px is untouched. */
+/* ===== PC SAME AS MOBILE LAYOUT ===== */
+/* Desktop/PC will use the exact mobile-style layout, centered like a phone.
+   Mobile below 900px is untouched. */
 @media (min-width: 900px){
 
-  :root{
-    --pc-max: 1180px;
-    --pc-gap: 18px;
-    --pc-card-radius: 22px;
-  }
-
-  html,
-  body{
-    width:100%!important;
-    max-width:100%!important;
+  html.pc-same-mobile-html,
+  body.pc-same-mobile{
+    min-height:100%!important;
     overflow-x:hidden!important;
-  }
-
-  body{
     background:
-      radial-gradient(circle at 12% 6%, rgba(0,231,168,.10), transparent 26%),
-      radial-gradient(circle at 92% 36%, rgba(83,93,255,.12), transparent 28%),
-      linear-gradient(180deg,#041715 0%,#070b18 55%,#12091f 100%)!important;
+      radial-gradient(circle at 18% 8%, rgba(0,231,168,.10), transparent 24%),
+      radial-gradient(circle at 86% 24%, rgba(85,105,255,.12), transparent 28%),
+      linear-gradient(180deg,#041715 0%,#07111c 55%,#12091f 100%)!important;
   }
 
-  /* Global app frame */
-  body[data-user-clean-ui="true"] #appPage,
-  body[data-user-clean-ui="true"] main,
-  body.pc-desktop-mode #appPage,
-  body.pc-desktop-mode main,
-  #appPage,
-  main{
-    width:100%!important;
-    max-width:var(--pc-max)!important;
-    margin:0 auto!important;
-    padding-left:24px!important;
-    padding-right:24px!important;
-    padding-bottom:130px!important;
-    box-sizing:border-box!important;
+  body.pc-same-mobile::before{
+    content:""!important;
+    position:fixed!important;
+    inset:0!important;
+    pointer-events:none!important;
+    background:linear-gradient(90deg,rgba(255,255,255,.035),transparent 22%,transparent 78%,rgba(255,255,255,.035))!important;
+    z-index:-1!important;
   }
 
-  .pc-page-container,
-  #dashboard,#home,#trade,#tradepage,#wallet,#pnl,#history,#plans,#more{
-    width:100%!important;
-    max-width:var(--pc-max)!important;
-    margin-left:auto!important;
-    margin-right:auto!important;
-    box-sizing:border-box!important;
-  }
-
-  /* Header */
-  .clean-top-header{
-    width:100%!important;
-    max-width:var(--pc-max)!important;
-    margin:0 auto 16px!important;
-    padding:14px 24px!important;
-    border-radius:0 0 24px 24px!important;
-    box-sizing:border-box!important;
-  }
-
-  .top-header-title span{
-    font-size:24px!important;
-  }
-
-  .top-header-menu-btn{
-    width:48px!important;
-    height:48px!important;
-  }
-
-  .top-header-user-btn{
-    max-width:240px!important;
-  }
-
-  .top-header-menu-panel{
-    left:calc(50% - (var(--pc-max) / 2) + 24px)!important;
-    top:76px!important;
-  }
-
-  /* Generic cards */
-  .card,
-  .pc-card,
-  .clean-welcome-card,
-  .clean-ai-signal-card,
-  .clean-market-card,
-  .clean-stat-card,
-  .manual-open-positions-card,
-  .exact-order-ticket-card,
-  .mini-feed-card{
-    box-sizing:border-box!important;
-    border-radius:var(--pc-card-radius)!important;
-    max-width:100%!important;
-  }
-
-  .card{
-    margin-left:auto!important;
-    margin-right:auto!important;
-  }
-
-  input,select,textarea,button{
-    max-width:100%!important;
-    box-sizing:border-box!important;
-  }
-
-  /* HOME: clean desktop layout */
-  #cleanHomeMount{
-    width:100%!important;
-    max-width:var(--pc-max)!important;
-    margin:0 auto!important;
-  }
-
-  .clean-home-shell{
-    width:100%!important;
-    max-width:var(--pc-max)!important;
-    margin:0 auto!important;
-    display:grid!important;
-    grid-template-columns:1fr!important;
-    gap:var(--pc-gap)!important;
-  }
-
-  .clean-welcome-card{
-    width:100%!important;
-  }
-
-  .clean-account-mode{
-    grid-template-columns:1fr 1fr!important;
-    gap:14px!important;
-  }
-
-  .clean-market-grid{
-    display:grid!important;
-    grid-template-columns:repeat(4,minmax(0,1fr))!important;
-    gap:14px!important;
-    width:100%!important;
-  }
-
-  .clean-stats-grid{
-    display:grid!important;
-    grid-template-columns:repeat(4,minmax(0,1fr))!important;
-    gap:14px!important;
-    width:100%!important;
-  }
-
-  .clean-signal-grid{
-    display:grid!important;
-    grid-template-columns:repeat(4,minmax(0,1fr))!important;
-    gap:14px!important;
-  }
-
-  #homeAiTradeControlCard{
-    width:100%!important;
-    max-width:var(--pc-max)!important;
-    margin:18px auto!important;
-  }
-
-  .clean-ai-percent-grid,
-  .home-ai-percent-grid{
-    grid-template-columns:repeat(4,minmax(0,1fr))!important;
-  }
-
-  /* TRADE: desktop clean stack with readable width */
-  body[data-active-page="trade"] #trade,
-  body[data-active-page="trade"] #tradepage,
-  #trade.active-page,
-  #tradepage.active-page{
-    width:100%!important;
-    max-width:var(--pc-max)!important;
-    margin:0 auto!important;
-    padding:0 0 130px!important;
-    display:block!important;
-    box-sizing:border-box!important;
-  }
-
-  #trade .card,
-  #tradepage .card{
-    width:100%!important;
-    max-width:var(--pc-max)!important;
-  }
-
-  #trade .chart-card,
-  #tradepage .chart-card,
-  #trade .exact-chart-card,
-  #tradepage .exact-chart-card{
-    width:100%!important;
-    max-width:var(--pc-max)!important;
-    margin:14px auto!important;
-    padding:10px!important;
-  }
-
-  /* Keep existing chart behavior from base, just make desktop card fit nicely */
-  #crypto_live_chart,
-  #tradingViewChart,
-  #chartContainer{
-    width:100%!important;
-    max-width:100%!important;
-  }
-
-  #crypto_live_chart iframe,
-  #tradingViewChart iframe,
-  #chartContainer iframe{
-    width:100%!important;
-    max-width:100%!important;
-  }
-
-  .trade-page-ticket-wrap,
-  .exact-order-ticket-card,
-  .manual-open-positions-card{
-    width:100%!important;
-    max-width:var(--pc-max)!important;
-    margin:16px auto!important;
-  }
-
-  .trade-page-ticket-wrap .order-ticket,
-  .exact-order-ticket-card .order-ticket{
-    width:100%!important;
-  }
-
-  .order-ticket .form-grid,
-  .trade-form-grid,
-  #trade .form-grid,
-  #tradepage .form-grid{
-    display:grid!important;
-    grid-template-columns:repeat(2,minmax(0,1fr))!important;
-    gap:14px!important;
-  }
-
-  .trade-actions,
-  #trade .action-row,
-  #tradepage .action-row{
-    display:grid!important;
-    grid-template-columns:1fr 1fr!important;
-    gap:14px!important;
-  }
-
-  .trade-actions button,
-  #trade .action-row button,
-  #tradepage .action-row button{
-    min-height:54px!important;
-    width:100%!important;
-  }
-
-  .chart-bottom-feed,
-  .exact-feed-grid{
-    width:100%!important;
-    max-width:var(--pc-max)!important;
-    margin:16px auto!important;
-    display:grid!important;
-    grid-template-columns:1fr 1fr!important;
-    gap:16px!important;
-    align-items:start!important;
-  }
-
-  .mini-feed-card,
-  .exact-feed-card,
-  .force-show-order-feed{
-    display:block!important;
-    width:100%!important;
+  /* Make the whole app behave like mobile width on PC */
+  body.pc-same-mobile #appPage,
+  body.pc-same-mobile main,
+  body.pc-same-mobile .app,
+  body.pc-same-mobile .app-shell{
+    width:430px!important;
+    max-width:430px!important;
     min-width:0!important;
-    visibility:visible!important;
-    opacity:1!important;
-  }
-
-  .mini-feed-card table,
-  .exact-feed-card table{
-    width:100%!important;
-  }
-
-  /* WALLET: desktop */
-  #wallet{
-    display:block;
-  }
-
-  #wallet .card{
-    width:100%!important;
-    max-width:var(--pc-max)!important;
-    margin:16px auto!important;
-  }
-
-  #wallet .grid,
-  #wallet .wallet-grid,
-  #wallet .balance-grid,
-  #wallet .account-grid,
-  #wallet .deposit-withdraw-grid,
-  #wallet .two-col{
-    display:grid!important;
-    grid-template-columns:repeat(2,minmax(0,1fr))!important;
-    gap:16px!important;
-    width:100%!important;
-  }
-
-  #wallet .table-wrap,
-  #history .table-wrap,
-  #pnl .table-wrap{
-    width:100%!important;
-    overflow-x:auto!important;
-  }
-
-  #wallet table,
-  #history table,
-  #pnl table{
-    width:100%!important;
-    min-width:720px!important;
-  }
-
-  /* PNL / HISTORY / PLANS / MORE */
-  #pnl .card,
-  #history .card,
-  #plans .card,
-  #more .card{
-    width:100%!important;
-    max-width:var(--pc-max)!important;
-    margin:16px auto!important;
-  }
-
-  #pnl .grid,
-  #history .grid,
-  #plans .grid{
-    display:grid!important;
-    grid-template-columns:repeat(2,minmax(0,1fr))!important;
-    gap:16px!important;
-  }
-
-  /* Admin-like pages should not overflow on PC */
-  .admin-page,
-  #adminPage,
-  #adminApp{
-    max-width:var(--pc-max)!important;
-    margin:0 auto!important;
-    overflow-x:hidden!important;
-  }
-
-  /* Bottom nav desktop */
-  .bottom-nav,
-  .mobile-nav,
-  nav.bottom{
-    width:760px!important;
-    max-width:calc(100vw - 48px)!important;
-    left:50%!important;
-    right:auto!important;
-    transform:translateX(-50%)!important;
-    bottom:18px!important;
-    border-radius:28px!important;
+    margin-left:auto!important;
+    margin-right:auto!important;
+    padding-left:0!important;
+    padding-right:0!important;
     box-sizing:border-box!important;
   }
 
-  .floating-live-position-bar{
-    width:760px!important;
-    max-width:calc(100vw - 48px)!important;
+  body.pc-same-mobile #dashboard,
+  body.pc-same-mobile #home,
+  body.pc-same-mobile #trade,
+  body.pc-same-mobile #tradepage,
+  body.pc-same-mobile #wallet,
+  body.pc-same-mobile #pnl,
+  body.pc-same-mobile #history,
+  body.pc-same-mobile #plans,
+  body.pc-same-mobile #more{
+    width:430px!important;
+    max-width:430px!important;
+    margin-left:auto!important;
+    margin-right:auto!important;
+    box-sizing:border-box!important;
+  }
+
+  /* Header same as mobile and centered */
+  body.pc-same-mobile .clean-top-header{
+    width:430px!important;
+    max-width:430px!important;
     left:50%!important;
     right:auto!important;
     transform:translateX(-50%)!important;
-    bottom:88px!important;
+    margin:0!important;
+    border-radius:0 0 20px 20px!important;
     box-sizing:border-box!important;
   }
-}
 
-/* Large PC screens */
-@media (min-width: 1280px){
-  :root{
-    --pc-max: 1240px;
-  }
-}
-
-/* Desktop but not too wide */
-@media (min-width:900px) and (max-width:1040px){
-  :root{
-    --pc-max: calc(100vw - 36px);
+  body.pc-same-mobile .top-header-title span{
+    font-size:18px!important;
   }
 
-  body[data-user-clean-ui="true"] #appPage,
-  body[data-user-clean-ui="true"] main,
-  #appPage,
-  main{
-    padding-left:18px!important;
-    padding-right:18px!important;
+  body.pc-same-mobile .top-header-user-btn{
+    max-width:138px!important;
   }
 
-  .clean-market-grid,
-  .clean-stats-grid,
-  .clean-signal-grid{
-    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  body.pc-same-mobile .top-header-menu-panel{
+    left:calc(50% - 215px + 10px)!important;
+    top:64px!important;
   }
 
-  .chart-bottom-feed,
-  .exact-feed-grid{
+  /* All cards remain mobile sized */
+  body.pc-same-mobile .card,
+  body.pc-same-mobile .clean-home-shell,
+  body.pc-same-mobile #cleanHomeMount,
+  body.pc-same-mobile #homeAiTradeControlCard,
+  body.pc-same-mobile .manual-open-positions-card,
+  body.pc-same-mobile .trade-page-ticket-wrap,
+  body.pc-same-mobile .chart-bottom-feed,
+  body.pc-same-mobile .exact-feed-grid{
+    width:100%!important;
+    max-width:430px!important;
+    margin-left:auto!important;
+    margin-right:auto!important;
+    box-sizing:border-box!important;
+  }
+
+  /* Force mobile-like single column, not desktop grid */
+  body.pc-same-mobile .clean-home-shell,
+  body.pc-same-mobile .clean-market-grid,
+  body.pc-same-mobile .clean-stats-grid,
+  body.pc-same-mobile .clean-signal-grid,
+  body.pc-same-mobile .chart-bottom-feed,
+  body.pc-same-mobile .exact-feed-grid,
+  body.pc-same-mobile #wallet .grid,
+  body.pc-same-mobile #wallet .wallet-grid,
+  body.pc-same-mobile #wallet .balance-grid,
+  body.pc-same-mobile #wallet .account-grid,
+  body.pc-same-mobile #wallet .deposit-withdraw-grid,
+  body.pc-same-mobile #pnl .grid,
+  body.pc-same-mobile #history .grid,
+  body.pc-same-mobile #plans .grid{
     grid-template-columns:1fr!important;
+  }
+
+  body.pc-same-mobile .clean-market-grid,
+  body.pc-same-mobile .clean-stats-grid{
+    display:grid!important;
+    gap:12px!important;
+  }
+
+  /* Keep trade chart/order exactly mobile-like */
+  body.pc-same-mobile #trade,
+  body.pc-same-mobile #tradepage{
+    padding-left:0!important;
+    padding-right:0!important;
+    padding-bottom:145px!important;
+  }
+
+  body.pc-same-mobile #trade .card,
+  body.pc-same-mobile #tradepage .card{
+    width:100%!important;
+    max-width:430px!important;
+  }
+
+  body.pc-same-mobile input,
+  body.pc-same-mobile select,
+  body.pc-same-mobile textarea,
+  body.pc-same-mobile button{
+    max-width:100%!important;
+    box-sizing:border-box!important;
+  }
+
+  /* Tables behave like mobile cards/scroll instead of wide desktop */
+  body.pc-same-mobile .table-wrap{
+    overflow-x:auto!important;
+    width:100%!important;
+  }
+
+  body.pc-same-mobile table{
+    max-width:100%!important;
+  }
+
+  /* Bottom nav centered at mobile width */
+  body.pc-same-mobile .bottom-nav,
+  body.pc-same-mobile .mobile-nav,
+  body.pc-same-mobile nav.bottom{
+    width:430px!important;
+    max-width:430px!important;
+    left:50%!important;
+    right:auto!important;
+    transform:translateX(-50%)!important;
+    bottom:0!important;
+    border-radius:22px 22px 0 0!important;
+    box-sizing:border-box!important;
+  }
+
+  /* Floating position bar same as mobile width */
+  body.pc-same-mobile .floating-live-position-bar{
+    width:414px!important;
+    max-width:414px!important;
+    left:50%!important;
+    right:auto!important;
+    transform:translateX(-50%)!important;
+    bottom:72px!important;
+    box-sizing:border-box!important;
+  }
+}
+
+/* Slightly wider desktop option for very large monitor only, still mobile-like */
+@media (min-width: 1400px){
+  body.pc-same-mobile #appPage,
+  body.pc-same-mobile main,
+  body.pc-same-mobile .app,
+  body.pc-same-mobile .app-shell,
+  body.pc-same-mobile #dashboard,
+  body.pc-same-mobile #home,
+  body.pc-same-mobile #trade,
+  body.pc-same-mobile #tradepage,
+  body.pc-same-mobile #wallet,
+  body.pc-same-mobile #pnl,
+  body.pc-same-mobile #history,
+  body.pc-same-mobile #plans,
+  body.pc-same-mobile #more,
+  body.pc-same-mobile .clean-top-header,
+  body.pc-same-mobile .bottom-nav,
+  body.pc-same-mobile .mobile-nav,
+  body.pc-same-mobile nav.bottom{
+    width:460px!important;
+    max-width:460px!important;
+  }
+
+  body.pc-same-mobile .card,
+  body.pc-same-mobile .clean-home-shell,
+  body.pc-same-mobile #cleanHomeMount,
+  body.pc-same-mobile #homeAiTradeControlCard,
+  body.pc-same-mobile .manual-open-positions-card,
+  body.pc-same-mobile .trade-page-ticket-wrap,
+  body.pc-same-mobile .chart-bottom-feed,
+  body.pc-same-mobile .exact-feed-grid{
+    max-width:460px!important;
+  }
+
+  body.pc-same-mobile .floating-live-position-bar{
+    width:444px!important;
+    max-width:444px!important;
+  }
+
+  body.pc-same-mobile .top-header-menu-panel{
+    left:calc(50% - 230px + 10px)!important;
   }
 }

@@ -4710,38 +4710,16 @@ function restoreManualHistoryBackup(mode = state.mode) {
 })();
 
 
-
-
-
-/* ===== PC DESKTOP COMPLETE FIX ===== */
+/* ===== PC SAME AS MOBILE LAYOUT ===== */
 (function(){
-  function pcApply(){
-    try{
-      document.body.classList.toggle("pc-desktop-mode", window.innerWidth >= 900);
-
-      if(window.innerWidth >= 900){
-        // Keep page visibility sane on desktop.
-        const active = document.body.dataset.activePage || (
-          document.getElementById("trade")?.classList.contains("active-page") ? "trade" :
-          document.getElementById("wallet")?.classList.contains("active-page") ? "wallet" :
-          document.getElementById("pnl")?.classList.contains("active-page") ? "pnl" :
-          document.getElementById("history")?.classList.contains("active-page") ? "history" :
-          "dashboard"
-        );
-        document.body.dataset.activePage = active;
-
-        // Mark desktop cards for layout without affecting mobile.
-        ["dashboard","home","trade","tradepage","wallet","pnl","history","plans","more"].forEach(id=>{
-          const el = document.getElementById(id);
-          if(el) el.classList.add("pc-page-container");
-        });
-
-        document.querySelectorAll(".card").forEach(c=>c.classList.add("pc-card"));
-      }
-    }catch(e){}
+  function applyPcSameMobile(){
+    try {
+      const isPc = window.innerWidth >= 900;
+      document.body.classList.toggle("pc-same-mobile", isPc);
+      document.documentElement.classList.toggle("pc-same-mobile-html", isPc);
+    } catch(e) {}
   }
-  document.addEventListener("DOMContentLoaded", pcApply);
-  window.addEventListener("load", pcApply);
-  window.addEventListener("resize", pcApply);
-  setInterval(pcApply, 3000);
+  document.addEventListener("DOMContentLoaded", applyPcSameMobile);
+  window.addEventListener("load", applyPcSameMobile);
+  window.addEventListener("resize", applyPcSameMobile);
 })();

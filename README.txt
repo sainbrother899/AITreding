@@ -619,26 +619,13 @@ Chart Important Override Fix:
 - Diagnostics: {"syntax": "OK", "styles_crypto_mentions": 23, "app_has_important_fix": true, "css_has_important_fix": true}
 
 
-PC Desktop Layout Fix Only:
-- Mobile CSS/layout is untouched.
-- Added desktop-only media query starting at 900px.
-- PC pages get max-width 1180px and centered layout.
-- Home grids become proper desktop grids.
-- Trade page cards, Order Book, Trade Feed align cleanly on desktop.
-- Wallet/History/PnL cards/tables get desktop width control.
-- Bottom nav and floating position bar centered on desktop.
-- No SQL required.
-- JS syntax check: OK
-
-
-PC Desktop Complete Fix:
-- Replaced previous desktop patch with a stronger desktop-only layout reset.
-- Mobile below 900px remains untouched.
-- Desktop app frame max-width and centered.
-- Home, Trade, Wallet, PnL, History, Plans, More desktop layouts aligned.
-- Trade Order Book/Trade Feed desktop two-column.
-- Wallet/History/PnL tables controlled with horizontal scroll where needed.
-- Bottom nav and floating bar centered on PC.
-- Existing chart behavior from uploaded base is not rebuilt; only desktop card fitting is adjusted.
+PC Same As Mobile Layout:
+- Uses the uploaded mobile-working base.
+- PC/Desktop no longer uses separate desktop grid layout.
+- On screens 900px+, the app is shown in a centered mobile-width shell.
+- Mobile below 900px is untouched.
+- This keeps the same layout that works on mobile and prevents PC desktop grid issues.
+- Chart logic untouched.
+- Wallet/Trade/Home/History all use same mobile-style structure on PC.
 - No SQL required.
 - JS syntax check: OK
