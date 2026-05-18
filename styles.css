@@ -6044,3 +6044,177 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
     grid-template-columns:1fr!important;
   }
 }
+
+
+/* ===== ADMIN PC LAYOUT RESTORE ===== */
+/* Restores admin desktop layout while keeping user side PC same-as-mobile unchanged. */
+@media (min-width:900px){
+
+  html.admin-pc-restore-html,
+  body.admin-pc-restore{
+    width:100%!important;
+    max-width:none!important;
+    overflow-x:auto!important;
+  }
+
+  body.admin-pc-restore #appPage,
+  body.admin-pc-restore main,
+  body.admin-pc-restore .app,
+  body.admin-pc-restore .app-shell,
+  body.admin-pc-restore #adminPage,
+  body.admin-pc-restore #adminApp,
+  body.admin-pc-restore .admin-page,
+  body.admin-pc-restore .admin-shell,
+  body.admin-pc-restore .admin-layout{
+    width:100%!important;
+    max-width:none!important;
+    min-width:0!important;
+    margin:0!important;
+    padding-left:18px!important;
+    padding-right:18px!important;
+    box-sizing:border-box!important;
+  }
+
+  /* Cancel PC same-as-mobile width rules on admin */
+  body.admin-pc-restore #dashboard,
+  body.admin-pc-restore #home,
+  body.admin-pc-restore #trade,
+  body.admin-pc-restore #tradepage,
+  body.admin-pc-restore #wallet,
+  body.admin-pc-restore #pnl,
+  body.admin-pc-restore #history,
+  body.admin-pc-restore #plans,
+  body.admin-pc-restore #more,
+  body.admin-pc-restore .card,
+  body.admin-pc-restore .clean-home-shell,
+  body.admin-pc-restore #cleanHomeMount,
+  body.admin-pc-restore #homeAiTradeControlCard{
+    width:auto!important;
+    max-width:none!important;
+  }
+
+  body.admin-pc-restore .admin-shell,
+  body.admin-pc-restore .admin-layout{
+    display:grid!important;
+    grid-template-columns:260px minmax(0,1fr)!important;
+    gap:18px!important;
+    align-items:start!important;
+  }
+
+  body.admin-pc-restore .admin-sidebar,
+  body.admin-pc-restore aside,
+  body.admin-pc-restore .sidebar{
+    width:260px!important;
+    max-width:260px!important;
+    min-height:calc(100vh - 24px)!important;
+    position:sticky!important;
+    top:12px!important;
+    align-self:start!important;
+    border-radius:22px!important;
+  }
+
+  body.admin-pc-restore .admin-main,
+  body.admin-pc-restore .admin-content,
+  body.admin-pc-restore .main-content{
+    width:100%!important;
+    max-width:none!important;
+    min-width:0!important;
+  }
+
+  body.admin-pc-restore .card,
+  body.admin-pc-restore .admin-card,
+  body.admin-pc-restore .admin-pay-sec-panel{
+    width:100%!important;
+    max-width:none!important;
+    margin-left:0!important;
+    margin-right:0!important;
+    box-sizing:border-box!important;
+  }
+
+  body.admin-pc-restore .grid,
+  body.admin-pc-restore .admin-grid,
+  body.admin-pc-restore .stats-grid,
+  body.admin-pc-restore .metrics-grid{
+    display:grid!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    gap:14px!important;
+  }
+
+  body.admin-pc-restore table{
+    width:100%!important;
+    min-width:760px!important;
+  }
+
+  body.admin-pc-restore .table-wrap,
+  body.admin-pc-restore .admin-table-wrap{
+    width:100%!important;
+    overflow-x:auto!important;
+  }
+
+  body.admin-pc-restore input,
+  body.admin-pc-restore select,
+  body.admin-pc-restore textarea,
+  body.admin-pc-restore button{
+    max-width:100%!important;
+    box-sizing:border-box!important;
+  }
+
+  body.admin-pc-restore .admin-pay-settings-form{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:12px!important;
+  }
+
+  body.admin-pc-restore .admin-pay-sec-list{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:14px!important;
+  }
+
+  body.admin-pc-restore .bottom-nav,
+  body.admin-pc-restore .mobile-nav,
+  body.admin-pc-restore nav.bottom,
+  body.admin-pc-restore .floating-live-position-bar{
+    display:none!important;
+  }
+
+  /* Admin header should not be phone-width centered */
+  body.admin-pc-restore .clean-top-header,
+  body.admin-pc-restore header,
+  body.admin-pc-restore .app-header,
+  body.admin-pc-restore .top-header{
+    width:100%!important;
+    max-width:none!important;
+    left:auto!important;
+    right:auto!important;
+    transform:none!important;
+    margin:0 0 16px!important;
+    border-radius:0 0 18px 18px!important;
+  }
+}
+
+/* Admin tablet width */
+@media (min-width:900px) and (max-width:1100px){
+  body.admin-pc-restore .admin-shell,
+  body.admin-pc-restore .admin-layout{
+    grid-template-columns:220px minmax(0,1fr)!important;
+  }
+
+  body.admin-pc-restore .admin-sidebar,
+  body.admin-pc-restore aside,
+  body.admin-pc-restore .sidebar{
+    width:220px!important;
+    max-width:220px!important;
+  }
+
+  body.admin-pc-restore .grid,
+  body.admin-pc-restore .admin-grid,
+  body.admin-pc-restore .stats-grid,
+  body.admin-pc-restore .metrics-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+
+  body.admin-pc-restore .admin-pay-sec-list{
+    grid-template-columns:1fr!important;
+  }
+}

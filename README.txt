@@ -724,3 +724,15 @@ Payment KYC Admin Approval Final:
 - User wallet shows admin deposit payment settings where possible.
 - Data is local-state/localStorage for now; no SQL required in this UI version.
 - JS syntax check: OK
+
+
+Admin PC Layout Restore:
+- Fixes admin panel being affected by user PC same-as-mobile layout.
+- User side PC/mobile layout remains unchanged.
+- Admin page on PC uses full-width dashboard layout again.
+- Admin sidebar/content grid restored where available.
+- Admin cards/tables no longer forced to 430px mobile width.
+- Admin Payment Settings and Payout Method Requests layout improved for desktop.
+- Bottom nav/floating user bar hidden on admin PC.
+- No SQL required.
+- JS syntax check: OK

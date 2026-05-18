@@ -6158,3 +6158,35 @@ function restoreManualHistoryBackup(mode = state.mode) {
   window.addEventListener("load", () => setTimeout(psRun, 1000));
   setInterval(psRun, 2500);
 })();
+
+
+/* ===== ADMIN PC LAYOUT RESTORE ===== */
+(function(){
+  function isAdminPage(){
+    return location.pathname.toLowerCase().includes("admin") ||
+      document.body.classList.contains("admin") ||
+      document.getElementById("adminPage") ||
+      document.getElementById("adminApp") ||
+      document.querySelector(".admin-shell,.admin-layout,.admin-sidebar");
+  }
+
+  function applyAdminPcRestore(){
+    try {
+      const admin = isAdminPage();
+      document.body.classList.toggle("admin-pc-restore", admin && window.innerWidth >= 900);
+      document.documentElement.classList.toggle("admin-pc-restore-html", admin && window.innerWidth >= 900);
+
+      if (admin) {
+        // Make sure user-side centered mobile shell class does not affect admin.
+        document.body.classList.remove("pc-same-mobile");
+        document.documentElement.classList.remove("pc-same-mobile-html");
+        document.body.removeAttribute("data-user-clean-ui");
+      }
+    } catch(e) {}
+  }
+
+  document.addEventListener("DOMContentLoaded", applyAdminPcRestore);
+  window.addEventListener("load", applyAdminPcRestore);
+  window.addEventListener("resize", applyAdminPcRestore);
+  setInterval(applyAdminPcRestore, 1500);
+})();
