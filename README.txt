@@ -736,3 +736,16 @@ Admin PC Layout Restore:
 - Bottom nav/floating user bar hidden on admin PC.
 - No SQL required.
 - JS syntax check: OK
+
+
+Admin Payment Tabs Fix:
+- Payment Settings and Payout Method Requests no longer stay appended at bottom.
+- Added admin menu/sidebar buttons:
+  - Payout Method Requests
+  - Payment Settings
+- Clicking these buttons opens their section like other admin options.
+- New payment sections stay hidden until clicked.
+- Clicking any normal admin option hides payment sections again.
+- Existing admin layout restore remains included.
+- No SQL required.
+- JS syntax check: OK

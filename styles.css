@@ -6218,3 +6218,61 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
     grid-template-columns:1fr!important;
   }
 }
+
+
+/* ===== ADMIN PAYMENT TABS FIX ===== */
+.admin-pay-tab-btn{
+  width:100%!important;
+  min-height:44px!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:10px!important;
+  border:0!important;
+  border-radius:13px!important;
+  padding:0 12px!important;
+  margin:5px 0!important;
+  background:rgba(255,255,255,.045)!important;
+  color:#eaf2ff!important;
+  text-align:left!important;
+  cursor:pointer!important;
+}
+.admin-pay-tab-btn span{
+  width:26px!important;
+  display:grid!important;
+  place-items:center!important;
+}
+.admin-pay-tab-btn b{
+  font-size:13px!important;
+  font-weight:850!important;
+}
+.admin-pay-tab-btn.active{
+  background:linear-gradient(135deg,rgba(0,231,168,.20),rgba(53,167,255,.16))!important;
+  color:#00e7a8!important;
+  border:1px solid rgba(0,231,168,.22)!important;
+}
+.force-admin-pay-hidden{
+  display:none!important;
+}
+.active-admin-pay-panel{
+  display:block!important;
+  width:100%!important;
+  max-width:none!important;
+  margin:0!important;
+}
+#adminPayoutRequestsPanel,
+#adminPaymentSettingsPanel{
+  width:100%!important;
+  max-width:none!important;
+  margin:0 0 16px!important;
+}
+body[data-admin-active-section="payoutMethods"] #adminPayoutRequestsPanel,
+body[data-admin-active-section="paymentSettings"] #adminPaymentSettingsPanel{
+  display:block!important;
+}
+@media(min-width:900px){
+  body.admin-pc-restore #adminPayoutRequestsPanel,
+  body.admin-pc-restore #adminPaymentSettingsPanel{
+    width:100%!important;
+    max-width:none!important;
+  }
+}
