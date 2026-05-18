@@ -1301,26 +1301,16 @@ function renderRealTradingViewChart(force = false) {
 
   realChartFeedState.activeSymbol = symbol;
   host.innerHTML = `
-    <div class="real-tv-chart-shell">
-      <div class="real-tv-chart-head">
-        <div>
-          <b>${coin.replace("USDT", "/USDT")}</b>
-          <span>Live TradingView Chart</span>
-        </div>
-        <strong id="realChartLivePrice">${rcUsd(rcPrice(coin))}</strong>
-      </div>
-      <iframe
-        title="TradingView ${coin}"
-        class="real-tv-chart-frame"
-        src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_${coin}&symbol=${encodeURIComponent(symbol)}&interval=1&hidesidetoolbar=1&symboledit=1&saveimage=0&toolbarbg=0b1220&studies=[]&theme=dark&style=1&timezone=Asia%2FKolkata&withdateranges=1&hideideas=1"
-        allowtransparency="true"
-        scrolling="no"
-        frameborder="0">
-      </iframe>
-    </div>
+    <iframe
+      title="TradingView ${coin}"
+      class="real-tv-chart-frame clean-tv-only-frame"
+      src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_${coin}&symbol=${encodeURIComponent(symbol)}&interval=1&hidesidetoolbar=1&symboledit=1&saveimage=0&toolbarbg=0b1220&studies=[]&theme=dark&style=1&timezone=Asia%2FKolkata&withdateranges=1&hideideas=1"
+      allowtransparency="true"
+      scrolling="no"
+      frameborder="0">
+    </iframe>
   `;
 }
-
 function renderOrderBookRealFix() {
   const el = document.getElementById("orderBook");
   if (!el) return;
@@ -4640,120 +4630,87 @@ function restoreManualHistoryBackup(mode = state.mode) {
 })();
 
 
-/* ===== MOBILE TRADE LAYOUT FINAL ===== */
+/* ===== TRADE EXACT STRUCTURE FIX ===== */
 (function(){
-  function mtTradePage(){
-    return document.getElementById("trade") || document.getElementById("tradepage") || document.querySelector('[data-page="trade"]');
+  function exactTradePage(){
+    return document.getElementById("tradepage") || document.getElementById("trade");
   }
 
-  function mtText(el){
-    return (el?.textContent || "").trim();
-  }
-
-  function mtIsOrderBookText(t){ return /Order Book|BTC\/USDT Depth|Depth/i.test(t || ""); }
-  function mtIsTradeFeedText(t){ return /Trade Feed|Recent Fills/i.test(t || ""); }
-
-  function mtFindCardByText(re){
-    const page = mtTradePage();
-    if (!page) return null;
-    let found = null;
-    Array.from(page.querySelectorAll(".card, section, div")).some(el => {
-      const txt = mtText(el);
-      if (txt && txt.length < 1200 && re.test(txt)) {
-        found = el.closest(".card") || el;
-        return true;
-      }
-      return false;
-    });
-    return found;
-  }
-
-  function mtMakeLayout(){
+  function exactApply(){
     try {
-      const page = mtTradePage();
+      const page = exactTradePage();
       if (!page) return;
 
-      page.classList.add("mobile-trade-page-final");
+      page.classList.add("trade-exact-page");
 
-      // Chart card
-      const chart =
-        document.getElementById("crypto_live_chart") ||
-        document.getElementById("tradingViewChart") ||
-        document.getElementById("chartContainer") ||
-        document.querySelector("iframe[src*='tradingview'], iframe[src*='widgetembed']");
+      const chartCard = page.querySelector(".chart-card");
+      const ticket = page.querySelector(".trade-page-ticket-wrap");
+      const feed = page.querySelector(".chart-bottom-feed");
+      const chartHost = document.getElementById("crypto_live_chart") || document.getElementById("tradingViewChart") || document.getElementById("chartContainer");
 
-      let chartCard = null;
-      if (chart) {
-        chartCard = chart.closest(".card") || chart.parentElement;
-        chartCard?.classList.add("mt-chart-card");
-        chart.classList.add("mt-chart-frame");
-
-        // Hide duplicate outer controls/rates above chart, but never hide the actual chart/iframe.
-        if (chartCard) {
-          Array.from(chartCard.children).forEach(child => {
-            if (child === chart || child.contains(chart)) return;
-            const txt = mtText(child);
-            if (!txt) return;
-            if (
-              /REAL ACCOUNT|TRADING|5m candles|BTC\/USDT|Live TradingView Chart|\$[\d,]+|1m\s+5m|15m|1H|4H|D/i.test(txt) &&
-              txt.length < 350
-            ) {
-              child.classList.add("mt-hide-chart-duplicate");
-            }
-          });
-        }
+      if (chartCard) {
+        chartCard.classList.add("exact-chart-card");
+        chartCard.querySelector(".pro-pair-line")?.remove();
+        chartCard.querySelector(".pro-time-tabs")?.remove();
+        chartCard.querySelector(".chart-hint")?.remove();
       }
 
-      // Order title + warning cleanup
-      Array.from(page.querySelectorAll("h1,h2,h3,b,strong,p,span,div")).forEach(el => {
-        const t = mtText(el);
-        if (/^Place (Simulation|Buy\/Sell) Order$/i.test(t)) el.textContent = "Place Buy/Sell Order";
-        if (/^SIM$/i.test(t)) (el.closest("button,.badge,.pill,span,div") || el).classList.add("mt-hide-sim");
-        if (/Simulation only|Real exchange order\/API is not connected/i.test(t)) el.classList.add("mt-hide-sim-warning");
-      });
-
-      // Mark key cards
-      const openPositions = mtFindCardByText(/Open Positions|Live Positions/i);
-      if (openPositions) openPositions.classList.add("mt-open-positions-card");
-
-      const orderCard = mtFindCardByText(/Place Buy\/Sell Order|Place Simulation Order|Order Ticket/i);
-      if (orderCard) orderCard.classList.add("mt-order-card");
-
-      const orderBook = mtFindCardByText(/Order Book|BTC\/USDT Depth|Depth/i);
-      if (orderBook) {
-        orderBook.classList.remove("hide-outer-chart-ui","hide-empty-timeframe-row","hide-outer-timeframe","force-page-hidden");
-        orderBook.classList.add("mt-orderbook-card","force-show-order-feed");
-        orderBook.style.display = "";
+      if (chartHost) {
+        chartHost.classList.add("exact-chart-host");
+        chartHost.querySelector(".real-tv-chart-head")?.remove();
+        chartHost.querySelectorAll("iframe").forEach(f => f.classList.add("exact-chart-frame"));
       }
 
-      const tradeFeed = mtFindCardByText(/Trade Feed|Recent Fills/i);
-      if (tradeFeed) {
-        tradeFeed.classList.remove("hide-outer-chart-ui","hide-empty-timeframe-row","hide-outer-timeframe","force-page-hidden");
-        tradeFeed.classList.add("mt-tradefeed-card","force-show-order-feed");
-        tradeFeed.style.display = "";
+      // Move Order Ticket outside chart card, after chart card.
+      if (chartCard && ticket && chartCard.contains(ticket)) {
+        chartCard.insertAdjacentElement("afterend", ticket);
+      }
+      if (ticket) {
+        ticket.classList.add("card","exact-order-ticket-card");
+        ticket.querySelector(".pill")?.classList.add("mt-order-sim-hide");
+        const title = ticket.querySelector("h1,h2,h3");
+        if (title && /Simulation/i.test(title.textContent || "")) title.textContent = "Place Buy/Sell Order";
+        ticket.querySelectorAll("p,span,small,div").forEach(el => {
+          const txt = (el.textContent || "").trim();
+          if (/Simulation only|Real exchange order\/API is not connected/i.test(txt)) el.remove();
+        });
       }
 
-      // Reorder sections into final mobile flow where possible:
-      // chart -> open positions -> order card -> order book -> trade feed
-      const flow = [chartCard, openPositions, orderCard, orderBook, tradeFeed].filter(Boolean);
-      const seen = new Set();
-      flow.forEach(el => {
-        if (seen.has(el)) return;
-        seen.add(el);
-        if (el.parentElement === page) {
-          page.appendChild(el);
+      // Move Order Book/Trade Feed outside chart card, after ticket.
+      if (chartCard && feed && chartCard.contains(feed)) {
+        if (ticket) ticket.insertAdjacentElement("afterend", feed);
+        else chartCard.insertAdjacentElement("afterend", feed);
+      }
+      if (feed) {
+        feed.classList.add("exact-feed-grid");
+        feed.querySelectorAll(".mini-feed-card").forEach(card => {
+          card.classList.add("card","exact-feed-card","force-show-order-feed");
+          card.style.display = "";
+          card.style.visibility = "";
+          card.style.opacity = "";
+        });
+      }
+
+      // Force Order Book and Trade Feed visible.
+      ["orderBook","recentFills"].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const card = el.closest(".mini-feed-card") || el.closest(".card") || el.parentElement;
+        if (card) {
+          card.classList.remove("hide-outer-chart-ui","hide-empty-timeframe-row","hide-outer-timeframe","force-page-hidden");
+          card.classList.add("force-show-order-feed");
+          card.style.display = "";
         }
       });
 
-      document.body.classList.add("mobile-trade-layout-ready");
+      document.body.classList.add("trade-exact-structure-ready");
     } catch(e) {
-      console.warn("Mobile trade layout skipped", e);
+      console.warn("Trade exact structure skipped", e);
     }
   }
 
-  window.applyMobileTradeLayoutFinal = mtMakeLayout;
-
-  document.addEventListener("DOMContentLoaded", () => setTimeout(mtMakeLayout, 700));
-  window.addEventListener("load", () => setTimeout(mtMakeLayout, 900));
-  setInterval(mtMakeLayout, 2500);
+  window.applyTradeExactStructureFix = exactApply;
+  document.addEventListener("DOMContentLoaded", () => setTimeout(exactApply, 500));
+  window.addEventListener("load", () => setTimeout(exactApply, 750));
+  setInterval(exactApply, 2000);
 })();

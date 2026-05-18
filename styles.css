@@ -4862,179 +4862,167 @@ body[data-active-page="more"] #more{
 }
 
 
-/* ===== MOBILE TRADE LAYOUT FINAL ===== */
-body[data-active-page="trade"] #trade,
-body[data-active-page="trade"] #tradepage,
-.mobile-trade-page-final{
-  display:block!important;
-  width:100%!important;
-  max-width:100%!important;
+/* ===== TRADE EXACT STRUCTURE FIX ===== */
+.trade-exact-page{
   padding:8px 6px 150px!important;
 }
-
-.mobile-trade-page-final .card{
+.trade-exact-page .pro-dashboard-shell,
+.trade-exact-page .trade-only-layout{
+  display:block!important;
   width:100%!important;
   max-width:none!important;
-  margin:12px auto!important;
-  border-radius:18px!important;
-  border:1px solid rgba(118,158,236,.18)!important;
-  background:linear-gradient(180deg,rgba(13,24,41,.96),rgba(7,13,25,.98))!important;
-  box-shadow:0 12px 26px rgba(0,0,0,.22)!important;
 }
-
-.mt-hide-chart-duplicate,
-.mt-hide-sim,
-.mt-hide-sim-warning,
-.hide-simulation-warning,
-.hide-sim-badge{
+.exact-chart-card{
+  width:100%!important;
+  max-width:none!important;
+  margin:10px auto 12px!important;
+  padding:8px!important;
+  border-radius:18px!important;
+  overflow:hidden!important;
+  min-height:auto!important;
+}
+.exact-chart-card .pro-pair-line,
+.exact-chart-card .pro-time-tabs,
+.exact-chart-card .chart-hint,
+.exact-chart-card .real-tv-chart-head{
+  display:none!important;
+}
+.exact-chart-card .section-head{
+  padding:6px 6px 8px!important;
+  margin:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+}
+.exact-chart-card .section-head h2{
+  font-size:28px!important;
+  line-height:1!important;
+  margin:0!important;
+}
+.exact-chart-card .section-head .label{
+  font-size:12px!important;
+  margin-bottom:4px!important;
+}
+.exact-chart-host{
+  width:100%!important;
+  height:520px!important;
+  min-height:520px!important;
+  border-radius:16px!important;
+  overflow:hidden!important;
+  background:#080d16!important;
+}
+.exact-chart-host iframe,
+.exact-chart-frame,
+.clean-tv-only-frame,
+.real-tv-chart-frame{
+  width:100%!important;
+  height:520px!important;
+  min-height:520px!important;
+  border-radius:16px!important;
+  display:block!important;
+}
+.real-tv-chart-head{
   display:none!important;
 }
 
-/* Big, clean TradingView chart card */
-.mt-chart-card{
-  padding:8px!important;
-  min-height:505px!important;
-  overflow:hidden!important;
-}
-.mt-chart-frame,
-.mt-chart-card iframe,
-.mt-chart-card #crypto_live_chart,
-.mt-chart-card #tradingViewChart,
-.mt-chart-card #chartContainer{
+/* Order ticket as separate card */
+.exact-order-ticket-card{
   width:100%!important;
-  min-height:486px!important;
-  height:486px!important;
-  border-radius:16px!important;
-  overflow:hidden!important;
-}
-
-/* Open Positions like compact trading app card */
-.mt-open-positions-card{
-  padding:14px!important;
-}
-.mt-open-positions-card h1,
-.mt-open-positions-card h2,
-.mt-open-positions-card h3{
-  font-size:18px!important;
-  line-height:1.15!important;
-}
-.manual-open-positions-card{
-  padding:14px!important;
-}
-.manual-position-card{
-  border-radius:14px!important;
-  padding:12px!important;
-}
-.position-grid{
-  grid-template-columns:repeat(2,minmax(0,1fr))!important;
-}
-
-/* Buy/Sell order card */
-.mt-order-card{
+  max-width:none!important;
+  margin:12px auto!important;
   padding:16px!important;
+  border-radius:18px!important;
+  background:linear-gradient(180deg,rgba(13,24,41,.96),rgba(7,13,25,.98))!important;
+  border:1px solid rgba(118,158,236,.18)!important;
 }
-.mt-order-card h1,
-.mt-order-card h2,
-.mt-order-card h3,
-.mt-order-card .clean-order-title{
-  font-size:20px!important;
+.exact-order-ticket-card .order-ticket{
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+}
+.exact-order-ticket-card h3{
+  font-size:22px!important;
   line-height:1.15!important;
-  margin-bottom:12px!important;
 }
-.mt-order-card label,
-.mt-order-card .label{
-  font-size:13px!important;
-  margin-bottom:6px!important;
+.mt-order-sim-hide,
+.exact-order-ticket-card .pill{
+  display:none!important;
 }
-.mt-order-card input,
-.mt-order-card select{
-  min-height:48px!important;
-  border-radius:12px!important;
-  font-size:15px!important;
+.exact-order-ticket-card input,
+.exact-order-ticket-card select{
+  min-height:50px!important;
+  border-radius:13px!important;
 }
-.mt-order-card .action-row{
+.exact-order-ticket-card .trade-actions{
   display:grid!important;
   grid-template-columns:1fr 1fr!important;
   gap:10px!important;
   margin-top:12px!important;
 }
-.mt-order-card .action-row button,
-.mt-order-card button{
-  min-height:50px!important;
-  border-radius:12px!important;
-  font-size:15px!important;
+.exact-order-ticket-card .trade-actions button{
+  min-height:52px!important;
+  border-radius:13px!important;
   font-weight:950!important;
 }
 
-/* Order book / trade feed as full-width cards on mobile */
-.mt-orderbook-card,
-.mt-tradefeed-card{
-  display:block!important;
-  padding:14px!important;
-  min-height:auto!important;
-  overflow:hidden!important;
-}
-.mt-orderbook-card table,
-.mt-tradefeed-card table{
+/* Feed grid below order ticket */
+.exact-feed-grid{
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  gap:12px!important;
   width:100%!important;
-  font-size:13px!important;
+  margin:12px auto!important;
 }
-.mt-orderbook-card td,
-.mt-orderbook-card th,
-.mt-tradefeed-card td,
-.mt-tradefeed-card th{
-  padding:7px 4px!important;
-}
-
-/* Keep Order Book / Trade Feed visible even after previous cleanup */
+.exact-feed-card,
 .force-show-order-feed{
   display:block!important;
   visibility:visible!important;
   opacity:1!important;
+  height:auto!important;
+  min-height:auto!important;
+  overflow:hidden!important;
 }
-
-/* Floating bar stays one-line above nav */
-.floating-live-position-bar{
-  bottom:78px!important;
-  left:8px!important;
-  right:8px!important;
-  min-height:52px!important;
-  z-index:998!important;
+.exact-feed-card{
+  width:100%!important;
+  max-width:none!important;
+  margin:0!important;
+  padding:14px!important;
+  border-radius:18px!important;
+  background:linear-gradient(180deg,rgba(13,24,41,.96),rgba(7,13,25,.98))!important;
+  border:1px solid rgba(118,158,236,.18)!important;
+}
+.exact-feed-card table,
+.exact-feed-card .order-book,
+.exact-feed-card .recent-fills{
+  width:100%!important;
 }
 
 @media(max-width:430px){
-  body[data-active-page="trade"] #trade,
-  body[data-active-page="trade"] #tradepage,
-  .mobile-trade-page-final{
+  .trade-exact-page{
     padding-left:5px!important;
     padding-right:5px!important;
   }
-  .mobile-trade-page-final .card{
-    border-radius:17px!important;
-    margin:10px auto!important;
-  }
-  .mt-chart-card{
-    min-height:475px!important;
+  .exact-chart-card{
     padding:6px!important;
+    border-radius:17px!important;
   }
-  .mt-chart-frame,
-  .mt-chart-card iframe,
-  .mt-chart-card #crypto_live_chart,
-  .mt-chart-card #tradingViewChart,
-  .mt-chart-card #chartContainer{
-    min-height:462px!important;
-    height:462px!important;
+  .exact-chart-card .section-head h2{
+    font-size:26px!important;
+  }
+  .exact-chart-host,
+  .exact-chart-host iframe,
+  .exact-chart-frame,
+  .clean-tv-only-frame,
+  .real-tv-chart-frame{
+    height:475px!important;
+    min-height:475px!important;
     border-radius:14px!important;
   }
-  .mt-order-card{
+  .exact-order-ticket-card{
     padding:14px!important;
+    border-radius:17px!important;
   }
-  .mt-order-card input,
-  .mt-order-card select{
-    min-height:46px!important;
-  }
-  .mt-order-card .action-row button,
-  .mt-order-card button{
-    min-height:48px!important;
+  .exact-order-ticket-card h3{
+    font-size:20px!important;
   }
 }
