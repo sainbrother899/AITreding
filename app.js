@@ -3555,32 +3555,262 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
 })();
 
 
-/* ===== AI CONTROL BLINK ROOT FIX ===== */
+
+
+
+/* ===== HOME RATE LIVE + STATIC SHELL FIX ===== */
 (function(){
-  function stableAiCardParent(){
-    const card = document.getElementById("homeAiTradeControlCard");
-    if (!card) return;
+  let shellBuilt = false;
 
-    const shell = document.getElementById("cleanHomeShell");
-    const mount = document.getElementById("cleanHomeMount");
-    const dashboard = document.getElementById("dashboard") ||
-      document.getElementById("home") ||
-      document.querySelector('[data-page="home"]') ||
-      document.getElementById("appPage");
-
-    if (!dashboard) return;
-
-    // If card is inside rebuilt shell/mount, move it outside as a stable sibling.
-    if ((shell && shell.contains(card)) || (mount && mount.contains(card))) {
-      dashboard.appendChild(card);
-    }
-
-    card.style.display = "";
-    card.style.visibility = "";
-    card.style.opacity = "";
+  function hrIsUser(){
+    return state?.user && state.user.role !== "admin";
+  }
+  function hrMoney(n){
+    try { if (typeof money === "function") return money(n); } catch(e){}
+    return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  }
+  function hrUsd(n){
+    try { if (typeof usd === "function") return usd(n); } catch(e){}
+    return "$" + Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  }
+  function hrPrice(coin){
+    try { if (typeof priceOf === "function") return Number(priceOf(coin) || 0); } catch(e){}
+    return Number(state?.prices?.[coin]?.price || 0);
+  }
+  function hrChange(coin){
+    return Number(state?.prices?.[coin]?.change || 0);
+  }
+  function hrRealWallet(){
+    try { if (typeof realWallet === "function") return Number(realWallet() || 0); } catch(e){}
+    return Number(state?.accounts?.REAL?.balance || 0);
+  }
+  function hrDemoWallet(){
+    return Number(state?.accounts?.DEMO?.balance || 100000);
+  }
+  function hrMode(){
+    return state?.mode || "DEMO";
+  }
+  function hrTodayPnl(){
+    try {
+      const acc = state?.accounts?.[hrMode()] || {};
+      const open = (acc.trades || []).reduce((a,t)=>a+Number(t.pnl||0),0);
+      const closed = (acc.closedTrades || []).reduce((a,t)=>a+Number(t.pnl||0),0);
+      const managed = (state.managedTrades || [])
+        .filter(t => String(t.userId || t.user_id || "") === String(state.user?.id || state.user?.email || ""))
+        .reduce((a,t)=>a+Number(t.pnl||0),0);
+      return open + closed + managed;
+    } catch(e){ return 0; }
+  }
+  function hrSignal(){
+    const sig = state?.signal || state?.activeSignal || {};
+    return {
+      side: sig.side || sig.action || "BUY",
+      coin: sig.coin || "BTCUSDT",
+      target: sig.target || sig.targetPrice || null,
+      stopLoss: sig.stopLoss || sig.sl || null
+    };
   }
 
-  window.addEventListener("load", () => setTimeout(stableAiCardParent, 1200));
-  document.addEventListener("DOMContentLoaded", () => setTimeout(stableAiCardParent, 1200));
-  setInterval(stableAiCardParent, 3000);
+  function hrMakeShellHtml(){
+    const sig = hrSignal();
+    const coins = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT"];
+    const mode = hrMode();
+    const userName = state?.user?.name || state?.user?.email?.split("@")[0] || "User";
+    const initial = (userName[0] || "U").toUpperCase();
+
+    return `
+      <section id="cleanHomeShell" class="clean-home-shell static-home-shell">
+        <div class="clean-header-card">
+          <div class="clean-brand-badge">AI</div>
+          <div class="clean-brand-title">
+            <h1>AI Trading Assistant</h1>
+            <p>Live AI signal dashboard</p>
+          </div>
+          <button class="clean-logout-btn" type="button" onclick="uiLogout()">Logout</button>
+        </div>
+
+        <div class="clean-welcome-card card">
+          <div class="clean-welcome-top">
+            <div>
+              <p class="label">Welcome Back</p>
+              <h2>Hello, ${userName}</h2>
+            </div>
+            <div class="clean-avatar">${initial}</div>
+          </div>
+
+          <div class="clean-account-mode">
+            <button type="button" id="cleanDemoAccountBtn" class="clean-account-pill ${mode==="DEMO" ? "active" : ""}" onclick="uiSwitchMode('DEMO')">
+              <span>Demo Account</span>
+              <b id="cleanDemoBalance">${hrMoney(hrDemoWallet())}</b>
+            </button>
+            <button type="button" id="cleanRealAccountBtn" class="clean-account-pill ${mode==="REAL" ? "active" : ""}" onclick="uiSwitchMode('REAL')">
+              <span>Real Account</span>
+              <b id="cleanRealBalance">${hrMoney(hrRealWallet())}</b>
+            </button>
+          </div>
+        </div>
+
+        <div class="clean-market-grid" id="cleanMarketGrid">
+          ${coins.map(c => `
+            <div class="clean-market-card" data-clean-coin="${c}">
+              <b>${c.replace("USDT","/USDT")}</b>
+              <span data-clean-price="${c}">${hrUsd(hrPrice(c))}</span>
+              <em data-clean-change="${c}" class="${hrChange(c)>=0?'pos':'neg'}">${hrChange(c).toFixed(2)}%</em>
+            </div>
+          `).join("")}
+        </div>
+
+        <div class="clean-stats-grid">
+          <div class="clean-stat-card"><span>Today PnL</span><b id="cleanTodayPnl" class="${hrTodayPnl()>=0?'pos':'neg'}">${hrMoney(hrTodayPnl())}</b></div>
+          <div class="clean-stat-card"><span>Win Rate</span><b id="cleanWinRate">${state?.winRate || "0"}%</b></div>
+          <div class="clean-stat-card"><span>Market Mood</span><b id="cleanMarketMood">${state?.marketMood || "Neutral"}</b></div>
+          <div class="clean-stat-card"><span>Active Signal</span><b id="cleanActiveSignal">${sig.side}</b></div>
+        </div>
+
+        <div class="clean-ai-signal-card card">
+          <div class="clean-live-dot"></div>
+          <div class="clean-ai-main">
+            <p class="label">AI Signal Live</p>
+            <h2 id="cleanAiSignalTitle">${sig.side} ${String(sig.coin || "BTCUSDT").replace("USDT","/USDT")}</h2>
+            <p>AI trend confirmation active.</p>
+          </div>
+          <div class="clean-confidence">82%</div>
+          <div class="clean-signal-grid">
+            <div><span>Entry</span><b id="cleanSignalEntry">Market</b></div>
+            <div><span>Target</span><b id="cleanSignalTarget">${sig.target ? hrUsd(sig.target) : "-"}</b></div>
+            <div><span>Stop Loss</span><b id="cleanSignalStopLoss">${sig.stopLoss ? hrUsd(sig.stopLoss) : "-"}</b></div>
+            <div><span>Expires</span><b>30m</b></div>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function hrDashboard(){
+    return document.getElementById("dashboard") ||
+      document.getElementById("home") ||
+      document.querySelector('[data-page="home"]') ||
+      document.querySelector(".page.active-page") ||
+      document.getElementById("appPage");
+  }
+
+  function hrBuildOnce(){
+    if (!hrIsUser()) return;
+    const dash = hrDashboard();
+    if (!dash) return;
+
+    let mount = document.getElementById("cleanHomeMount");
+    if (!mount) {
+      mount = document.createElement("div");
+      mount.id = "cleanHomeMount";
+      dash.prepend(mount);
+    }
+
+    if (!document.getElementById("cleanHomeShell")) {
+      mount.innerHTML = hrMakeShellHtml();
+      shellBuilt = true;
+    }
+
+    hrHideOldHomeBlocks();
+    hrUpdateValues();
+  }
+
+  function hrHideOldHomeBlocks(){
+    const dash = hrDashboard();
+    if (!dash) return;
+
+    Array.from(dash.children).forEach(child => {
+      if (child.id === "cleanHomeMount") return;
+      if (child.id === "homeAiTradeControlCard") return;
+      if (child.id === "manualOpenPositionsMount") return;
+
+      const txt = child.textContent || "";
+      if (
+        /BTC\/USDT|ETH\/USDT|SOL\/USDT|BNB\/USDT|Today PnL|Win Rate|Market Mood|Active Signal|Hello,|Switch Account|AI\/AI Trades Today|AI Signal Live/i.test(txt)
+      ) {
+        child.classList.add("clean-home-hidden-old");
+      }
+    });
+
+    // Also hide any old rate/ticker sections that appear between AI Signal and Live Position.
+    document.querySelectorAll(".ticker-grid, #tickerGrid, .market-ticker, .live-rates, .rate-strip").forEach(el => {
+      if (!el.closest("#cleanHomeShell")) {
+        el.classList.add("hide-old-rate-strip");
+      }
+    });
+  }
+
+  function hrUpdateValues(){
+    if (!document.getElementById("cleanHomeShell")) return;
+
+    ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT"].forEach(c => {
+      const priceEl = document.querySelector(`[data-clean-price="${c}"]`);
+      const changeEl = document.querySelector(`[data-clean-change="${c}"]`);
+      if (priceEl) priceEl.textContent = hrUsd(hrPrice(c));
+      if (changeEl) {
+        const ch = hrChange(c);
+        changeEl.textContent = ch.toFixed(2) + "%";
+        changeEl.classList.toggle("pos", ch >= 0);
+        changeEl.classList.toggle("neg", ch < 0);
+      }
+    });
+
+    const demo = document.getElementById("cleanDemoBalance");
+    const real = document.getElementById("cleanRealBalance");
+    if (demo) demo.textContent = hrMoney(hrDemoWallet());
+    if (real) real.textContent = hrMoney(hrRealWallet());
+
+    document.getElementById("cleanDemoAccountBtn")?.classList.toggle("active", hrMode() === "DEMO");
+    document.getElementById("cleanRealAccountBtn")?.classList.toggle("active", hrMode() === "REAL");
+
+    const pnl = hrTodayPnl();
+    const pnlEl = document.getElementById("cleanTodayPnl");
+    if (pnlEl) {
+      pnlEl.textContent = hrMoney(pnl);
+      pnlEl.classList.toggle("pos", pnl >= 0);
+      pnlEl.classList.toggle("neg", pnl < 0);
+    }
+
+    const win = document.getElementById("cleanWinRate");
+    if (win) win.textContent = (state?.winRate || "0") + "%";
+
+    const mood = document.getElementById("cleanMarketMood");
+    if (mood) mood.textContent = state?.marketMood || "Neutral";
+
+    const sig = hrSignal();
+    const active = document.getElementById("cleanActiveSignal");
+    if (active) active.textContent = sig.side;
+
+    const title = document.getElementById("cleanAiSignalTitle");
+    if (title) title.textContent = `${sig.side} ${String(sig.coin || "BTCUSDT").replace("USDT","/USDT")}`;
+
+    const target = document.getElementById("cleanSignalTarget");
+    if (target) target.textContent = sig.target ? hrUsd(sig.target) : "-";
+
+    const sl = document.getElementById("cleanSignalStopLoss");
+    if (sl) sl.textContent = sig.stopLoss ? hrUsd(sig.stopLoss) : "-";
+  }
+
+  // Override old renderer if it exists: no innerHTML rebuild after first build.
+  window.uiRenderHomeShell = function(){
+    hrBuildOnce();
+  };
+
+  window.updateCleanHomeRates = function(){
+    try {
+      hrHideOldHomeBlocks();
+      hrUpdateValues();
+    } catch(e) {}
+  };
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(hrBuildOnce, 400));
+  window.addEventListener("load", () => setTimeout(hrBuildOnce, 700));
+
+  // Price values update quickly, but shell never rebuilds.
+  setInterval(() => {
+    try {
+      if (typeof fetchPrices === "function") fetchPrices();
+    } catch(e) {}
+    updateCleanHomeRates();
+  }, 1000);
 })();

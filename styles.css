@@ -4279,11 +4279,33 @@ body[data-user-clean-ui="true"] .table-wrap{
 }
 
 
-/* ===== AI CONTROL BLINK ROOT FIX ===== */
-#homeAiTradeControlCard.clean-home-ai-control{
+
+
+
+/* ===== HOME RATE LIVE + STATIC SHELL FIX ===== */
+.hide-old-rate-strip{
+  display:none!important;
+}
+.clean-home-hidden-old{
+  display:none!important;
+}
+.static-home-shell .clean-market-card{
+  min-height:98px!important;
+}
+.static-home-shell .clean-market-card b,
+.static-home-shell .clean-market-card span,
+.static-home-shell .clean-market-card em{
   display:block!important;
-  visibility:visible!important;
-  opacity:1!important;
-  transform:none!important;
-  animation:none!important;
+  width:100%!important;
+  line-height:1.25!important;
+}
+.static-home-shell .clean-market-card span{
+  font-size:16px!important;
+  margin:6px 0 4px!important;
+}
+.static-home-shell .clean-market-card em.pos{
+  color:var(--clean-green,#00e7a8)!important;
+}
+.static-home-shell .clean-market-card em.neg{
+  color:var(--clean-red,#ff456b)!important;
 }

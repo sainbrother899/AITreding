@@ -373,3 +373,13 @@ AI Control Blink Root Fix:
 - ctarget_replaced=True
 - No SQL required.
 - JS syntax check: OK
+
+
+Home Rate Live + Static Shell Fix:
+- Home shell now builds once and does not rebuild with innerHTML repeatedly.
+- Home rate cards update values every 1 second.
+- Old ticker/rate strip outside cleanHomeShell is hidden, including rate strip between AI Signal and Live Position.
+- Demo/Real balances, Today PnL, Signal fields update without rebuilding cards.
+- AI Control remains stable outside rebuilt shell.
+- No SQL required.
+- JS syntax check: OK
