@@ -55,7 +55,7 @@ window.addEventListener("error", function(e){
 const $ = (id) => document.getElementById(id);
 const qsa = (sel) => Array.from(document.querySelectorAll(sel));
 const cfg = window.APP_CONFIG || {};
-const isAdminPage = /admin\.html/i.test(location.pathname) || document.body?.dataset?.adminPage === "true";
+const isAdminPage = !!window.FORCE_ADMIN_PAGE || /admin\.html/i.test(location.pathname) || document.body?.dataset?.adminPage === "true";
 const LS_KEY = "ai_trading_clean_core_v1";
 const SESSION_KEY = isAdminPage ? "ai_admin_session_v1" : "ai_user_session_v1";
 let supabaseClient = null;
@@ -2456,3 +2456,133 @@ function pctBindAdminBulkPercent() {
 }
 setInterval(pctBindAdminBulkPercent, 1200);
 window.addEventListener("load", () => setTimeout(pctBindAdminBulkPercent, 1000));
+
+
+/* ===== ADMIN REFRESH SESSION HARD FIX ===== */
+(function(){
+  function isHardAdminPage() {
+    return !!window.FORCE_ADMIN_PAGE ||
+      /(^|\/)admin\.html(\?|#|$)/i.test(location.pathname) ||
+      document.body?.dataset?.adminPage === "true";
+  }
+
+  window.isHardAdminPage = isHardAdminPage;
+
+  function getAdminSessionHard() {
+    try {
+      return JSON.parse(localStorage.getItem("ai_admin_session_v1") || "null");
+    } catch(e) {
+      return null;
+    }
+  }
+
+  function saveAdminSessionHard(user) {
+    if (user && user.role === "admin") {
+      localStorage.setItem("ai_admin_session_v1", JSON.stringify(user));
+      // Do not let user-session override admin page.
+      localStorage.removeItem("ai_user_session_v1");
+    }
+  }
+
+  function lockAdminPageHard() {
+    if (!isHardAdminPage()) return;
+
+    document.body.dataset.adminPage = "true";
+
+    const adminSession = getAdminSessionHard();
+    if (adminSession && adminSession.role === "admin") {
+      try {
+        state.user = adminSession;
+        state.mode = "REAL";
+        if (typeof saveSession === "function") saveSession();
+      } catch(e) {}
+
+      try {
+        const auth = document.getElementById("authPage");
+        const app = document.getElementById("appPage");
+        const logout = document.getElementById("logoutBtn");
+        if (auth) auth.classList.add("hidden");
+        if (app) app.classList.remove("hidden");
+        if (logout) logout.classList.remove("hidden");
+      } catch(e) {}
+
+      setTimeout(() => {
+        try {
+          if (typeof showPage === "function") showPage("admin");
+          else document.getElementById("admin")?.classList.add("active-page");
+          if (typeof render === "function") render();
+        } catch(e) {}
+      }, 250);
+    } else {
+      // No admin session: keep admin login page only. Never open user/demo dashboard on admin.html.
+      try {
+        state.user = null;
+        localStorage.removeItem("ai_admin_session_v1");
+      } catch(e) {}
+
+      setTimeout(() => {
+        const auth = document.getElementById("authPage");
+        const app = document.getElementById("appPage");
+        const logout = document.getElementById("logoutBtn");
+        if (auth) auth.classList.remove("hidden");
+        if (app) app.classList.add("hidden");
+        if (logout) logout.classList.add("hidden");
+      }, 100);
+    }
+  }
+
+  // Patch afterLogin so admin session is saved separately.
+  const installAfterLoginPatch = () => {
+    try {
+      if (window.__adminAfterLoginPatched) return;
+      if (typeof afterLogin !== "function") return;
+
+      const oldAfterLogin = afterLogin;
+      window.afterLogin = afterLogin = function(user) {
+        if (isHardAdminPage()) {
+          if (!user || user.role !== "admin") {
+            alert("Admin page पर केवल admin login allowed है.");
+            return;
+          }
+          saveAdminSessionHard(user);
+        }
+        return oldAfterLogin(user);
+      };
+
+      window.__adminAfterLoginPatched = true;
+    } catch(e) {}
+  };
+
+  document.addEventListener("DOMContentLoaded", function(){
+    installAfterLoginPatch();
+    setTimeout(lockAdminPageHard, 200);
+    setTimeout(lockAdminPageHard, 1000);
+  });
+
+  window.addEventListener("load", function(){
+    installAfterLoginPatch();
+    setTimeout(lockAdminPageHard, 300);
+  });
+
+  setInterval(function(){
+    installAfterLoginPatch();
+    if (isHardAdminPage() && state?.user?.role === "admin") {
+      const app = document.getElementById("appPage");
+      const auth = document.getElementById("authPage");
+      if (app && app.classList.contains("hidden")) app.classList.remove("hidden");
+      if (auth && !auth.classList.contains("hidden")) auth.classList.add("hidden");
+    }
+  }, 1500);
+})();
+
+
+/* Admin page guest/demo guard */
+document.addEventListener("click", function(e){
+  if ((window.FORCE_ADMIN_PAGE || document.body?.dataset?.adminPage === "true") && e.target.closest("#guestBtn")) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    alert("Admin page पर guest/demo login allowed नहीं है.");
+    return false;
+  }
+}, true);

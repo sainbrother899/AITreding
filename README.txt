@@ -139,3 +139,13 @@ User Wallet Percent AI Trade Update:
 - Users are skipped if auto OFF, AI daily limit complete, wallet low, or amount below ₹100.
 - SQL patch adds profiles.ai_trade_percent and profiles.auto_trade_permission.
 - JS syntax check: OK
+
+
+Admin Refresh Session Fix:
+- admin.html is hard-marked with window.FORCE_ADMIN_PAGE = true.
+- Admin page refresh now restores ai_admin_session_v1.
+- Admin page will not open user/demo dashboard after refresh.
+- Guest/demo login blocked on admin page.
+- User session is separated from admin session.
+- No SQL required.
+- JS syntax check: OK
