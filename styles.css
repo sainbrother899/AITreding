@@ -6276,3 +6276,72 @@ body[data-admin-active-section="paymentSettings"] #adminPaymentSettingsPanel{
     max-width:none!important;
   }
 }
+
+
+/* ===== ADMIN PAYMENT MENU FORCE FIX ===== */
+.admin-pay-force-btn,
+.admin-payment-quick-menu button,
+[data-admin-pay-open],
+[data-admin-pay-tab]{
+  width:100%!important;
+  min-height:44px!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:10px!important;
+  border:0!important;
+  border-radius:13px!important;
+  padding:0 12px!important;
+  margin:6px 0!important;
+  background:rgba(255,255,255,.055)!important;
+  color:#eaf2ff!important;
+  text-align:left!important;
+  cursor:pointer!important;
+  box-sizing:border-box!important;
+}
+.admin-pay-force-btn span,
+.admin-payment-quick-menu button span{
+  width:26px!important;
+  display:grid!important;
+  place-items:center!important;
+}
+.admin-pay-force-btn b,
+.admin-payment-quick-menu button b{
+  font-size:13px!important;
+  font-weight:850!important;
+}
+.admin-pay-force-btn.active,
+.admin-payment-quick-menu button.active,
+[data-admin-pay-open].active,
+[data-admin-pay-tab].active{
+  background:linear-gradient(135deg,rgba(0,231,168,.20),rgba(53,167,255,.16))!important;
+  color:#00e7a8!important;
+  border:1px solid rgba(0,231,168,.22)!important;
+}
+.admin-payment-quick-menu{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:10px!important;
+  width:100%!important;
+  margin:0 0 14px!important;
+  padding:12px!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  background:rgba(255,255,255,.035)!important;
+  border-radius:18px!important;
+  box-sizing:border-box!important;
+}
+.admin-payment-quick-menu.fallback-hidden{
+  display:none!important;
+}
+.force-admin-pay-hidden,
+.admin-pay-force-temp-hide{
+  display:none!important;
+}
+#adminPayoutRequestsPanel.active-admin-pay-panel,
+#adminPaymentSettingsPanel.active-admin-pay-panel{
+  display:block!important;
+}
+@media(max-width:700px){
+  .admin-payment-quick-menu{
+    grid-template-columns:1fr!important;
+  }
+}

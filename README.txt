@@ -749,3 +749,16 @@ Admin Payment Tabs Fix:
 - Existing admin layout restore remains included.
 - No SQL required.
 - JS syntax check: OK
+
+
+Admin Payment Menu Force Fix:
+- Stronger injection for admin menu/sidebar buttons.
+- Adds buttons:
+  - Payout Method Requests
+  - Payment Settings
+- If sidebar selector fails, creates Admin Payment Quick Menu at top as fallback.
+- Payment sections remain hidden until button click.
+- Normal admin menu click hides payment sections again.
+- Existing admin/payment logic retained.
+- No SQL required.
+- JS syntax check: OK

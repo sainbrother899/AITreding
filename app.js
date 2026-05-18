@@ -6362,3 +6362,183 @@ function restoreManualHistoryBackup(mode = state.mode) {
   window.addEventListener("load", () => setTimeout(bindAdminPayTabs, 1200));
   setInterval(bindAdminPayTabs, 2200);
 })();
+
+
+/* ===== ADMIN PAYMENT MENU FORCE FIX ===== */
+(function(){
+  function apmIsAdmin(){
+    return location.pathname.toLowerCase().includes("admin") ||
+      document.body.classList.contains("admin-pc-restore") ||
+      document.body.classList.contains("admin") ||
+      !!document.getElementById("adminPage") ||
+      !!document.getElementById("adminApp") ||
+      !!document.querySelector("[id*='admin' i], [class*='admin' i]");
+  }
+
+  function apmAdminRoot(){
+    return document.getElementById("adminPage") ||
+      document.getElementById("adminApp") ||
+      document.querySelector(".admin-page,.admin-shell,.admin-layout,.admin-main,.admin-content") ||
+      document.body;
+  }
+
+  function apmFindMenu(){
+    const selectors = [
+      ".admin-sidebar nav",
+      ".admin-sidebar",
+      ".admin-menu",
+      ".admin-nav",
+      ".admin-tabs",
+      ".sidebar nav",
+      ".sidebar",
+      "aside nav",
+      "aside",
+      "[class*='sidebar' i]",
+      "[class*='menu' i]",
+      "[class*='tabs' i]"
+    ];
+    for (const s of selectors) {
+      const el = document.querySelector(s);
+      if (!el) continue;
+      const txt = (el.textContent || "").toLowerCase();
+      if (txt.includes("user") || txt.includes("deposit") || txt.includes("withdraw") || txt.includes("trade") || txt.includes("admin") || el.querySelector("button,a")) {
+        return el;
+      }
+    }
+    return null;
+  }
+
+  function apmEnsureQuickMenu(){
+    let quick = document.getElementById("adminPaymentQuickMenu");
+    if (!quick) {
+      quick = document.createElement("div");
+      quick.id = "adminPaymentQuickMenu";
+      quick.className = "admin-payment-quick-menu";
+      quick.innerHTML = `
+        <button type="button" data-admin-pay-open="payoutMethods">💳 Payout Method Requests</button>
+        <button type="button" data-admin-pay-open="paymentSettings">🏦 Payment Settings</button>
+      `;
+      const root = apmAdminRoot();
+      root.insertAdjacentElement("afterbegin", quick);
+    }
+    return quick;
+  }
+
+  function apmButton(tab, icon, text){
+    let btn = document.querySelector(`[data-admin-pay-open="${tab}"]`);
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "admin-pay-force-btn";
+      btn.dataset.adminPayOpen = tab;
+      btn.innerHTML = `<span>${icon}</span><b>${text}</b>`;
+    }
+    return btn;
+  }
+
+  function apmInjectButtons(){
+    if (!apmIsAdmin()) return;
+
+    const menu = apmFindMenu();
+    const payout = apmButton("payoutMethods", "💳", "Payout Method Requests");
+    const settings = apmButton("paymentSettings", "🏦", "Payment Settings");
+
+    if (menu) {
+      if (!menu.querySelector('[data-admin-pay-open="payoutMethods"]')) menu.appendChild(payout);
+      if (!menu.querySelector('[data-admin-pay-open="paymentSettings"]')) menu.appendChild(settings);
+    } else {
+      apmEnsureQuickMenu();
+    }
+
+    // Always create quick menu as fallback if sidebar injection does not visually appear.
+    const quick = apmEnsureQuickMenu();
+    if (menu) quick.classList.add("fallback-hidden");
+    else quick.classList.remove("fallback-hidden");
+  }
+
+  function apmHideAllNormal(){
+    document.querySelectorAll(".admin-panel,.admin-section,.admin-page-section,.admin-tab-panel,#adminDashboard,#adminUsers,#adminDeposits,#adminWithdrawals,#adminTrades,#adminSettings").forEach(el => {
+      if (el.id === "adminPayoutRequestsPanel" || el.id === "adminPaymentSettingsPanel") return;
+      el.classList.add("admin-pay-force-temp-hide");
+      el.style.setProperty("display","none","important");
+    });
+  }
+
+  function apmShowNormal(){
+    document.querySelectorAll(".admin-pay-force-temp-hide").forEach(el => {
+      el.classList.remove("admin-pay-force-temp-hide");
+      el.style.removeProperty("display");
+    });
+  }
+
+  function apmOpen(tab){
+    const payout = document.getElementById("adminPayoutRequestsPanel");
+    const settings = document.getElementById("adminPaymentSettingsPanel");
+
+    apmHideAllNormal();
+
+    [payout, settings].filter(Boolean).forEach(panel => {
+      const show = (tab === "payoutMethods" && panel.id === "adminPayoutRequestsPanel") ||
+                   (tab === "paymentSettings" && panel.id === "adminPaymentSettingsPanel");
+      panel.classList.toggle("force-admin-pay-hidden", !show);
+      panel.classList.toggle("active-admin-pay-panel", show);
+      panel.style.setProperty("display", show ? "block" : "none", "important");
+    });
+
+    document.querySelectorAll("[data-admin-pay-open],[data-admin-pay-tab]").forEach(btn => {
+      const t = btn.dataset.adminPayOpen || btn.dataset.adminPayTab;
+      btn.classList.toggle("active", t === tab);
+    });
+
+    document.body.dataset.adminActiveSection = tab;
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+
+  function apmBind(){
+    if (!apmIsAdmin()) return;
+    apmInjectButtons();
+
+    document.querySelectorAll("[data-admin-pay-open],[data-admin-pay-tab]").forEach(btn => {
+      if (btn.dataset.forcePayBound === "1") return;
+      btn.dataset.forcePayBound = "1";
+      btn.addEventListener("click", function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        apmOpen(btn.dataset.adminPayOpen || btn.dataset.adminPayTab);
+      }, true);
+    });
+
+    // Hide panels by default until user clicks option.
+    if (!document.body.dataset.adminActiveSection) {
+      document.querySelectorAll("#adminPayoutRequestsPanel,#adminPaymentSettingsPanel").forEach(panel => {
+        panel.classList.add("force-admin-pay-hidden");
+        panel.style.setProperty("display","none","important");
+      });
+    }
+
+    // Normal admin menu clicks reset payment tab.
+    const menu = apmFindMenu();
+    if (menu && menu.dataset.forceNormalReset !== "1") {
+      menu.dataset.forceNormalReset = "1";
+      menu.addEventListener("click", function(e){
+        if (e.target.closest("[data-admin-pay-open],[data-admin-pay-tab]")) return;
+        const normal = e.target.closest("button,a,[data-tab],[data-section],[data-admin-tab]");
+        if (!normal) return;
+        apmShowNormal();
+        delete document.body.dataset.adminActiveSection;
+        document.querySelectorAll("#adminPayoutRequestsPanel,#adminPaymentSettingsPanel").forEach(panel => {
+          panel.classList.add("force-admin-pay-hidden");
+          panel.style.setProperty("display","none","important");
+        });
+        document.querySelectorAll("[data-admin-pay-open],[data-admin-pay-tab]").forEach(b => b.classList.remove("active"));
+      }, true);
+    }
+  }
+
+  window.openAdminPaymentSection = apmOpen;
+  window.injectAdminPaymentMenuButtons = apmInjectButtons;
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(apmBind, 800));
+  window.addEventListener("load", () => setTimeout(apmBind, 1000));
+  setInterval(apmBind, 1200);
+})();
