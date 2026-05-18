@@ -1926,3 +1926,253 @@ function renderPlanWalletBalanceHint() {
 }
 setInterval(renderPlanWalletBalanceHint, 1500);
 window.addEventListener("load", () => setTimeout(renderPlanWalletBalanceHint, 800));
+
+
+/* ===== ADMIN STABILITY FIX ===== */
+function adminSafeMoney(n) {
+  try { if (typeof money === "function") return money(n); } catch(e) {}
+  return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+}
+function adminSafeUsd(n) {
+  try { if (typeof usd === "function") return usd(n); } catch(e) {}
+  return "$" + Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+function adminGetUsersOnly() {
+  return (state.users || []).filter(u => String(u.role || "user").toLowerCase() !== "admin");
+}
+function adminWalletForUser(u) {
+  if (!u) return 0;
+  const uid = String(u.id || u.email || "");
+  try { if (typeof realWallet === "function") return Number(realWallet(uid) || 0); } catch(e) {}
+  const dep = (state.depositRequests || [])
+    .filter(d => String(d.userId || d.user_id || "") === uid && String(d.status || "").toUpperCase() === "APPROVED")
+    .reduce((a,d)=>a+Number(d.amount||0),0);
+  const led = (state.walletLedger || [])
+    .filter(l => String(l.userId || l.user_id || "") === uid)
+    .reduce((a,l)=>a+Number(l.amount||0),0);
+  return dep + led;
+}
+function adminPlanLimit(u) {
+  try { if (typeof aiLimitForUser === "function") return aiLimitForUser(u); } catch(e) {}
+  const plan = (state.plans || []).find(p => String(p.name||p.id).toLowerCase() === String(u.plan || "Free").toLowerCase());
+  return Number(plan?.aiTradeLimit || plan?.ai_trade_limit || 5);
+}
+function adminUsedAi(u) {
+  try { if (typeof aiUsed === "function") return aiUsed(u); } catch(e) {}
+  const key = `${String(u.id || u.email || "local")}_REAL_${new Date().toISOString().slice(0,10)}`;
+  return Number(state.aiTradeUsage?.[key] || 0);
+}
+function adminCanReceiveAi(u) {
+  return u?.autoTradePermission !== false && adminUsedAi(u) < adminPlanLimit(u);
+}
+function adminEnsurePanels() {
+  const panels = document.querySelectorAll(".admin-panel");
+  if (!panels.length) return;
+  if (![...panels].some(p => p.classList.contains("active-admin-panel"))) {
+    panels[0].classList.add("active-admin-panel");
+  }
+  document.querySelectorAll(".admin-tab").forEach(tab => {
+    if (tab.dataset.adminStableBound) return;
+    tab.dataset.adminStableBound = "1";
+    tab.addEventListener("click", function(e) {
+      e.preventDefault();
+      document.querySelectorAll(".admin-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      document.querySelectorAll(".admin-panel").forEach(p => p.classList.remove("active-admin-panel"));
+      const target = document.getElementById(tab.dataset.adminTab);
+      if (target) target.classList.add("active-admin-panel");
+      adminRenderAllSafe();
+    });
+  });
+}
+function adminRenderStatsSafe() {
+  const users = adminGetUsersOnly();
+  const totalDep = (state.depositRequests || []).filter(d => String(d.status).toUpperCase()==="APPROVED").reduce((a,d)=>a+Number(d.amount||0),0);
+  const pendingDep = (state.depositRequests || []).filter(d => String(d.status).toUpperCase()==="PENDING").length;
+  const openTrades = (state.managedTrades || []).filter(t => String(t.status).toUpperCase()==="OPEN").length;
+  const map = {
+    adminTotalUsers: users.length,
+    adminTotalUsersMini: users.length,
+    adminTotalDeposits: adminSafeMoney(totalDep),
+    adminTotalDepositsMini: adminSafeMoney(totalDep),
+    adminPendingDeposits: pendingDep,
+    adminPendingDepositsMini: pendingDep,
+    adminOpenTrades: openTrades,
+    adminOpenTradesMini: openTrades
+  };
+  Object.entries(map).forEach(([id,val]) => { const el=document.getElementById(id); if(el) el.textContent=val; });
+}
+function adminRenderDepositsSafe() {
+  const el = document.getElementById("depositRequestsLog");
+  if (!el) return;
+  el.innerHTML = (state.depositRequests || []).map(d => {
+    const st = String(d.status || "PENDING").toUpperCase();
+    return `<tr>
+      <td>${d.userEmail || d.user_email || "-"}</td>
+      <td>${adminSafeMoney(d.amount)}</td>
+      <td>${d.txn || "-"}</td>
+      <td>${st}</td>
+      <td>${st==="PENDING" ? `<button class="approve-btn" onclick="approveDeposit('${d.id}')">Approve</button><button class="reject-btn" onclick="rejectDeposit('${d.id}')">Reject</button>` : "-"}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="5" class="empty">No deposits.</td></tr>`;
+}
+function adminRenderWithdrawalsSafe() {
+  const el = document.getElementById("withdrawalRequestsLog");
+  if (!el) return;
+  el.innerHTML = (state.withdrawalRequests || []).map(w => {
+    const st = String(w.status || "PENDING").toUpperCase();
+    return `<tr>
+      <td>${w.userEmail || w.user_email || "-"}</td>
+      <td>${adminSafeMoney(w.amount)}</td>
+      <td>${w.method || "-"}</td>
+      <td>${st}</td>
+      <td>${st==="PENDING" ? `<button class="approve-btn" onclick="approveWithdrawal('${w.id}')">Approve</button><button class="reject-btn" onclick="rejectWithdrawal('${w.id}')">Reject</button>` : "-"}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="5" class="empty">No withdrawals.</td></tr>`;
+}
+function adminRenderUserSelectsSafe() {
+  const users = adminGetUsersOnly();
+  const managed = document.getElementById("managedUserSelect");
+  if (managed) {
+    const old = managed.value;
+    managed.innerHTML = `<option value="ALL">All Eligible Users</option>` + users.map(u => `<option value="${u.id || u.email}">${u.email || u.name} — ${adminSafeMoney(adminWalletForUser(u))}</option>`).join("");
+    if ([...managed.options].some(o => o.value === old)) managed.value = old;
+  }
+  adminUpdateWalletPreviewSafe();
+}
+function adminUpdateWalletPreviewSafe() {
+  const target = document.getElementById("managedUserSelect")?.value || "ALL";
+  const walletEl = document.getElementById("managedUserWalletText");
+  const availEl = document.getElementById("managedUserAvailableText");
+  const amount = Number(document.getElementById("managedAmount")?.value || 0);
+  const users = adminGetUsersOnly();
+  if (!walletEl && !availEl) return;
+  if (target === "ALL") {
+    const eligible = users.filter(adminCanReceiveAi);
+    const total = eligible.reduce((a,u)=>a+adminWalletForUser(u),0);
+    const lowest = eligible.length ? Math.min(...eligible.map(adminWalletForUser)) : 0;
+    if (walletEl) walletEl.textContent = `${eligible.length} eligible | ${adminSafeMoney(total)}`;
+    if (availEl) availEl.textContent = `Lowest wallet: ${adminSafeMoney(lowest)} | Trade amount: ${adminSafeMoney(amount)}`;
+  } else {
+    const u = users.find(x => String(x.id || x.email) === String(target));
+    const bal = adminWalletForUser(u);
+    if (walletEl) walletEl.textContent = adminSafeMoney(bal);
+    if (availEl) availEl.textContent = `Available: ${adminSafeMoney(bal)} | Trade amount: ${adminSafeMoney(amount)}`;
+  }
+}
+function adminRenderEligibilitySafe() {
+  const el = document.getElementById("adminAiEligibilityLog");
+  if (!el) return;
+  el.innerHTML = adminGetUsersOnly().map(u => {
+    const used = adminUsedAi(u), limit = adminPlanLimit(u), left = Math.max(0, limit-used);
+    return `<tr>
+      <td>${u.email || u.name || "-"}</td>
+      <td>${u.plan || "Free"}</td>
+      <td>${used}</td>
+      <td>${limit}</td>
+      <td>${left}</td>
+      <td>${left>0 && u.autoTradePermission !== false ? "Eligible" : "Blocked"}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="6" class="empty">No users found.</td></tr>`;
+}
+function adminRenderManagedTradesSafe() {
+  const open = (state.managedTrades || []).filter(t => String(t.status).toUpperCase()==="OPEN");
+  const sel = document.getElementById("managedTradeSelect");
+  if (sel) {
+    const old = sel.value;
+    sel.innerHTML = `<option value="">Select open trade</option>` + open.map(t => `<option value="${t.id}">${t.userEmail || t.userId} | ${t.side} ${t.coin} | ${adminSafeMoney(t.amount)}</option>`).join("");
+    if ([...sel.options].some(o => o.value === old)) sel.value = old;
+  }
+  const log = document.getElementById("managedTradesLog");
+  if (log) {
+    log.innerHTML = (state.managedTrades || []).map(t => `<tr>
+      <td>${t.userEmail || t.userId || "-"}</td>
+      <td>${String(t.coin||"").replace("USDT","/USDT")}</td>
+      <td>${t.side || "-"}</td>
+      <td>${adminSafeMoney(t.amount)}</td>
+      <td>${adminSafeUsd(t.entry || t.entry_price)}</td>
+      <td>${t.close || t.close_price ? adminSafeUsd(t.close || t.close_price) : "-"}</td>
+      <td class="${Number(t.pnl||0)>=0?'pnl-plus':'pnl-minus'}">${adminSafeMoney(t.pnl)}</td>
+      <td>${t.status || "OPEN"}</td>
+      <td>${String(t.status).toUpperCase()==="OPEN" ? `<button class="reject-btn" onclick="document.getElementById('managedTradeSelect').value='${t.id}';cancelManagedTrade()">Cancel</button>` : "-"}</td>
+    </tr>`).join("") || `<tr><td colspan="9" class="empty">No managed trades.</td></tr>`;
+  }
+  const mass = document.getElementById("massTradesLog");
+  if (mass) {
+    mass.innerHTML = (state.managedTrades || []).filter(t => t.source === "ADMIN_MASS").map(t => `<tr>
+      <td>${t.userEmail || t.userId || "-"}</td><td>${String(t.coin||"").replace("USDT","/USDT")}</td><td>${t.side}</td><td>${adminSafeMoney(t.amount)}</td>
+      <td>${adminSafeUsd(t.entry)}</td><td>${t.close?adminSafeUsd(t.close):"-"}</td><td>${adminSafeMoney(t.pnl)}</td><td>${t.status}</td><td>-</td>
+    </tr>`).join("") || `<tr><td colspan="9" class="empty">No mass trades.</td></tr>`;
+  }
+}
+function adminRenderPlansSafe() {
+  const el = document.getElementById("adminPlansEditorLog");
+  if (!el) return;
+  el.innerHTML = (state.plans || []).map(p => `<tr>
+    <td>${p.name}</td><td>${adminSafeMoney(p.price)}</td><td>${p.duration || "-"}</td><td>${p.aiTradeLimit || p.ai_trade_limit || 5}</td>
+    <td><button class="ghost-btn" onclick="editPlan('${p.id || p.name}')">Edit</button></td>
+  </tr>`).join("") || `<tr><td colspan="5" class="empty">No plans.</td></tr>`;
+}
+function adminRenderReferralSafe() {
+  const el = document.getElementById("adminReferralLog") || document.getElementById("adminReferralsLog");
+  if (!el) return;
+  el.innerHTML = (state.referrals || []).map(r => `<tr>
+    <td>${r.referrerEmail || r.referrer_email || r.referrerId || "-"}</td>
+    <td>${r.userEmail || r.user_email || r.userId || "-"}</td>
+    <td>${adminSafeMoney(r.depositAmount || r.deposit_amount)}</td>
+    <td>${adminSafeMoney(r.bonusAmount || r.bonus_amount)}</td>
+    <td>${r.status || "PAID"}</td>
+  </tr>`).join("") || `<tr><td colspan="5" class="empty">No referral bonus yet.</td></tr>`;
+}
+function adminRenderPaymentsSafe() {
+  const el = document.getElementById("paymentRequestsLog");
+  if (!el) return;
+  el.innerHTML = (state.paymentRequests || []).map(p => `<tr>
+    <td>${p.userEmail || p.user_email || "-"}</td><td>${p.planName || p.plan_name || p.planId || "-"}</td><td>${adminSafeMoney(p.amount)}</td><td>${p.status || "PENDING"}</td><td>-</td>
+  </tr>`).join("") || `<tr><td colspan="5" class="empty">No payment requests.</td></tr>`;
+}
+function adminRenderKycSafe() {
+  const el = document.getElementById("kycRequestsLog");
+  if (!el) return;
+  el.innerHTML = (state.kycRequests || []).map(k => `<tr>
+    <td>${k.userEmail || k.user_email || "-"}</td><td>${k.name || "-"}</td><td>${k.docType || k.doc_type || "-"}</td><td>${k.status || "PENDING"}</td>
+    <td>${String(k.status).toUpperCase()==="PENDING" ? `<button class="approve-btn" onclick="approveKyc('${k.id}')">Approve</button>` : "-"}</td>
+  </tr>`).join("") || `<tr><td colspan="5" class="empty">No KYC requests.</td></tr>`;
+}
+function adminRenderAllSafe() {
+  try {
+    if (state.user?.role !== "admin") return;
+    adminEnsurePanels();
+    adminRenderStatsSafe();
+    adminRenderDepositsSafe();
+    adminRenderWithdrawalsSafe();
+    adminRenderUserSelectsSafe();
+    adminRenderEligibilitySafe();
+    adminRenderManagedTradesSafe();
+    adminRenderPlansSafe();
+    adminRenderReferralSafe();
+    adminRenderPaymentsSafe();
+    adminRenderKycSafe();
+  } catch(e) {
+    console.warn("Admin stable render failed", e);
+  }
+}
+function adminBindControlsSafe() {
+  ["managedUserSelect","managedAmount","managedCoin","managedOrderType"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el.dataset.adminStableControl) return;
+    el.dataset.adminStableControl = "1";
+    el.addEventListener("change", adminUpdateWalletPreviewSafe);
+    el.addEventListener("input", adminUpdateWalletPreviewSafe);
+  });
+}
+setInterval(() => {
+  adminEnsurePanels();
+  adminBindControlsSafe();
+  adminRenderAllSafe();
+}, 1200);
+window.addEventListener("load", () => setTimeout(() => {
+  adminEnsurePanels();
+  adminBindControlsSafe();
+  adminRenderAllSafe();
+}, 800));

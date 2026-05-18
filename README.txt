@@ -116,3 +116,15 @@ Plan Buy From Wallet Update:
 - User profile plan is updated in Supabase.
 - SQL patch included for missing columns.
 - JS syntax check: OK
+
+
+Admin Stability Fix:
+- Admin page body marked as data-admin-page.
+- Admin tabs/panels stable render.
+- Deposit/withdrawal logs render safely.
+- Managed/mass trade logs and selectors render safely.
+- User wallet preview renders safely.
+- Plan, referral, payment, KYC logs render safely if their table bodies exist.
+- Admin desktop layout fixed to prevent shifting.
+- SQL optional columns added for admin tables if missing.
+- JS syntax check: OK

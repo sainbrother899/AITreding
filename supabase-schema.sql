@@ -193,3 +193,14 @@ alter table public.payment_requests add column if not exists plan_name text;
 alter table public.payment_requests add column if not exists amount numeric default 0;
 alter table public.payment_requests add column if not exists status text default 'PENDING';
 alter table public.profiles add column if not exists plan text default 'Free';
+
+
+
+-- Admin stability optional columns
+alter table public.payment_requests add column if not exists user_email text;
+alter table public.payment_requests add column if not exists plan_name text;
+alter table public.payment_requests add column if not exists status text default 'PENDING';
+alter table public.kyc_requests add column if not exists doc_type text;
+alter table public.kyc_requests add column if not exists doc_number text;
+alter table public.managed_trades add column if not exists source text default 'ADMIN_MANAGED';
+alter table public.managed_trades add column if not exists risk text;

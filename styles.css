@@ -3315,3 +3315,58 @@ td:has(> .liq-badge){}
   color:var(--text,#fff);
   font-size:12px;
 }
+
+
+/* ===== ADMIN STABILITY FIX CSS ===== */
+body[data-admin-page="true"]{
+  overflow-x:hidden;
+}
+body[data-admin-page="true"] .admin-shell,
+body[data-admin-page="true"] .admin-layout,
+body[data-admin-page="true"] main{
+  max-width:1180px!important;
+  width:100%!important;
+  margin:0 auto!important;
+}
+body[data-admin-page="true"] .admin-panel{
+  display:none!important;
+}
+body[data-admin-page="true"] .admin-panel.active-admin-panel{
+  display:block!important;
+}
+body[data-admin-page="true"] .admin-tab{
+  cursor:pointer!important;
+  white-space:nowrap!important;
+}
+body[data-admin-page="true"] .table-wrap{
+  overflow-x:auto!important;
+}
+body[data-admin-page="true"] table{
+  min-width:760px!important;
+}
+body[data-admin-page="true"] input,
+body[data-admin-page="true"] select,
+body[data-admin-page="true"] textarea{
+  max-width:100%!important;
+}
+body[data-admin-page="true"] .card{
+  box-sizing:border-box!important;
+}
+body[data-admin-page="true"] .approve-btn,
+body[data-admin-page="true"] .reject-btn,
+body[data-admin-page="true"] .ghost-btn{
+  cursor:pointer!important;
+}
+@media(max-width:900px){
+  body[data-admin-page="true"] .admin-shell,
+  body[data-admin-page="true"] .admin-layout,
+  body[data-admin-page="true"] main{
+    width:100%!important;
+    padding-left:10px!important;
+    padding-right:10px!important;
+  }
+  body[data-admin-page="true"] .admin-tabs{
+    overflow-x:auto!important;
+    flex-wrap:nowrap!important;
+  }
+}
