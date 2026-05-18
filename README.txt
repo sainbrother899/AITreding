@@ -996,9 +996,17 @@ Mobile Payment Input Preserve Fix:
 - JS syntax check: OK
 
 
-Clean Rebuild V1:
-- index.html, admin.html, styles.css kept as design base.
-- Old app.js saved as app-old-backup.js only.
-- Active app.js rebuilt fresh; old duplicate patches/monkey patches not reused.
-- Clean KYC flow, My Payment Methods, admin KYC/Payout approval, deposit/withdraw/trade basics included.
-- Chart/Trade/Home/Wallet/P&L/History design untouched; active logic rebuilt to match current IDs.
+KYC + Payment + Referral Clean Module Final:
+- Stable ZIP design kept.
+- Original app.js backed up as app-design-base-backup.js.
+- Removed only previously added KYC/payment patch blocks by markers, not design/chart/trade/wallet render functions.
+- Added one clean module that owns:
+  * User KYC page
+  * My Payment Methods page
+  * Referral page
+  * Admin KYC approve/reject handlers
+  * Admin payout method approve/reject handlers
+- Old full app.js was NOT replaced.
+- Home/Trade/Chart/Wallet/P&L/History/card/menu design untouched.
+- Removed markers: [{"marker": "CLEAN KYC + PAYMENT LOGIC LOCKED BASE", "js": 1, "css": 1}, {"marker": "KYC + PAYMENT ROUTE LOCK FINAL", "js": 1, "css": 1}, {"marker": "MOBILE PAYMENT INPUT PRESERVE FIX", "js": 1, "css": 0}]
+- JS syntax check: OK

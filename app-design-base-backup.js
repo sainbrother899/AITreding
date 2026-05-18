@@ -6869,19 +6869,25 @@ function restoreManualHistoryBackup(mode = state.mode) {
 
 
 
-
-
-
-/* ===== KYC PAYMENT REFERRAL CLEAN MODULE FINAL ===== */
+/* ===== CLEAN KYC + PAYMENT LOGIC LOCKED BASE ===== */
 (function(){
-  const MAX_UPI = 2;
-  const MAX_BANK = 2;
-  const WARNING = "YOUR PAYMENT METHOD NAME SHOULD MATCH KYC NAME. DON'T USE OTHER ACCOUNT. IF YOU USE OTHER ACCOUNT, YOUR ACCOUNT MAY BE SUSPENDED.";
-  const KYC_BUCKET = "kyc-documents";
-  let pmType = (localStorage.getItem("kpr_pm_type") || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI";
-  let renderingPayment = false;
-  let renderingKyc = false;
-  let renderingReferral = false;
+  /* This block intentionally handles ONLY:
+     - Admin KYC existing table DB render
+     - User KYC approved/pending/rejected state
+     - My Payment Methods UPI/BANK stable selection
+     - 2 UPI + 2 BANK limit
+     It does NOT touch chart/trade/home/wallet/pnl/history layout or logic.
+  */
+
+  const PM_MAX_UPI = 2;
+  const PM_MAX_BANK = 2;
+  const PM_WARNING = "YOUR PAYMENT METHOD NAME SHOULD MATCH KYC NAME. DON'T USE OTHER ACCOUNT. IF YOU USE OTHER ACCOUNT, YOUR ACCOUNT MAY BE SUSPENDED.";
+
+  let kycRowsCache = null;
+  let kycLastHtml = "";
+  let kycLoading = false;
+  let pmSelectedType = (localStorage.getItem("pm_selected_type_locked") || localStorage.getItem("pm_selected_type_final") || localStorage.getItem("pm_selected_type_v2") || localStorage.getItem("selected_payment_method_type") || "UPI").toUpperCase();
+  if (pmSelectedType !== "BANK") pmSelectedType = "UPI";
 
   function sb(){
     try {
@@ -6890,246 +6896,952 @@ function restoreManualHistoryBackup(mode = state.mode) {
     } catch(e){}
     return null;
   }
-  function u(){ return state?.user || {}; }
-  function uid(){ return String(u().id || u().email || "local"); }
-  function email(){ return String(u().email || ""); }
-  function name(){ return u().name || u().email?.split("@")[0] || "User"; }
-  function kycName(){ return u().kycName || u().kyc_name || name(); }
-  function saveAll(){
-    try { saveState?.(); } catch(e){}
-    try { saveSession?.(); } catch(e){}
+
+  function currentUser(){
+    return state?.user || {};
   }
-  function isShown(el){
-    if (!el) return false;
-    return el.classList.contains("active-page") && getComputedStyle(el).display !== "none";
+
+  function currentUid(){
+    const u = currentUser();
+    return String(u.id || u.email || "local");
   }
-  function pageId(){
-    if (isShown(document.getElementById("kycPage"))) return "kyc";
-    if (isShown(document.getElementById("paymentMethodsPage"))) return "payment";
-    if (isShown(document.getElementById("referral"))) return "referral";
-    return "";
+
+  function currentEmail(){
+    return String(currentUser().email || "");
   }
-  function rootFor(page){
-    if (page === "kyc") {
-      const p = document.getElementById("kycPage");
-      return document.getElementById("kycPageContent") || p?.querySelector(".menu-real-content") || p?.querySelector(".menu-full-content") || p;
+
+  function isAdminPage(){
+    return location.pathname.toLowerCase().includes("admin") ||
+      state?.user?.role === "admin" ||
+      !!document.getElementById("adminPage") ||
+      !!document.getElementById("adminApp") ||
+      !!document.querySelector(".admin-shell,.admin-layout,.admin-sidebar");
+  }
+
+  function val(row, keys, fallback="-"){
+    for (const k of keys) {
+      if (row && row[k] !== undefined && row[k] !== null && row[k] !== "") return row[k];
     }
-    if (page === "payment") {
-      const p = document.getElementById("paymentMethodsPage");
-      return document.getElementById("paymentMethodsPageContent") || p?.querySelector(".menu-real-content") || p?.querySelector(".menu-full-content") || p;
+    return fallback;
+  }
+
+  function kycStatusHtml(s){
+    s = String(s || "PENDING").toUpperCase();
+    const cls = s === "APPROVED" ? "approved" : (s === "REJECTED" ? "rejected" : "pending");
+    return `<span class="clean-kyc-status ${cls}">${s}</span>`;
+  }
+
+  function kycTime(row){
+    const raw = row.raw || row || {};
+    const v = raw.reviewed_at || raw.submitted_at || raw.created_at || raw.createdAt || row.submittedAt || "";
+    const t = Date.parse(v);
+    return Number.isFinite(t) ? t : Number(row.id || 0) || 0;
+  }
+
+  function dedupeKycRows(rows){
+    const groups = new Map();
+    (rows || []).forEach(row => {
+      const raw = row.raw || {};
+      const key = String(row.user || raw.user_email || raw.email || raw.user_id || raw.userId || row.name || row.id).toLowerCase().trim();
+      const cur = groups.get(key);
+      if (!cur) {
+        groups.set(key, row);
+        return;
+      }
+      const rowApproved = String(row.status || "").toUpperCase() === "APPROVED";
+      const curApproved = String(cur.status || "").toUpperCase() === "APPROVED";
+      if (rowApproved && !curApproved) groups.set(key, row);
+      else if (rowApproved === curApproved && kycTime(row) > kycTime(cur)) groups.set(key, row);
+    });
+    return Array.from(groups.values());
+  }
+
+  function findKycBody(){
+    const byId = document.getElementById("kycRequestsLog");
+    if (byId) return byId;
+
+    const tables = Array.from(document.querySelectorAll("table"));
+    for (const table of tables) {
+      const txt = (table.textContent || "").toLowerCase();
+      if (txt.includes("doc type") && txt.includes("doc no") && txt.includes("status")) {
+        let tbody = table.querySelector("tbody");
+        if (!tbody) {
+          tbody = document.createElement("tbody");
+          table.appendChild(tbody);
+        }
+        return tbody;
+      }
     }
-    if (page === "referral") {
-      const p = document.getElementById("referral");
-      return document.getElementById("referralPageContent") || p?.querySelector(".menu-real-content") || p?.querySelector(".menu-full-content") || p;
+
+    const containers = Array.from(document.querySelectorAll(".card, section, div"));
+    for (const c of containers) {
+      const txt = (c.textContent || "").toLowerCase();
+      if (txt.includes("user kyc requests") && txt.includes("doc type") && txt.includes("doc no")) {
+        let body = c.querySelector("[data-clean-kyc-body]");
+        if (!body) {
+          body = document.createElement("div");
+          body.dataset.cleanKycBody = "1";
+          body.className = "clean-kyc-body";
+          c.appendChild(body);
+        }
+        return body;
+      }
     }
     return null;
   }
-  function toastMsg(msg){
-    try { toast?.(msg); } catch(e){ alert(msg); }
-  }
 
-  /* ---------- KYC clean owner ---------- */
-  function kycRowsForUser(){
-    const id = uid();
-    const em = String(email()).toLowerCase();
-    return (state.kycRequests || []).filter(k =>
-      String(k.userId || k.user_id || "") === id ||
-      String(k.userEmail || k.user_email || k.email || "").toLowerCase() === em
-    );
-  }
-  function rankStatus(s){
-    s = String(s || "PENDING").toUpperCase();
-    if (s === "APPROVED") return 3;
-    if (s === "PENDING") return 2;
-    if (s === "REJECTED") return 1;
-    return 0;
-  }
-  function rowTime(r){
-    const v = r.reviewed_at || r.submitted_at || r.createdAt || r.created_at || "";
-    return Date.parse(v) || Number(r.id || 0) || 0;
-  }
-  function latestKyc(){
-    const rows = kycRowsForUser();
-    if (!rows.length) return null;
-    return rows.slice().sort((a,b) => (rankStatus(b.status)-rankStatus(a.status)) || (rowTime(b)-rowTime(a)))[0];
-  }
-  function currentKycStatus(){
-    return String(latestKyc()?.status || u().kycStatus || u().kyc_status || "").toUpperCase();
-  }
-  async function uploadKycDoc(kycId, key, file){
+  async function loadAdminKycRows(){
+    if (kycLoading) return kycRowsCache || [];
     const client = sb();
-    if (!client || !file?.name) return null;
-    const safe = file.name.replace(/[^\w.\-]+/g, "_");
-    const path = `${uid()}/${kycId}/${key}_${Date.now()}_${safe}`;
-    const up = await client.storage.from(KYC_BUCKET).upload(path, file, { upsert:false });
-    if (up.error) throw up.error;
+    if (!client) return kycRowsCache || [];
+
+    kycLoading = true;
     try {
-      await client.from("kyc_documents").insert({
-        id: `doc_${Date.now()}_${key}`,
-        kyc_id: String(kycId),
-        user_id: uid(),
-        doc_key: key,
-        file_name: file.name,
-        file_path: path,
-        file_url: "",
-        mime_type: file.type || "",
-        size_bytes: file.size || 0
-      });
-    } catch(e){}
-    return { name:file.name, path, uploadedAt:new Date().toLocaleString() };
-  }
-  async function submitCleanKyc(form){
-    if (!state.user) return toastMsg("Login required.");
-    const fd = new FormData(form);
-    const kycId = Date.now();
-    const fullName = String(fd.get("kycName") || fd.get("name") || kycName()).trim();
-    const mobile = String(fd.get("kycMobile") || fd.get("mobile") || u().mobile || "").trim();
-    const docType = String(fd.get("kycDocType") || fd.get("docType") || "KYC").trim();
-    const docNumber = String(fd.get("kycDocNumber") || fd.get("docNumber") || "").trim();
-
-    if (!fullName) return alert("Please enter KYC name.");
-    if (!docNumber) return alert("Please enter document number.");
-
-    const row = {
-      id: String(kycId),
-      userId: uid(),
-      userEmail: email(),
-      name: fullName,
-      mobile,
-      docType,
-      docNumber,
-      status: "PENDING",
-      documents: {},
-      createdAt: new Date().toLocaleString()
-    };
-
-    const client = sb();
-    if (client) {
-      const insert = await client.from("kyc_requests").insert({
-        id: kycId,
-        user_id: row.userId,
-        user_email: row.userEmail,
-        name: fullName,
-        full_name: fullName,
-        mobile,
-        doc_type: docType,
-        doc_number: docNumber,
-        status: "PENDING",
-        submitted_at: new Date().toISOString()
-      });
-      if (insert.error) throw insert.error;
-
-      const docs = {};
-      const front = form.querySelector('[name="idFront"],[name="kycFrontFile"]')?.files?.[0] || document.getElementById("kycFrontFile")?.files?.[0];
-      const selfie = form.querySelector('[name="selfie"],[name="kycSelfieFile"]')?.files?.[0] || document.getElementById("kycSelfieFile")?.files?.[0];
-      if (front?.name) docs.front = await uploadKycDoc(kycId, "front", front);
-      if (selfie?.name) docs.selfie = await uploadKycDoc(kycId, "selfie", selfie);
-      row.documents = docs;
-      try { await client.from("kyc_requests").update({ documents: docs }).eq("id", kycId); } catch(e){}
-    }
-
-    state.kycRequests ||= [];
-    state.kycRequests.unshift(row);
-    state.user.kycStatus = "PENDING";
-    state.user.kycName = fullName;
-    saveAll();
-    renderKyc();
-    toastMsg("KYC submitted for admin approval.");
-  }
-  function renderKyc(){
-    const root = rootFor("kyc");
-    if (!root || renderingKyc) return;
-    renderingKyc = true;
-    try {
-      const row = latestKyc();
-      const status = String(row?.status || u().kycStatus || "").toUpperCase();
-      if (status === "APPROVED" || status === "PENDING") {
-        root.innerHTML = `
-          <div class="card kpr-kyc-card ${status.toLowerCase()}">
-            <div class="kpr-kyc-icon">${status === "APPROVED" ? "✓" : "⏳"}</div>
-            <h3>${status === "APPROVED" ? "Your KYC Approved" : "KYC Under Review"}</h3>
-            <p>${status === "APPROVED" ? "Your identity verification is approved. You do not need to submit KYC again." : "Your KYC documents have been submitted. Please wait for admin approval."}</p>
-            ${status === "APPROVED" ? `<div><span>Name</span><b>${row?.name || kycName()}</b></div>` : ""}
-          </div>`;
-        return;
+      let res = await client.from("kyc_requests").select("*").order("created_at", { ascending:false });
+      if (res.error) {
+        res = await client.from("kyc_requests").select("*");
+        if (res.error) throw res.error;
       }
 
-      const rejected = status === "REJECTED" ? `
-        <div class="card kpr-kyc-card rejected">
-          <div class="kpr-kyc-icon">!</div>
-          <h3>KYC Rejected</h3>
-          <p>Your previous KYC was rejected. Please submit again with correct details.</p>
-        </div>` : "";
+      let docsById = {};
+      try {
+        const dres = await client.from("kyc_documents").select("*");
+        if (!dres.error) {
+          (dres.data || []).forEach(d => {
+            const id = String(d.kyc_id || "");
+            docsById[id] ||= [];
+            docsById[id].push(d);
+          });
+        }
+      } catch(e){}
 
-      root.innerHTML = `${rejected}
-        <form id="kprKycForm" class="card menu-real-form">
-          <label>Full Name
-            <input name="kycName" value="${kycName()}" required>
-          </label>
-          <label>Mobile
-            <input name="kycMobile" value="${u().mobile || ""}" inputmode="numeric">
-          </label>
-          <label>Document Type
-            <select name="kycDocType">
-              <option>PAN</option>
-              <option>Aadhaar</option>
-              <option>Passport</option>
-              <option>Other</option>
-            </select>
-          </label>
-          <label>Document Number
-            <input name="kycDocNumber" required>
-          </label>
-          <label>ID Front / Document
-            <input type="file" name="idFront" accept="image/*,.pdf" required>
-          </label>
-          <label>Selfie Optional
-            <input type="file" name="selfie" accept="image/*">
-          </label>
-          <button type="submit">Submit KYC Documents for Approval</button>
-        </form>`;
+      const mapped = (res.data || []).map(r => {
+        const id = String(val(r, ["id"], ""));
+        const docs = r.documents || {};
+        const docCount = Object.keys(docs || {}).length + (docsById[id] || []).length;
+        return {
+          raw: r,
+          id,
+          user: val(r, ["user_email","email","user_id","userId"], "-"),
+          name: val(r, ["full_name","name","kyc_name"], "-"),
+          docType: val(r, ["doc_type","document_type"], "KYC"),
+          docNo: val(r, ["doc_number","document_number","kyc_id"], "-"),
+          files: docCount ? `${docCount} file${docCount > 1 ? "s" : ""}` : "Uploaded",
+          status: val(r, ["status"], "PENDING"),
+          submittedAt: val(r, ["submitted_at","created_at","createdAt"], "")
+        };
+      });
 
-      document.getElementById("kprKycForm")?.addEventListener("submit", async function(e){
-        e.preventDefault();
-        try { await submitCleanKyc(e.target); }
-        catch(err){ alert("KYC submit failed: " + (err.message || err)); }
-      }, true);
+      kycRowsCache = dedupeKycRows(mapped);
+      state.kycRequests = kycRowsCache.map(r => ({
+        id: r.id,
+        userEmail: r.user,
+        name: r.name,
+        docType: r.docType,
+        docNumber: r.docNo,
+        files: r.files,
+        status: r.status
+      }));
+      return kycRowsCache;
+    } catch(e) {
+      console.warn("Clean KYC DB load failed", e);
+      return kycRowsCache || [];
     } finally {
-      renderingKyc = false;
+      kycLoading = false;
     }
   }
 
-  /* ---------- Payment Methods clean owner ---------- */
-  function userMethods(){
+  function kycTableHtml(rows, isTable){
+    if (!rows) {
+      return isTable
+        ? `<tr><td colspan="7" class="empty">Loading KYC requests...</td></tr>`
+        : `<div class="clean-kyc-empty">Loading KYC requests...</div>`;
+    }
+
+    if (isTable) {
+      return rows.length ? rows.map(r => {
+        const st = String(r.status || "").toUpperCase();
+        const locked = st === "APPROVED" || st === "REJECTED";
+        return `
+          <tr data-clean-kyc-row="${r.id}">
+            <td>${r.user}</td>
+            <td>${r.name}</td>
+            <td>${r.docType}</td>
+            <td>${r.docNo}</td>
+            <td>${r.files}</td>
+            <td>${kycStatusHtml(r.status)}</td>
+            <td>
+              ${locked ? `<span class="clean-kyc-locked">${st === "APPROVED" ? "Locked" : "Closed"}</span>` : `
+                <button type="button" class="clean-kyc-action approve" data-clean-kyc-approve="${r.id}">Approve</button>
+                <button type="button" class="clean-kyc-action reject" data-clean-kyc-reject="${r.id}">Reject</button>
+              `}
+            </td>
+          </tr>`;
+      }).join("") : `<tr><td colspan="7" class="empty">No KYC requests found.</td></tr>`;
+    }
+
+    return rows.length ? rows.map(r => {
+      const st = String(r.status || "").toUpperCase();
+      const locked = st === "APPROVED" || st === "REJECTED";
+      return `
+        <div class="clean-kyc-grid-row" data-clean-kyc-row="${r.id}">
+          <span>${r.user}</span><span>${r.name}</span><span>${r.docType}</span><span>${r.docNo}</span><span>${r.files}</span>
+          <span>${kycStatusHtml(r.status)}</span>
+          <span>${locked ? `<span class="clean-kyc-locked">${st === "APPROVED" ? "Locked" : "Closed"}</span>` : `
+            <button type="button" class="clean-kyc-action approve" data-clean-kyc-approve="${r.id}">Approve</button>
+            <button type="button" class="clean-kyc-action reject" data-clean-kyc-reject="${r.id}">Reject</button>
+          `}</span>
+        </div>`;
+    }).join("") : `<div class="clean-kyc-empty">No KYC requests found.</div>`;
+  }
+
+  function renderAdminKyc(){
+    const body = findKycBody();
+    if (!body) return;
+    const html = kycTableHtml(kycRowsCache, body.tagName === "TBODY");
+    if (html !== kycLastHtml || body.innerHTML.trim() === "" || /Loading KYC|No KYC/i.test(body.textContent || "")) {
+      body.innerHTML = html;
+      kycLastHtml = html;
+    }
+  }
+
+  async function refreshAdminKyc(force=false){
+    if (!isAdminPage()) return;
+    await loadAdminKycRows();
+    if (force) kycLastHtml = "";
+    renderAdminKyc();
+  }
+
+  async function updateKycStatus(id, status){
+    const client = sb();
+    if (!client) throw new Error("Supabase client not found");
+    let res = await client.from("kyc_requests").update({ status, reviewed_at:new Date().toISOString() }).eq("id", id);
+    if (res.error && /reviewed_at/i.test(res.error.message || "")) {
+      res = await client.from("kyc_requests").update({ status }).eq("id", id);
+    }
+    if (res.error) throw res.error;
+
+    if (kycRowsCache) {
+      const row = kycRowsCache.find(x => String(x.id) === String(id));
+      if (row) row.status = status;
+      kycRowsCache = dedupeKycRows(kycRowsCache);
+    }
+  }
+
+  async function loadUserKyc(){
+    const client = sb();
+    const u = currentUser();
+    if (!client || !u) return null;
+
+    const id = currentUid();
+    const email = currentEmail();
+    let rows = [];
+
+    try {
+      let res;
+      if (email && id && email !== id) res = await client.from("kyc_requests").select("*").or(`user_id.eq.${id},user_email.eq.${email},email.eq.${email}`);
+      else res = await client.from("kyc_requests").select("*").eq("user_id", id);
+
+      if (res.error) {
+        const all = await client.from("kyc_requests").select("*");
+        if (all.error) throw all.error;
+        rows = (all.data || []).filter(r => String(r.user_id || "") === id || String(r.user_email || "") === email || String(r.email || "") === email);
+      } else {
+        rows = res.data || [];
+      }
+    } catch(e) {
+      console.warn("Clean user KYC load failed", e);
+      return null;
+    }
+
+    const picked = dedupeKycRows(rows.map(r => ({
+      raw: r,
+      id: String(r.id || ""),
+      user: r.user_email || r.email || r.user_id || "",
+      name: r.full_name || r.name || "",
+      status: r.status || "PENDING",
+      submittedAt: r.submitted_at || r.created_at || ""
+    })))[0] || null;
+
+    if (picked) {
+      state.user.kycStatus = picked.status || "PENDING";
+      state.user.kycName = picked.name || state.user.kycName || state.user.name;
+      try { saveState?.(); } catch(e){}
+      try { saveSession?.(); } catch(e){}
+    }
+    return picked;
+  }
+
+  function kycCard(status, name){
+    status = String(status || "").toUpperCase();
+    if (status === "APPROVED") return `
+      <div class="card clean-kyc-final-card approved">
+        <div class="clean-kyc-final-icon">✓</div>
+        <h3>Your KYC Approved</h3>
+        <p>Your identity verification is approved. You do not need to submit KYC again.</p>
+        <div><span>Name</span><b>${name || "Verified User"}</b></div>
+      </div>`;
+    if (status === "PENDING") return `
+      <div class="card clean-kyc-final-card pending">
+        <div class="clean-kyc-final-icon">⏳</div>
+        <h3>KYC Under Review</h3>
+        <p>Your KYC documents have been submitted. Please wait for admin approval.</p>
+      </div>`;
+    if (status === "REJECTED") return `
+      <div class="card clean-kyc-final-card rejected">
+        <div class="clean-kyc-final-icon">!</div>
+        <h3>KYC Rejected</h3>
+        <p>Your previous KYC was rejected. Please check details and submit again.</p>
+      </div>`;
+    return "";
+  }
+
+  async function applyUserKycState(){
+    const page = document.getElementById("kycPage");
+    if (!page || !page.classList.contains("active-page")) return;
+
+    const content = document.getElementById("kycPageContent") || page.querySelector(".menu-real-content") || page;
+    const form = page.querySelector("#realKycForm,#menuKycForm");
+    const row = await loadUserKyc();
+    const status = String(row?.status || state?.user?.kycStatus || "").toUpperCase();
+    const name = row?.name || state?.user?.kycName || state?.user?.name || "";
+
+    let wrap = page.querySelector("#cleanKycFinalStateWrap");
+    if (!wrap && status) {
+      wrap = document.createElement("div");
+      wrap.id = "cleanKycFinalStateWrap";
+      content.prepend(wrap);
+    }
+
+    if (status === "APPROVED" || status === "PENDING") {
+      wrap.innerHTML = kycCard(status, name);
+      if (form) form.style.setProperty("display","none","important");
+      page.querySelectorAll("#kycDocumentUploadBlock").forEach(x => x.style.setProperty("display","none","important"));
+      return;
+    }
+
+    if (status === "REJECTED") {
+      wrap.innerHTML = kycCard(status, name);
+      if (form) form.style.removeProperty("display");
+      page.querySelectorAll("#kycDocumentUploadBlock").forEach(x => x.style.removeProperty("display"));
+      return;
+    }
+
+    if (wrap) wrap.remove();
+    if (form) form.style.removeProperty("display");
+  }
+
+  function pmPage(){
+    return document.getElementById("paymentMethodsPage");
+  }
+
+  function pmOpen(){
+    const p = pmPage();
+    return !!(p && p.classList.contains("active-page") && getComputedStyle(p).display !== "none");
+  }
+
+  function pmForm(){
+    const p = pmPage();
+    return p?.querySelector("#securePaymentMethodForm,#realPaymentMethodForm,#menuPaymentMethodForm,form");
+  }
+
+  function pmSelect(){
+    const p = pmPage();
+    return document.getElementById("securePayType") || document.getElementById("realPayType") || p?.querySelector("select[name='type']") || p?.querySelector("select");
+  }
+
+  function payoutMethods(){
+    const id = currentUid();
+    const list = state?.userPayoutMethods || state?.payoutMethods || [];
+    return (list || []).filter(m => {
+      const mid = String(m.userId || m.user_id || "");
+      return !mid || mid === id;
+    });
+  }
+
+  function payoutType(m){
+    return String(m.type || m.method || m.method_type || "").toUpperCase();
+  }
+
+  function pmCount(type){
+    type = String(type || "").toUpperCase();
+    return payoutMethods().filter(m => payoutType(m) === type).length;
+  }
+
+  function pmCanAdd(type){
+    type = String(type || pmSelectedType).toUpperCase();
+    return type === "BANK" ? pmCount("BANK") < PM_MAX_BANK : pmCount("UPI") < PM_MAX_UPI;
+  }
+
+  function pmLimitText(type){
+    type = String(type || pmSelectedType).toUpperCase();
+    return type === "BANK" ? `You can add only ${PM_MAX_BANK} bank accounts.` : `You can add only ${PM_MAX_UPI} UPI IDs.`;
+  }
+
+  function setPmType(type){
+    type = String(type || "UPI").toUpperCase();
+    pmSelectedType = type === "BANK" ? "BANK" : "UPI";
+    localStorage.setItem("pm_selected_type_locked", pmSelectedType);
+    localStorage.setItem("pm_selected_type_final", pmSelectedType);
+    localStorage.setItem("pm_selected_type_v2", pmSelectedType);
+    localStorage.setItem("selected_payment_method_type", pmSelectedType);
+
+    const p = pmPage();
+    const s = pmSelect();
+    if (s && String(s.value).toUpperCase() !== pmSelectedType) s.value = pmSelectedType;
+
+    if (p) {
+      p.classList.toggle("payment-bank-selected-clean", pmSelectedType === "BANK");
+      p.classList.toggle("payment-bank-selected-final", pmSelectedType === "BANK");
+      p.classList.toggle("payment-bank-selected", pmSelectedType === "BANK");
+      p.classList.toggle("pay-bank-mode", pmSelectedType === "BANK");
+    }
+
+    const root = p || document;
+    root.querySelectorAll(".secure-pay-bank-fields,.real-pay-bank-fields,.pay-bank-fields,[data-bank-fields]").forEach(el => {
+      el.style.setProperty("display", pmSelectedType === "BANK" ? "grid" : "none", "important");
+    });
+    root.querySelectorAll(".secure-pay-upi,.real-pay-upi,.pay-upi-field,[data-upi-field]").forEach(el => {
+      el.style.setProperty("display", pmSelectedType === "BANK" ? "none" : "grid", "important");
+    });
+  }
+
+  function cleanupPaymentWarnings(){
+    const p = pmPage();
+    if (!p) return;
+
+    p.querySelectorAll(".pm-strong-warning,.pm-combined-limit-note,.payment-method-limit-note,.pm-one-warning-note,.pm-one-limit-note,.clean-pm-warning,.clean-pm-limit").forEach((el, idx) => {
+      if (el.classList.contains("clean-pm-warning") || el.classList.contains("clean-pm-limit")) return;
+      el.remove();
+    });
+
+    p.querySelectorAll(".pay-sec-note,.menu-real-note,.menu-full-note,.menu-payment-note,.card").forEach(el => {
+      if (el.querySelector("input,select,textarea")) return;
+      const txt = (el.textContent || "").toUpperCase();
+      if (txt.includes("PAYMENT METHOD NAME") || txt.includes("DON'T USE OTHER ACCOUNT") || txt.includes("DONT USE OTHER ACCOUNT") || txt.includes("LOCKED WITH YOUR KYC") || txt.includes("ADD UPI OR BANK ACCOUNT")) {
+        if (el.classList.contains("clean-pm-warning")) return;
+        el.remove();
+      }
+    });
+  }
+
+  function ensurePaymentWarning(){
+    const f = pmForm();
+    if (!f) return;
+
+    cleanupPaymentWarnings();
+
+    let note = document.querySelector("#paymentMethodsPage .clean-pm-warning");
+    if (!note) {
+      note = document.createElement("div");
+      note.className = "clean-pm-warning";
+      f.insertAdjacentElement("beforebegin", note);
+    }
+    note.textContent = PM_WARNING;
+  }
+
+  function ensurePaymentLimit(){
+    const f = pmForm();
+    if (!f) return;
+
+    let note = f.querySelector(".clean-pm-limit");
+    if (!note) {
+      note = document.createElement("div");
+      note.className = "clean-pm-limit";
+      const btn = f.querySelector("button[type='submit'],button");
+      if (btn) btn.insertAdjacentElement("beforebegin", note);
+      else f.appendChild(note);
+    }
+
+    const ok = pmCanAdd(pmSelectedType);
+    note.innerHTML = ok
+      ? `<span>Limit: UPI ${pmCount("UPI")}/${PM_MAX_UPI} • Bank ${pmCount("BANK")}/${PM_MAX_BANK}</span>`
+      : `<b>${pmLimitText(pmSelectedType)}</b>`;
+
+    const btn = f.querySelector("button[type='submit'],button");
+    if (btn) {
+      btn.disabled = !ok;
+      btn.classList.toggle("clean-pm-disabled", !ok);
+      if (!ok) {
+        if (!btn.dataset.cleanPmText) btn.dataset.cleanPmText = btn.textContent || "Add Method for Admin Approval";
+        btn.textContent = pmLimitText(pmSelectedType);
+      } else if (btn.dataset.cleanPmText) {
+        btn.textContent = btn.dataset.cleanPmText;
+        delete btn.dataset.cleanPmText;
+      }
+    }
+  }
+
+  function bindPaymentForm(){
+    const p = pmPage();
+    if (!p) return;
+
+    const s = pmSelect();
+    if (s && s.dataset.cleanPmSelectBound !== "1") {
+      s.dataset.cleanPmSelectBound = "1";
+      s.value = pmSelectedType;
+      s.addEventListener("change", function(e){
+        setPmType(e.target.value);
+        ensurePaymentWarning();
+        ensurePaymentLimit();
+      }, true);
+    }
+  }
+
+  function applyPaymentMethods(){
+    const p = pmPage();
+    if (!p) return;
+    bindPaymentForm();
+    setPmType(pmSelectedType);
+    ensurePaymentWarning();
+    ensurePaymentLimit();
+  }
+
+  function patchExistingRenderers(){
+    if (window.__cleanLogicRenderersPatched) return;
+    window.__cleanLogicRenderersPatched = true;
+
+    // Replace old KYC renderer so its own interval renders DB cache instead of blank/local stale rows.
+    window.adminRenderKycSafe = renderAdminKyc;
+    try { adminRenderKycSafe = renderAdminKyc; } catch(e) {}
+
+    if (typeof window.applyPaymentKycAdminApproval === "function") {
+      const oldPay = window.applyPaymentKycAdminApproval;
+      window.applyPaymentKycAdminApproval = function(){
+        const result = oldPay.apply(this, arguments);
+        setTimeout(applyPaymentMethods, 120);
+        return result;
+      };
+    }
+
+    if (typeof window.openRealMenuPage === "function") {
+      const oldOpen = window.openRealMenuPage;
+      window.openRealMenuPage = function(type){
+        const result = oldOpen.apply(this, arguments);
+        if (type === "paymentMethods") {
+          setTimeout(applyPaymentMethods, 180);
+          setTimeout(applyPaymentMethods, 800);
+        }
+        if (type === "kyc") {
+          setTimeout(applyUserKycState, 500);
+          setTimeout(applyUserKycState, 1200);
+        }
+        return result;
+      };
+    }
+  }
+
+  function bindEvents(){
+    document.addEventListener("click", async function(e){
+      const approve = e.target?.dataset?.cleanKycApprove;
+      const reject = e.target?.dataset?.cleanKycReject;
+      if (!approve && !reject) return;
+
+      const id = approve || reject;
+      const status = approve ? "APPROVED" : "REJECTED";
+      const old = e.target.textContent;
+      e.target.disabled = true;
+      e.target.textContent = "Updating...";
+      try {
+        await updateKycStatus(id, status);
+        kycLastHtml = "";
+        renderAdminKyc();
+      } catch(err) {
+        alert("KYC update failed: " + (err.message || err));
+      } finally {
+        e.target.disabled = false;
+        e.target.textContent = old;
+      }
+    }, true);
+
+    document.addEventListener("click", function(e){
+      const txt = (e.target?.textContent || "").toLowerCase();
+      if (txt.includes("kyc")) {
+        setTimeout(() => refreshAdminKyc(false), 350);
+        setTimeout(applyUserKycState, 800);
+      }
+      if (txt.includes("payment method") || txt.includes("payment methods")) {
+        setTimeout(applyPaymentMethods, 300);
+        setTimeout(applyPaymentMethods, 900);
+      }
+    }, true);
+
+    document.addEventListener("submit", function(e){
+      const f = e.target;
+      if (!f) return;
+
+      if (f.id === "realKycForm" || f.id === "menuKycForm") {
+        const st = String(state?.user?.kycStatus || "").toUpperCase();
+        if (st === "APPROVED" || st === "PENDING") {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          alert(st === "APPROVED" ? "Your KYC is already approved." : "Your KYC is already under review.");
+          return;
+        }
+      }
+
+      if (["securePaymentMethodForm","realPaymentMethodForm","menuPaymentMethodForm"].includes(f.id)) {
+        const s = pmSelect();
+        if (s) setPmType(s.value);
+
+        if (!pmCanAdd(pmSelectedType)) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          alert(pmLimitText(pmSelectedType));
+          applyPaymentMethods();
+          return;
+        }
+
+        let hidden = f.querySelector("input[name='type'][type='hidden']");
+        if (!hidden) {
+          hidden = document.createElement("input");
+          hidden.type = "hidden";
+          hidden.name = "type";
+          f.appendChild(hidden);
+        }
+        hidden.value = pmSelectedType;
+
+        setTimeout(applyPaymentMethods, 900);
+      }
+    }, true);
+  }
+
+  window.refreshAdminKycClean = function(){ return refreshAdminKyc(true); };
+  window.applyUserKycCleanState = applyUserKycState;
+  window.applyPaymentMethodsClean = applyPaymentMethods;
+
+  if (!window.__cleanKycPaymentLogicBound) {
+    window.__cleanKycPaymentLogicBound = true;
+    bindEvents();
+    patchExistingRenderers();
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => refreshAdminKyc(false), 1000);
+    setTimeout(applyUserKycState, 1200);
+    setTimeout(applyPaymentMethods, 1300);
+  });
+  window.addEventListener("load", () => {
+    setTimeout(() => refreshAdminKyc(false), 1200);
+    setTimeout(applyUserKycState, 1400);
+    setTimeout(applyPaymentMethods, 1500);
+  });
+
+  // Slow safety only. No fast blink/reset intervals.
+  setInterval(() => {
+    refreshAdminKyc(false);
+    if (pmOpen()) applyPaymentMethods();
+  }, 30000);
+})();
+
+
+
+
+
+
+
+
+
+
+
+/* ===== KYC + PAYMENT ROUTE LOCK FINAL ===== */
+(function(){
+  const PM_MAX_UPI = 2;
+  const PM_MAX_BANK = 2;
+  const PM_WARNING = "YOUR PAYMENT METHOD NAME SHOULD MATCH KYC NAME. DON'T USE OTHER ACCOUNT. IF YOU USE OTHER ACCOUNT, YOUR ACCOUNT MAY BE SUSPENDED.";
+
+  let activeLockedRoute = "";
+  let pmType = (localStorage.getItem("route_pm_type") || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI";
+  let renderLock = false;
+  let observerStarted = false;
+  let originalOpenRealMenuPage = null;
+
+  function client(){
+    try {
+      if (window.supabaseClient) return window.supabaseClient;
+      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
+    } catch(e){}
+    return null;
+  }
+
+  function user(){ return state?.user || {}; }
+  function uid(){ const u = user(); return String(u.id || u.email || "local"); }
+  function email(){ return String(user().email || ""); }
+  function kycName(){ return user().kycName || user().kyc_name || user().name || user().full_name || user().email?.split("@")[0] || "User"; }
+  function kycStatus(){ return String(user().kycStatus || user().kyc_status || "").toUpperCase(); }
+  function isKycApproved(){ return kycStatus() === "APPROVED"; }
+
+  function page(id){ return document.getElementById(id); }
+  function isShown(el){
+    if (!el) return false;
+    const st = getComputedStyle(el);
+    return el.classList.contains("active-page") && st.display !== "none" && st.visibility !== "hidden";
+  }
+  function currentRoute(){
+    if (isShown(page("paymentMethodsPage"))) return "paymentMethods";
+    if (isShown(page("kycPage"))) return "kyc";
+    return "";
+  }
+
+  function pRoot(){
+    const p = page("paymentMethodsPage");
+    return document.getElementById("paymentMethodsPageContent") ||
+      p?.querySelector(".menu-real-content") ||
+      p?.querySelector(".menu-full-content") ||
+      p;
+  }
+  function kRoot(){
+    const p = page("kycPage");
+    return document.getElementById("kycPageContent") ||
+      p?.querySelector(".menu-real-content") ||
+      p?.querySelector(".menu-full-content") ||
+      p;
+  }
+
+  async function loadUserKyc(){
+    const sb = client();
+    const u = user();
+    if (!sb || !u) return null;
     const id = uid();
-    return (state.userPayoutMethods || state.payoutMethods || []).filter(m => String(m.userId || m.user_id || "") === id);
+    const em = email();
+    try {
+      let rows = [];
+      let res;
+      if (em && id && em !== id) res = await sb.from("kyc_requests").select("*").or(`user_id.eq.${id},user_email.eq.${em},email.eq.${em}`);
+      else res = await sb.from("kyc_requests").select("*").eq("user_id", id);
+      if (res.error) {
+        const all = await sb.from("kyc_requests").select("*");
+        if (all.error) throw all.error;
+        rows = (all.data || []).filter(r => String(r.user_id || "") === id || String(r.user_email || "") === em || String(r.email || "") === em);
+      } else rows = res.data || [];
+
+      if (!rows.length) return null;
+      rows.sort((a,b) => {
+        const rank = s => String(s || "PENDING").toUpperCase() === "APPROVED" ? 3 : (String(s || "").toUpperCase() === "PENDING" ? 2 : 1);
+        const ra = rank(a.status), rb = rank(b.status);
+        if (ra !== rb) return rb - ra;
+        return (Date.parse(b.reviewed_at || b.submitted_at || b.created_at || "") || Number(b.id || 0) || 0) -
+               (Date.parse(a.reviewed_at || a.submitted_at || a.created_at || "") || Number(a.id || 0) || 0);
+      });
+      const row = rows[0];
+      state.user.kycStatus = row.status || "PENDING";
+      state.user.kycName = row.full_name || row.name || state.user.kycName || state.user.name;
+      try { saveState?.(); } catch(e){}
+      try { saveSession?.(); } catch(e){}
+      return row;
+    } catch(e) {
+      console.warn("Route-lock KYC DB load skipped", e);
+      return null;
+    }
   }
-  function methodType(m){ return String(m.type || m.method || m.method_type || "").toUpperCase(); }
-  function countMethod(type){
-    return userMethods().filter(m => methodType(m) === String(type).toUpperCase()).length;
+
+  function kycFinalCard(status, name){
+    status = String(status || "").toUpperCase();
+    if (status === "APPROVED") return `
+      <div class="card route-kyc-card approved">
+        <div class="route-kyc-icon">✓</div>
+        <h3>Your KYC Approved</h3>
+        <p>Your identity verification is approved. You do not need to submit KYC again.</p>
+        <div><span>Name</span><b>${name || "Verified User"}</b></div>
+      </div>`;
+    if (status === "PENDING") return `
+      <div class="card route-kyc-card pending">
+        <div class="route-kyc-icon">⏳</div>
+        <h3>KYC Under Review</h3>
+        <p>Your KYC documents have been submitted. Please wait for admin approval.</p>
+      </div>`;
+    if (status === "REJECTED") return `
+      <div class="card route-kyc-card rejected">
+        <div class="route-kyc-icon">!</div>
+        <h3>KYC Rejected</h3>
+        <p>Your previous KYC was rejected. Please check details and submit again.</p>
+      </div>`;
+    return "";
   }
-  function isKycApproved(){
-    return currentKycStatus() === "APPROVED";
+
+  async function renderKycRoute(){
+    const p = page("kycPage");
+    const root = kRoot();
+    if (!p || !root || currentRoute() !== "kyc") return;
+
+    const row = await loadUserKyc();
+    const status = String(row?.status || kycStatus()).toUpperCase();
+    const name = row?.full_name || row?.name || kycName();
+
+    const oldForm = p.querySelector("#realKycForm,#menuKycForm");
+    let wrap = p.querySelector("#routeKycStateWrap");
+    if (!wrap) {
+      wrap = document.createElement("div");
+      wrap.id = "routeKycStateWrap";
+      root.prepend(wrap);
+    }
+
+    if (status === "APPROVED" || status === "PENDING") {
+      wrap.innerHTML = kycFinalCard(status, name);
+      if (oldForm) oldForm.style.setProperty("display", "none", "important");
+      p.querySelectorAll("#kycDocumentUploadBlock").forEach(el => el.style.setProperty("display","none","important"));
+      return;
+    }
+
+    if (status === "REJECTED") {
+      wrap.innerHTML = kycFinalCard(status, name);
+      if (oldForm) oldForm.style.removeProperty("display");
+      p.querySelectorAll("#kycDocumentUploadBlock").forEach(el => el.style.removeProperty("display"));
+      return;
+    }
+
+    wrap.innerHTML = "";
+    if (oldForm) oldForm.style.removeProperty("display");
   }
-  function canAdd(type){
-    type = String(type || pmType).toUpperCase();
-    return type === "BANK" ? countMethod("BANK") < MAX_BANK : countMethod("UPI") < MAX_UPI;
+
+  function methods(){
+    const list = state?.userPayoutMethods || state?.payoutMethods || [];
+    const id = uid();
+    return (list || []).filter(m => {
+      const mid = String(m.userId || m.user_id || "");
+      return !mid || mid === id;
+    });
   }
-  function setType(type){
-    pmType = String(type || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI";
-    localStorage.setItem("kpr_pm_type", pmType);
-  }
-  function maskMethod(m){
-    const t = methodType(m);
-    if (t === "UPI") return m.upi || m.upi_id || "-";
+  function mType(m){ return String(m.type || m.method || m.method_type || "").toUpperCase(); }
+  function mCount(type){ return methods().filter(m => mType(m) === String(type).toUpperCase()).length; }
+  function canAdd(type){ type = String(type || pmType).toUpperCase(); return type === "BANK" ? mCount("BANK") < PM_MAX_BANK : mCount("UPI") < PM_MAX_UPI; }
+  function limitText(type){ type = String(type || pmType).toUpperCase(); return type === "BANK" ? `You can add only ${PM_MAX_BANK} bank accounts.` : `You can add only ${PM_MAX_UPI} UPI IDs.`; }
+  function setPmType(type){ pmType = String(type || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI"; localStorage.setItem("route_pm_type", pmType); }
+  function mask(m){
+    if (mType(m) === "UPI") return m.upi || m.upi_id || "-";
     const acc = String(m.accountNumber || m.account_number || "");
     return `${m.bankName || m.bank_name || "Bank"} ${acc ? "****" + acc.slice(-4) : ""}`;
   }
-  async function submitPaymentMethod(form){
-    if (!isKycApproved()) return alert("Please complete approved KYC before adding payment method.");
-    if (!canAdd(pmType)) return alert(pmType === "BANK" ? "You can add only 2 bank accounts." : "You can add only 2 UPI IDs.");
+  function pmStatus(s){
+    s = String(s || "PENDING").toUpperCase();
+    const cls = s === "APPROVED" ? "approved" : (s === "REJECTED" ? "rejected" : "pending");
+    return `<em class="route-pm-status ${cls}">${s}</em>`;
+  }
 
-    const fd = new FormData(form);
+  function paymentHtml(){
+    const approved = isKycApproved();
+    const ok = approved && canAdd(pmType);
+    const list = methods();
+    return `
+      <div class="route-pm-warning">${PM_WARNING}</div>
+
+      ${approved ? "" : `
+        <div class="card route-pm-kyc-note">
+          <b>KYC Approval Required</b>
+          <span>Please complete approved KYC before adding a payment method.</span>
+        </div>`}
+
+      <form id="routePaymentForm" class="card menu-real-form route-pm-form ${approved ? "" : "disabled"}">
+        <label>Method Type
+          <select id="routePayType" name="type" ${approved ? "" : "disabled"}>
+            <option value="UPI" ${pmType === "UPI" ? "selected" : ""}>UPI</option>
+            <option value="BANK" ${pmType === "BANK" ? "selected" : ""}>Bank Account</option>
+          </select>
+        </label>
+
+        <label class="route-pm-upi">UPI ID
+          <input name="upi" placeholder="example@upi" ${approved ? "" : "disabled"}>
+        </label>
+
+        <label>Account Holder Name / KYC Name
+          <input name="holderName" value="${kycName()}" readonly>
+        </label>
+
+        <div class="route-pm-bank">
+          <label>Bank Name
+            <input name="bankName" placeholder="Bank name" ${approved ? "" : "disabled"}>
+          </label>
+          <label>Account Number
+            <input name="accountNumber" placeholder="Account number" ${approved ? "" : "disabled"}>
+          </label>
+          <label>IFSC Code
+            <input name="ifsc" placeholder="IFSC code" ${approved ? "" : "disabled"}>
+          </label>
+        </div>
+
+        <div class="route-pm-limit">
+          ${ok ? `<span>Limit: UPI ${mCount("UPI")}/${PM_MAX_UPI} • Bank ${mCount("BANK")}/${PM_MAX_BANK}</span>` : `<b>${approved ? limitText(pmType) : "KYC approval required"}</b>`}
+        </div>
+
+        <button type="submit" ${ok ? "" : "disabled"}>${ok ? "Add Method for Admin Approval" : (approved ? limitText(pmType) : "KYC Approval Required")}</button>
+      </form>
+
+      <div class="menu-real-section-title">Saved Methods</div>
+      <div class="menu-real-methods route-pm-methods">
+        ${list.length ? list.map(m => `
+          <div class="card menu-real-method-card route-pm-method-card">
+            <div>
+              <span>${mType(m) || "METHOD"}</span>
+              <b>${mask(m)}</b>
+              <small>${m.holderName || m.holder_name || kycName()}</small>
+            </div>
+            ${pmStatus(m.status || "PENDING")}
+          </div>
+        `).join("") : `<div class="card menu-real-empty">No payment method added yet.</div>`}
+      </div>
+    `;
+  }
+
+  function applyPmTypeView(){
+    const p = page("paymentMethodsPage");
+    if (!p) return;
+    const sel = document.getElementById("routePayType");
+    if (sel && sel.value !== pmType) sel.value = pmType;
+    p.classList.toggle("route-pm-bank-selected", pmType === "BANK");
+    p.querySelectorAll(".route-pm-bank").forEach(el => el.style.setProperty("display", pmType === "BANK" ? "grid" : "none", "important"));
+    p.querySelectorAll(".route-pm-upi").forEach(el => el.style.setProperty("display", pmType === "BANK" ? "none" : "grid", "important"));
+  }
+
+  function renderPaymentRoute(){
+    const p = page("paymentMethodsPage");
+    const root = pRoot();
+    if (!p || !root || currentRoute() !== "paymentMethods") return;
+    if (renderLock) return;
+    renderLock = true;
+    try {
+      root.innerHTML = paymentHtml();
+      bindPaymentForm();
+      applyPmTypeView();
+    } finally {
+      renderLock = false;
+    }
+  }
+
+  function bindPaymentForm(){
+    const sel = document.getElementById("routePayType");
+    if (sel && sel.dataset.routeBound !== "1") {
+      sel.dataset.routeBound = "1";
+      sel.addEventListener("change", function(){
+        setPmType(sel.value);
+        renderPaymentRoute();
+      }, true);
+    }
+
+    const form = document.getElementById("routePaymentForm");
+    if (form && form.dataset.routeBound !== "1") {
+      form.dataset.routeBound = "1";
+      form.addEventListener("submit", submitPayment, true);
+    }
+  }
+
+  async function submitPayment(e){
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+
+    if (!isKycApproved()) {
+      alert("Please complete approved KYC before adding payment method.");
+      return;
+    }
+    if (!canAdd(pmType)) {
+      alert(limitText(pmType));
+      renderPaymentRoute();
+      return;
+    }
+
+    const fd = new FormData(e.target);
     const method = {
       id: "pm_" + Date.now(),
       userId: uid(),
@@ -7151,297 +7863,312 @@ function restoreManualHistoryBackup(mode = state.mode) {
     state.userPayoutMethods ||= state.payoutMethods || [];
     state.userPayoutMethods.unshift(method);
     state.payoutMethods = state.userPayoutMethods;
+    try { saveState?.(); } catch(e){}
+    try { saveSession?.(); } catch(e){}
 
-    const client = sb();
-    if (client) {
-      const res = await client.from("user_payout_methods").upsert({
-        id: method.id,
-        user_id: method.userId,
-        user_email: method.userEmail,
-        method_type: method.type,
-        holder_name: method.holderName,
-        kyc_name_snapshot: method.kycName,
-        upi_id: method.upi,
-        bank_name: method.bankName,
-        account_number: method.accountNumber,
-        ifsc: method.ifsc,
-        status: "PENDING",
-        name_match: true,
-        created_at_text: method.createdAt
-      }, { onConflict:"id" });
-      if (res.error) console.warn("Payout method DB save failed", res.error);
-    }
-
-    saveAll();
-    renderPayment();
-    toastMsg("Payment method sent for admin approval.");
-  }
-  function renderPayment(){
-    const root = rootFor("payment");
-    if (!root || renderingPayment) return;
-    renderingPayment = true;
-    try {
-      const approved = isKycApproved();
-      const ok = approved && canAdd(pmType);
-      const methods = userMethods();
-
-      root.innerHTML = `
-        <div class="kpr-pm-warning">${WARNING}</div>
-        ${approved ? "" : `<div class="card kpr-note"><b>KYC Approval Required</b><span>Please complete approved KYC before adding payment method.</span></div>`}
-
-        <form id="kprPaymentForm" class="card menu-real-form ${approved ? "" : "disabled"}">
-          <label>Method Type
-            <select id="kprPayType" name="type" ${approved ? "" : "disabled"}>
-              <option value="UPI" ${pmType === "UPI" ? "selected" : ""}>UPI</option>
-              <option value="BANK" ${pmType === "BANK" ? "selected" : ""}>Bank Account</option>
-            </select>
-          </label>
-
-          <label class="kpr-upi-field">UPI ID
-            <input name="upi" placeholder="example@upi" ${approved ? "" : "disabled"}>
-          </label>
-
-          <label>Account Holder Name / KYC Name
-            <input name="holderName" value="${kycName()}" readonly>
-          </label>
-
-          <div class="kpr-bank-fields">
-            <label>Bank Name
-              <input name="bankName" placeholder="Bank name" ${approved ? "" : "disabled"}>
-            </label>
-            <label>Account Number
-              <input name="accountNumber" placeholder="Account number" ${approved ? "" : "disabled"}>
-            </label>
-            <label>IFSC Code
-              <input name="ifsc" placeholder="IFSC code" ${approved ? "" : "disabled"}>
-            </label>
-          </div>
-
-          <div class="kpr-limit">${ok ? `<span>Limit: UPI ${countMethod("UPI")}/${MAX_UPI} • Bank ${countMethod("BANK")}/${MAX_BANK}</span>` : `<b>${approved ? (pmType === "BANK" ? "You can add only 2 bank accounts." : "You can add only 2 UPI IDs.") : "KYC approval required"}</b>`}</div>
-          <button type="submit" ${ok ? "" : "disabled"}>${ok ? "Add Method for Admin Approval" : "Not Available"}</button>
-        </form>
-
-        <div class="menu-real-section-title">Saved Methods</div>
-        <div class="menu-real-methods">
-          ${methods.length ? methods.map(m => `
-            <div class="card menu-real-method-card">
-              <div>
-                <span>${methodType(m) || "METHOD"}</span>
-                <b>${maskMethod(m)}</b>
-                <small>${m.holderName || m.holder_name || kycName()}</small>
-              </div>
-              <em class="kpr-status ${String(m.status || "PENDING").toLowerCase()}">${m.status || "PENDING"}</em>
-            </div>
-          `).join("") : `<div class="card menu-real-empty">No payment method added yet.</div>`}
-        </div>`;
-
-      const page = document.getElementById("paymentMethodsPage");
-      const select = document.getElementById("kprPayType");
-      function applyTypeView(){
-        if (select && select.value !== pmType) select.value = pmType;
-        page?.classList.toggle("kpr-bank-selected", pmType === "BANK");
-        page?.querySelectorAll(".kpr-bank-fields").forEach(el => el.style.display = pmType === "BANK" ? "grid" : "none");
-        page?.querySelectorAll(".kpr-upi-field").forEach(el => el.style.display = pmType === "BANK" ? "none" : "grid");
+    const sbc = client();
+    if (sbc) {
+      try {
+        const res = await sbc.from("user_payout_methods").upsert({
+          id: method.id,
+          user_id: method.userId,
+          method_type: method.type,
+          holder_name: method.holderName,
+          kyc_name_snapshot: method.kycName,
+          upi_id: method.upi,
+          bank_name: method.bankName,
+          account_number: method.accountNumber,
+          ifsc: method.ifsc,
+          status: "PENDING",
+          name_match: true,
+          created_at_text: method.createdAt
+        }, { onConflict:"id" });
+        if (res.error) console.warn("Payout method DB save failed", res.error);
+      } catch(err) {
+        console.warn("Payout method DB save failed", err);
       }
-      select?.addEventListener("change", () => {
-        setType(select.value);
-        renderPayment();
-      }, true);
-      document.getElementById("kprPaymentForm")?.addEventListener("submit", async e => {
-        e.preventDefault();
-        await submitPaymentMethod(e.target);
-      }, true);
-      applyTypeView();
-    } finally {
-      renderingPayment = false;
+    }
+
+    renderPaymentRoute();
+  }
+
+  function cleanupIfOldRouteAppears(){
+    const route = currentRoute();
+    if (route === "paymentMethods") {
+      const p = page("paymentMethodsPage");
+      if (p && !document.getElementById("routePaymentForm")) renderPaymentRoute();
+      else applyPmTypeView();
+    }
+    if (route === "kyc") {
+      renderKycRoute();
     }
   }
 
-  /* ---------- Referral clean owner ---------- */
-  function referralCode(user = u()){
-    let code = user.referral_code || user.referralCode;
-    if (!code) {
-      const base = String(user.email || user.id || "user").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8);
-      code = base + String(Math.floor(1000 + Math.random() * 9000));
-      user.referral_code = code;
-      user.referralCode = code;
-      saveAll();
-    }
-    return code;
-  }
-  function referralLink(){
-    return `${location.origin}${location.pathname}?ref=${encodeURIComponent(referralCode())}`;
-  }
-  function referralBonusTotal(){
-    const id = uid(), em = email().toLowerCase();
-    return (state.referrals || []).filter(r => String(r.referrerId || r.referrer_id || "") === id || String(r.referrerEmail || r.referrer_email || "").toLowerCase() === em)
-      .reduce((a,r) => a + Number(r.bonusAmount || r.bonus_amount || 0), 0);
-  }
-  function referralCount(){
-    const id = uid(), em = email().toLowerCase();
-    const directProfiles = (state.users || []).filter(x => String(x.referred_by || x.referredBy || "").toLowerCase() === String(referralCode()).toLowerCase()).length;
-    const records = (state.referrals || []).filter(r => String(r.referrerId || r.referrer_id || "") === id || String(r.referrerEmail || r.referrer_email || "").toLowerCase() === em).length;
-    return Math.max(directProfiles, records);
-  }
-  function renderReferral(){
-    const root = rootFor("referral");
-    if (!root || renderingReferral) return;
-    renderingReferral = true;
-    try {
-      const code = referralCode();
-      const link = referralLink();
-      const bonus = referralBonusTotal();
-      const count = referralCount();
+  function patchOpeners(){
+    if (window.__routeKycPaymentPatched) return;
+    window.__routeKycPaymentPatched = true;
 
-      const myCode = document.getElementById("myReferralCode");
-      const refCount = document.getElementById("refCount");
-      const refBonus = document.getElementById("refBonus");
-      if (myCode || refCount || refBonus) {
-        if (myCode) myCode.textContent = code;
-        if (refCount) refCount.textContent = count;
-        if (refBonus) refBonus.textContent = "₹" + Number(bonus || 0).toLocaleString("en-IN");
-        return;
-      }
-
-      root.innerHTML = `
-        <div class="card kpr-ref-card">
-          <span>Your Referral Code</span>
-          <h2>${code}</h2>
-          <p>${link}</p>
-          <button id="kprCopyReferral" type="button">Copy Referral Link</button>
-        </div>
-        <div class="kpr-ref-grid">
-          <div class="card"><span>Total Referrals</span><b>${count}</b></div>
-          <div class="card"><span>Referral Bonus</span><b>₹${Number(bonus || 0).toLocaleString("en-IN")}</b></div>
-        </div>`;
-      document.getElementById("kprCopyReferral")?.addEventListener("click", async () => {
-        try { await navigator.clipboard.writeText(link); toastMsg("Referral link copied."); }
-        catch(e){ prompt("Copy referral link:", link); }
-      });
-    } finally {
-      renderingReferral = false;
-    }
-  }
-
-  /* ---------- Admin owners for KYC/Payout ---------- */
-  async function approveKyc(id){
-    const row = (state.kycRequests || []).find(k => String(k.id) === String(id));
-    if (!row) return;
-    row.status = "APPROVED";
-    const client = sb();
-    if (client) await client.from("kyc_requests").update({ status:"APPROVED", reviewed_at:new Date().toISOString() }).eq("id", id);
-    saveAll();
-    try { render?.(); } catch(e){}
-  }
-  async function rejectKyc(id){
-    const row = (state.kycRequests || []).find(k => String(k.id) === String(id));
-    if (!row) return;
-    row.status = "REJECTED";
-    const client = sb();
-    if (client) await client.from("kyc_requests").update({ status:"REJECTED", reviewed_at:new Date().toISOString() }).eq("id", id);
-    saveAll();
-    try { render?.(); } catch(e){}
-  }
-  async function approvePayoutMethod(id){
-    const row = (state.userPayoutMethods || state.payoutMethods || []).find(m => String(m.id) === String(id));
-    if (!row) return;
-    row.status = "APPROVED";
-    const client = sb();
-    if (client) await client.from("user_payout_methods").update({ status:"APPROVED", reviewed_at:new Date().toISOString() }).eq("id", id);
-    saveAll();
-    try { render?.(); } catch(e){}
-  }
-  async function rejectPayoutMethod(id){
-    const row = (state.userPayoutMethods || state.payoutMethods || []).find(m => String(m.id) === String(id));
-    if (!row) return;
-    row.status = "REJECTED";
-    const client = sb();
-    if (client) await client.from("user_payout_methods").update({ status:"REJECTED", reviewed_at:new Date().toISOString() }).eq("id", id);
-    saveAll();
-    try { render?.(); } catch(e){}
-  }
-
-  /* ---------- Override only KYC/Payment/Referral routes, not design pages ---------- */
-  function patchNavigation(){
-    if (window.__kprCleanModulePatched) return;
-    window.__kprCleanModulePatched = true;
-
-    const oldShowPage = typeof window.showPage === "function" ? window.showPage : null;
-    if (oldShowPage) {
-      window.showPage = function(page){
-        const res = oldShowPage.apply(this, arguments);
-        setTimeout(() => {
-          if (page === "kycPage" || page === "kyc") renderKyc();
-          if (page === "paymentMethodsPage" || page === "paymentMethods") renderPayment();
-          if (page === "referral") renderReferral();
-        }, 50);
-        return res;
-      };
-      try { showPage = window.showPage; } catch(e){}
-    }
-
-    const oldOpenRealMenuPage = typeof window.openRealMenuPage === "function" ? window.openRealMenuPage : null;
-    if (oldOpenRealMenuPage) {
+    originalOpenRealMenuPage = typeof window.openRealMenuPage === "function" ? window.openRealMenuPage : null;
+    if (originalOpenRealMenuPage) {
       window.openRealMenuPage = function(type){
-        const res = oldOpenRealMenuPage.apply(this, arguments);
-        setTimeout(() => {
-          if (type === "kyc") renderKyc();
-          if (type === "paymentMethods") renderPayment();
-          if (type === "referral") renderReferral();
-        }, 50);
-        return res;
+        const result = originalOpenRealMenuPage.apply(this, arguments);
+        if (type === "paymentMethods") {
+          activeLockedRoute = "paymentMethods";
+          setTimeout(renderPaymentRoute, 0);
+          setTimeout(renderPaymentRoute, 100);
+          setTimeout(renderPaymentRoute, 400);
+        }
+        if (type === "kyc") {
+          activeLockedRoute = "kyc";
+          setTimeout(renderKycRoute, 0);
+          setTimeout(renderKycRoute, 200);
+          setTimeout(renderKycRoute, 700);
+        }
+        return result;
       };
-      try { openRealMenuPage = window.openRealMenuPage; } catch(e){}
     }
 
-    // Override global handlers for these modules only.
-    window.approveKyc = approveKyc;
-    window.rejectKyc = rejectKyc;
-    window.approvePayoutMethod = approvePayoutMethod;
-    window.rejectPayoutMethod = rejectPayoutMethod;
-    window.renderKycPage = renderKyc;
-    window.renderPaymentMethodsPage = renderPayment;
-    window.renderReferralClean = renderReferral;
-    window.kprRenderKyc = renderKyc;
-    window.kprRenderPayment = renderPayment;
+    // Prevent old payment renderer from overwriting while payment route is active.
+    window.applyPaymentKycAdminApproval = function(){
+      if (currentRoute() === "paymentMethods") return renderPaymentRoute();
+    };
+  }
+
+  function startObserver(){
+    if (observerStarted) return;
+    observerStarted = true;
+    const obs = new MutationObserver(function(){
+      const route = currentRoute();
+      if (route === "paymentMethods" || route === "kyc") {
+        setTimeout(cleanupIfOldRouteAppears, 0);
+      }
+    });
+    obs.observe(document.body, { childList:true, subtree:true });
   }
 
   document.addEventListener("click", function(e){
-    const text = (e.target?.textContent || "").toLowerCase();
-    const pageBtn = e.target.closest("[data-page]");
-    const menuBtn = e.target.closest("[data-menu-page],[data-direct-page]");
-    const target = pageBtn?.dataset?.page || menuBtn?.dataset?.menuPage || menuBtn?.dataset?.directPage || "";
-    if (target === "kyc" || target === "kycPage" || text.includes("kyc")) setTimeout(renderKyc, 80);
-    if (target === "paymentMethods" || target === "paymentMethodsPage" || text.includes("payment method")) setTimeout(renderPayment, 80);
-    if (target === "referral" || text.includes("referral")) setTimeout(renderReferral, 80);
+    const txt = (e.target?.textContent || "").toLowerCase();
+    if (txt.includes("payment method") || txt.includes("payment methods")) {
+      activeLockedRoute = "paymentMethods";
+      setTimeout(renderPaymentRoute, 50);
+      setTimeout(renderPaymentRoute, 250);
+      setTimeout(renderPaymentRoute, 650);
+    }
+    if (txt.includes("kyc")) {
+      activeLockedRoute = "kyc";
+      setTimeout(renderKycRoute, 80);
+      setTimeout(renderKycRoute, 450);
+    }
   }, true);
 
   document.addEventListener("submit", function(e){
-    if (e.target?.id === "kprKycForm" || e.target?.id === "kprPaymentForm") return;
-    const route = pageId();
-    if (route === "kyc" && e.target?.matches("form")) {
-      e.preventDefault();
-      e.stopPropagation();
-      renderKyc();
-    }
-    if (route === "payment" && e.target?.matches("form")) {
-      e.preventDefault();
-      e.stopPropagation();
-      renderPayment();
+    if (e.target?.id === "realKycForm" || e.target?.id === "menuKycForm") {
+      const st = kycStatus();
+      if (st === "APPROVED" || st === "PENDING") {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        alert(st === "APPROVED" ? "Your KYC is already approved." : "Your KYC is already under review.");
+      }
     }
   }, true);
 
-  function runForCurrent(){
-    patchNavigation();
-    const route = pageId();
-    if (route === "kyc") renderKyc();
-    if (route === "payment") renderPayment();
-    if (route === "referral") renderReferral();
+  window.renderRoutePaymentMethods = renderPaymentRoute;
+  window.renderRouteKycState = renderKycRoute;
+
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(patchOpeners, 200);
+    setTimeout(startObserver, 300);
+    setTimeout(cleanupIfOldRouteAppears, 800);
+  });
+  window.addEventListener("load", () => {
+    setTimeout(patchOpeners, 200);
+    setTimeout(startObserver, 300);
+    setTimeout(cleanupIfOldRouteAppears, 900);
+  });
+})();
+
+
+/* ===== MOBILE PAYMENT INPUT PRESERVE FIX ===== */
+(function(){
+  let pmEditing = false;
+  let editTimer = null;
+  let cachedValues = {};
+  let lastRenderAt = 0;
+
+  function page(){
+    return document.getElementById("paymentMethodsPage");
   }
 
-  document.addEventListener("DOMContentLoaded", () => setTimeout(runForCurrent, 1000));
-  window.addEventListener("load", () => setTimeout(runForCurrent, 1200));
+  function isPaymentOpen(){
+    const p = page();
+    return !!(p && p.classList.contains("active-page") && getComputedStyle(p).display !== "none");
+  }
 
-  // Very slow safety only; no per-second blinking.
-  setInterval(runForCurrent, 15000);
+  function form(){
+    return document.getElementById("routePaymentForm") ||
+      document.getElementById("finalUserPaymentMethodForm") ||
+      document.getElementById("userPaymentMethodCleanForm") ||
+      page()?.querySelector("form");
+  }
+
+  function collectValues(){
+    const f = form();
+    if (!f) return;
+    cachedValues = {};
+    f.querySelectorAll("input,select,textarea").forEach(el => {
+      const key = el.name || el.id;
+      if (!key) return;
+      if (el.type === "checkbox" || el.type === "radio") cachedValues[key] = el.checked;
+      else cachedValues[key] = el.value;
+    });
+  }
+
+  function restoreValues(){
+    const f = form();
+    if (!f || !cachedValues || !Object.keys(cachedValues).length) return;
+    f.querySelectorAll("input,select,textarea").forEach(el => {
+      const key = el.name || el.id;
+      if (!key || !(key in cachedValues)) return;
+      if (el.readOnly) return;
+      if (el.type === "checkbox" || el.type === "radio") el.checked = !!cachedValues[key];
+      else el.value = cachedValues[key];
+    });
+
+    const type = cachedValues.type || cachedValues.routePayType || cachedValues.finalUserPayType || cachedValues.userPmType;
+    if (type) {
+      try {
+        localStorage.setItem("route_pm_type", String(type).toUpperCase());
+        localStorage.setItem("user_pm_final_type", String(type).toUpperCase());
+      } catch(e){}
+      const p = page();
+      if (p) {
+        const isBank = String(type).toUpperCase() === "BANK";
+        p.classList.toggle("route-pm-bank-selected", isBank);
+        p.classList.toggle("final-pm-bank-selected", isBank);
+        p.classList.toggle("user-pm-bank-selected", isBank);
+        p.querySelectorAll(".route-pm-bank,.final-pm-bank-fields,.user-pm-bank-fields").forEach(x => x.style.setProperty("display", isBank ? "grid" : "none", "important"));
+        p.querySelectorAll(".route-pm-upi,.final-pm-upi-field,.user-pm-upi-field").forEach(x => x.style.setProperty("display", isBank ? "none" : "grid", "important"));
+      }
+    }
+  }
+
+  function startEditing(){
+    if (!isPaymentOpen()) return;
+    pmEditing = true;
+    collectValues();
+    clearTimeout(editTimer);
+    editTimer = setTimeout(() => {
+      collectValues();
+      // keep edit lock while mobile keyboard/input is active
+      if (document.activeElement && page()?.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) {
+        startEditing();
+      } else {
+        pmEditing = false;
+      }
+    }, 1800);
+  }
+
+  function patchRenderFunctions(){
+    if (window.__mobilePaymentInputPreservePatched) return;
+    window.__mobilePaymentInputPreservePatched = true;
+
+    const wrap = (name) => {
+      try {
+        if (typeof window[name] !== "function") return;
+        const old = window[name];
+        window[name] = function(){
+          if (isPaymentOpen() && pmEditing) {
+            restoreValues();
+            return;
+          }
+          collectValues();
+          const result = old.apply(this, arguments);
+          setTimeout(restoreValues, 50);
+          return result;
+        };
+      } catch(e){}
+    };
+
+    ["renderRoutePaymentMethods","renderFinalUserPaymentMethods","renderUserPaymentMethodsClean","applyPaymentMethodsClean","applyPaymentKycAdminApproval"].forEach(wrap);
+  }
+
+  function bind(){
+    const p = page();
+    if (!p) return;
+
+    p.querySelectorAll("input,select,textarea").forEach(el => {
+      if (el.dataset.mobilePreserveBound === "1") return;
+      el.dataset.mobilePreserveBound = "1";
+      ["input","change","focus","keydown","keyup","compositionstart","compositionend"].forEach(evt => {
+        el.addEventListener(evt, startEditing, true);
+      });
+      el.addEventListener("blur", () => {
+        collectValues();
+        clearTimeout(editTimer);
+        editTimer = setTimeout(() => { pmEditing = false; }, 700);
+      }, true);
+    });
+
+    const f = form();
+    if (f && f.dataset.mobileSubmitPreserveBound !== "1") {
+      f.dataset.mobileSubmitPreserveBound = "1";
+      f.addEventListener("submit", () => {
+        pmEditing = false;
+        cachedValues = {};
+      }, true);
+    }
+  }
+
+  // Guard against MutationObserver/render while typing: immediately restore if old render clears fields.
+  function startWatch(){
+    const p = page();
+    if (!p || p.dataset.mobilePreserveObserved === "1") return;
+    p.dataset.mobilePreserveObserved = "1";
+
+    const obs = new MutationObserver(() => {
+      if (!isPaymentOpen()) return;
+      patchRenderFunctions();
+      bind();
+
+      if (pmEditing) {
+        setTimeout(restoreValues, 0);
+        setTimeout(restoreValues, 80);
+      }
+    });
+    obs.observe(p, { childList:true, subtree:true, attributes:false });
+  }
+
+  document.addEventListener("click", function(e){
+    const txt = (e.target?.textContent || "").toLowerCase();
+    if (txt.includes("payment method") || txt.includes("payment methods")) {
+      setTimeout(() => { patchRenderFunctions(); bind(); startWatch(); restoreValues(); }, 400);
+      setTimeout(() => { patchRenderFunctions(); bind(); startWatch(); restoreValues(); }, 1000);
+    }
+  }, true);
+
+  window.preserveMobilePaymentInputs = function(){
+    collectValues();
+    restoreValues();
+  };
+
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(patchRenderFunctions, 500);
+    setTimeout(bind, 1000);
+    setTimeout(startWatch, 1200);
+  });
+  window.addEventListener("load", () => {
+    setTimeout(patchRenderFunctions, 600);
+    setTimeout(bind, 1100);
+    setTimeout(startWatch, 1300);
+  });
+
+  setInterval(() => {
+    if (isPaymentOpen()) {
+      patchRenderFunctions();
+      bind();
+      startWatch();
+      if (pmEditing) restoreValues();
+    }
+  }, 1500);
 })();
