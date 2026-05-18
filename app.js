@@ -4265,12 +4265,12 @@ function restoreManualHistoryBackup(mode = state.mode) {
       menu.id = "topHeaderMenuPanel";
       menu.className = "top-header-menu-panel";
       menu.innerHTML = `
-        <button type="button" data-goto-page="dashboard">Home</button>
-        <button type="button" data-goto-page="trade">Trade</button>
-        <button type="button" data-goto-page="wallet">Wallet</button>
-        <button type="button" data-goto-page="pnl">PnL</button>
-        <button type="button" data-goto-page="history">History</button>
-        <button type="button" id="topHeaderLogoutBtn">Logout</button>
+        <button type="button" data-menu-panel="profile">👤 Profile</button>
+        <button type="button" data-menu-panel="kyc">🛡️ KYC Verification</button>
+        <button type="button" data-menu-panel="referral">🎁 Referral</button>
+        <button type="button" data-menu-panel="paymentMethods">💳 My Payment Methods</button>
+        <button type="button" data-menu-panel="support">🎧 Support</button>
+        <button type="button" id="topHeaderLogoutBtn">🚪 Logout</button>
       `;
       document.body.appendChild(menu);
 
@@ -5073,4 +5073,197 @@ function restoreManualHistoryBackup(mode = state.mode) {
   document.addEventListener("DOMContentLoaded", () => setTimeout(hideOldWalletHistory, 900));
   window.addEventListener("load", () => setTimeout(hideOldWalletHistory, 1100));
   setInterval(hideOldWalletHistory, 2000);
+})();
+
+
+/* ===== MENU PROFILE KYC REFERRAL FIX ===== */
+(function(){
+  function mfUser(){
+    return state?.user || {};
+  }
+  function mfMoney(n){
+    try { if (typeof money === "function") return money(n); } catch(e){}
+    return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  }
+  function mfSafe(v){
+    return String(v || "-");
+  }
+  function mfReferralCode(){
+    const u = mfUser();
+    return u.referralCode || u.refCode || u.code || String(u.id || u.email || "USER").slice(0,8).toUpperCase();
+  }
+  function mfPanelHtml(type){
+    const u = mfUser();
+    const name = u.name || u.full_name || u.email?.split("@")[0] || "User";
+    const email = u.email || "-";
+    const mobile = u.mobile || u.phone || "-";
+    const kycStatus = String(u.kycStatus || u.kyc_status || "Pending").toUpperCase();
+    const refCode = mfReferralCode();
+
+    if (type === "profile") {
+      return `
+        <div class="menu-detail-head">
+          <button type="button" class="menu-detail-back">‹</button>
+          <div><p class="label">Account</p><h2>Profile</h2></div>
+        </div>
+        <div class="menu-profile-card">
+          <div class="menu-profile-avatar">${(name[0] || "U").toUpperCase()}</div>
+          <h3>${name}</h3>
+          <p>${email}</p>
+        </div>
+        <div class="menu-detail-list">
+          <div><span>Name</span><b>${mfSafe(name)}</b></div>
+          <div><span>Email</span><b>${mfSafe(email)}</b></div>
+          <div><span>Mobile</span><b>${mfSafe(mobile)}</b></div>
+          <div><span>KYC Status</span><b>${kycStatus}</b></div>
+        </div>
+      `;
+    }
+
+    if (type === "kyc") {
+      return `
+        <div class="menu-detail-head">
+          <button type="button" class="menu-detail-back">‹</button>
+          <div><p class="label">Verification</p><h2>KYC Verification</h2></div>
+        </div>
+        <div class="menu-kyc-status ${kycStatus.toLowerCase()}">
+          <span>Status</span>
+          <b>${kycStatus}</b>
+          <small>Admin approval required for completed KYC.</small>
+        </div>
+        <div class="menu-detail-list">
+          <div><span>PAN / ID</span><b>Not submitted</b></div>
+          <div><span>Address Proof</span><b>Not submitted</b></div>
+          <div><span>Bank Match</span><b>Pending</b></div>
+        </div>
+        <button type="button" class="menu-detail-primary">Submit KYC Details</button>
+      `;
+    }
+
+    if (type === "referral") {
+      const link = `${location.origin}${location.pathname}?ref=${encodeURIComponent(refCode)}`;
+      return `
+        <div class="menu-detail-head">
+          <button type="button" class="menu-detail-back">‹</button>
+          <div><p class="label">Invite & Earn</p><h2>Referral</h2></div>
+        </div>
+        <div class="menu-ref-card">
+          <span>Your Referral Code</span>
+          <b>${refCode}</b>
+          <small>${link}</small>
+        </div>
+        <div class="menu-detail-list">
+          <div><span>Total Referrals</span><b>${Number(u.referrals || u.referral_count || 0)}</b></div>
+          <div><span>Referral Bonus</span><b>${mfMoney(u.referralBonus || u.referral_bonus || 0)}</b></div>
+        </div>
+        <button type="button" class="menu-detail-primary" data-copy-ref="${link}">Copy Referral Link</button>
+      `;
+    }
+
+    if (type === "paymentMethods") {
+      const methods = (state?.payoutMethods || state?.userPayoutMethods || [])
+        .filter(m => String(m.userId || m.user_id || "") === String(u.id || u.email || "") || !m.userId && !m.user_id);
+      return `
+        <div class="menu-detail-head">
+          <button type="button" class="menu-detail-back">‹</button>
+          <div><p class="label">Withdraw Security</p><h2>My Payment Methods</h2></div>
+        </div>
+        <div class="menu-payment-note">
+          Add UPI or Bank Account. New method will work only after admin approval.
+        </div>
+        <button type="button" class="menu-detail-primary" id="addPaymentMethodBtn">Add Payment Method</button>
+        <div class="menu-method-list">
+          ${methods.length ? methods.map(m => `
+            <div class="menu-method-card">
+              <div><span>${mfSafe(m.type || m.method)}</span><b>${mfSafe(m.upi || m.account || m.account_number || m.bank || "-")}</b></div>
+              <em class="${String(m.status || "PENDING").toLowerCase()}">${String(m.status || "PENDING").toUpperCase()}</em>
+            </div>
+          `).join("") : `<div class="menu-empty-card">No payment method added yet.</div>`}
+        </div>
+      `;
+    }
+
+    return `
+      <div class="menu-detail-head">
+        <button type="button" class="menu-detail-back">‹</button>
+        <div><p class="label">Help</p><h2>Support</h2></div>
+      </div>
+      <div class="menu-detail-list">
+        <div><span>Support Ticket</span><b>Coming Soon</b></div>
+        <div><span>Email</span><b>support@example.com</b></div>
+      </div>
+      <button type="button" class="menu-detail-primary">Contact Support</button>
+    `;
+  }
+
+  function mfEnsureDetail(){
+    let panel = document.getElementById("menuDetailPanel");
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.id = "menuDetailPanel";
+      panel.className = "menu-detail-panel";
+      document.body.appendChild(panel);
+      panel.addEventListener("click", function(e){
+        if (e.target.classList.contains("menu-detail-back")) {
+          panel.classList.remove("show");
+          return;
+        }
+        const copy = e.target.dataset.copyRef;
+        if (copy) {
+          navigator.clipboard?.writeText(copy);
+          e.target.textContent = "Copied!";
+          setTimeout(()=> e.target.textContent = "Copy Referral Link", 1200);
+        }
+      });
+    }
+    return panel;
+  }
+
+  function mfOpen(type){
+    const panel = mfEnsureDetail();
+    panel.innerHTML = mfPanelHtml(type);
+    panel.classList.add("show");
+    document.getElementById("topHeaderMenuPanel")?.classList.remove("show");
+  }
+
+  function mfPatchMenu(){
+    const menu = document.getElementById("topHeaderMenuPanel");
+    if (!menu) return;
+
+    // Replace wrong bottom-nav options if still present.
+    if (menu.textContent.includes("Home") && menu.textContent.includes("Trade") && menu.textContent.includes("Wallet")) {
+      menu.innerHTML = `
+        <button type="button" data-menu-panel="profile">👤 Profile</button>
+        <button type="button" data-menu-panel="kyc">🛡️ KYC Verification</button>
+        <button type="button" data-menu-panel="referral">🎁 Referral</button>
+        <button type="button" data-menu-panel="paymentMethods">💳 My Payment Methods</button>
+        <button type="button" data-menu-panel="support">🎧 Support</button>
+        <button type="button" id="topHeaderLogoutBtn">🚪 Logout</button>
+      `;
+    }
+
+    if (menu.dataset.menuFixBound === "1") return;
+    menu.dataset.menuFixBound = "1";
+    menu.addEventListener("click", function(e){
+      const type = e.target?.dataset?.menuPanel;
+      if (type) {
+        e.preventDefault();
+        mfOpen(type);
+        return;
+      }
+      if (e.target?.id === "topHeaderLogoutBtn") {
+        try {
+          if (typeof logout === "function") return logout();
+          if (typeof uiLogout === "function") return uiLogout();
+        } catch(err) {}
+        localStorage.clear();
+        location.reload();
+      }
+    }, true);
+  }
+
+  window.openMenuDetailPanel = mfOpen;
+  document.addEventListener("DOMContentLoaded", () => setTimeout(mfPatchMenu, 700));
+  window.addEventListener("load", () => setTimeout(mfPatchMenu, 900));
+  setInterval(mfPatchMenu, 2000);
 })();

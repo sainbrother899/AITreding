@@ -664,3 +664,13 @@ Wallet History Only New Cards:
 - Mobile layout untouched except old duplicate history hidden.
 - No SQL required.
 - JS syntax check: OK
+
+
+Menu KYC Profile Referral Fix:
+- Top header menu no longer repeats bottom nav options.
+- Menu options are now: Profile, KYC Verification, Referral, My Payment Methods, Support, Logout.
+- Added lightweight menu detail panels for these items.
+- Bottom nav remains for Home, Trade, Wallet, PnL, History.
+- No SQL required.
+- JS syntax check: OK
+- Replaced existing menu HTML: True
