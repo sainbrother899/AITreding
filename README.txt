@@ -403,3 +403,12 @@ Global Profit/Loss Color Fix:
 - Runs after render so dynamic values also update color.
 - No SQL required.
 - JS syntax check: OK
+
+
+Floating Bar Size Polish:
+- Floating live position bar width/height increased slightly.
+- Text, PnL amount, and Close button are larger and more readable.
+- Still remains one-line compact bar above bottom navigation.
+- No logic changes.
+- No SQL required.
+- JS syntax check: OK
