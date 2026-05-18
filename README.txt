@@ -501,3 +501,10 @@ Wallet Nav Restore:
 - Wallet button is visible on PC and mobile.
 - Wallet is no longer hidden by demo/real mode CSS.
 - No SQL required.
+
+
+Referral Bonus Percentage Fix:
+- Fixed incorrect 5% calculation bug.
+- ₹100000 deposit now correctly gives ₹5000 referral bonus.
+- Added safer numeric parsing for approved deposit amount.
+- No SQL required.

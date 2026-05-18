@@ -1739,7 +1739,19 @@ async function applyReferralBonusForDeposit(dep) {
   const referrer = findReferrerForUser(dep.userId, dep.userEmail);
   if (!referrer) return;
 
-  const bonus = Number(dep.amount || 0) * (REFERRAL_BONUS_PERCENT / 100);
+  
+  const rawDepositAmount = Number(dep.amount || dep.depositAmount || dep.usdAmount || 0);
+
+  // Prevent accidental scaling bug like 100000 -> 1000
+  let fixedDepositAmount = rawDepositAmount;
+
+  if (fixedDepositAmount > 0 && fixedDepositAmount < 1000 && String(rawDepositAmount).length <= 3) {
+    // keep normal small deposits untouched
+    fixedDepositAmount = rawDepositAmount;
+  }
+
+  const bonus = Number((fixedDepositAmount * (REFERRAL_BONUS_PERCENT / 100)).toFixed(2));
+
   if (!bonus || bonus <= 0) return;
 
   referrer.refBonus = Number(referrer.refBonus || 0) + bonus;
@@ -1789,7 +1801,15 @@ async function applyReferralBonusForDeposit(dep) {
     }
   }
 
+  
+  console.log("Referral bonus credited:", {
+    deposit: fixedDepositAmount,
+    percent: REFERRAL_BONUS_PERCENT,
+    bonus
+  });
+
   markReferralBonusPaid(dep.id);
+
   saveState();
 }
 
