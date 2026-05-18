@@ -6861,3 +6861,287 @@ function restoreManualHistoryBackup(mode = state.mode) {
   setInterval(dbcInjectKycDocs, 2500);
   setInterval(dbcLoadFromDb, 12000);
 })();
+
+
+/* ===== ADMIN KYC REQUESTS FIX ===== */
+(function(){
+  function akIsAdmin(){
+    return location.pathname.toLowerCase().includes("admin") ||
+      document.body.classList.contains("admin-pc-restore") ||
+      document.body.classList.contains("admin") ||
+      state?.user?.role === "admin" ||
+      !!document.getElementById("adminPage") ||
+      !!document.getElementById("adminApp");
+  }
+
+  function akClient(){
+    try {
+      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
+      if (window.supabaseClient) return window.supabaseClient;
+    } catch(e){}
+    return null;
+  }
+
+  function akRoot(){
+    return document.getElementById("adminPage") ||
+      document.getElementById("adminApp") ||
+      document.querySelector(".admin-page,.admin-shell,.admin-layout,.admin-main,.admin-content") ||
+      document.body;
+  }
+
+  function akFindMenu(){
+    const selectors = [
+      ".admin-sidebar nav",".admin-sidebar",".admin-menu",".admin-nav",".admin-tabs",
+      ".sidebar nav",".sidebar","aside nav","aside","[class*='sidebar' i]","[class*='menu' i]"
+    ];
+    for (const s of selectors) {
+      const el = document.querySelector(s);
+      if (!el) continue;
+      if (el.querySelector("button,a") || /user|deposit|withdraw|trade|admin/i.test(el.textContent || "")) return el;
+    }
+    return null;
+  }
+
+  function akEnsureButton(){
+    if (!akIsAdmin()) return;
+    const menu = akFindMenu();
+
+    let btn = document.querySelector('[data-admin-stable-kyc="requests"]');
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ak-menu-btn";
+      btn.dataset.adminStableKyc = "requests";
+      btn.innerHTML = `<span>🛡️</span><b>KYC Requests</b>`;
+    }
+
+    if (menu && !menu.querySelector('[data-admin-stable-kyc="requests"]')) {
+      menu.appendChild(btn);
+    }
+
+    let quick = document.getElementById("adminKycQuickMenu");
+    if (!quick) {
+      quick = document.createElement("div");
+      quick.id = "adminKycQuickMenu";
+      quick.className = "ak-quick-menu";
+      quick.innerHTML = `<button type="button" data-admin-stable-kyc="requests"><span>🛡️</span><b>KYC Requests</b></button>`;
+      akRoot().insertAdjacentElement("afterbegin", quick);
+    }
+
+    // If sidebar/menu exists, hide fallback quick button.
+    quick.classList.toggle("hide-quick", !!menu);
+  }
+
+  function akStatus(s){
+    s = String(s || "PENDING").toUpperCase();
+    const cls = s === "APPROVED" ? "approved" : (s === "REJECTED" ? "rejected" : "pending");
+    return `<em class="ak-status ${cls}">${s}</em>`;
+  }
+
+  function akDocsHtml(k){
+    const docs = k.documents || {};
+    const rows = [];
+    Object.keys(docs || {}).forEach(key => {
+      const d = docs[key] || {};
+      rows.push(`<p><span>${key}</span><b>${d.name || d.file_name || d.path || d.file_path || "Uploaded"}</b></p>`);
+    });
+    if (!rows.length && Array.isArray(k.docRows)) {
+      k.docRows.forEach(d => rows.push(`<p><span>${d.doc_key || "doc"}</span><b>${d.file_name || d.file_path || "-"}</b></p>`));
+    }
+    return rows.length ? rows.join("") : `<p><span>Documents</span><b>No document metadata found</b></p>`;
+  }
+
+  async function akLoadKycRequests(){
+    const client = akClient();
+
+    // Try direct DB load first.
+    if (client) {
+      const { data, error } = await client.from("kyc_requests").select("*").order("created_at", { ascending:false });
+      if (error) throw error;
+
+      let docsByKyc = {};
+      try {
+        const { data: docs } = await client.from("kyc_documents").select("*").order("uploaded_at", { ascending:false });
+        (docs || []).forEach(d => {
+          const key = String(d.kyc_id || "");
+          docsByKyc[key] ||= [];
+          docsByKyc[key].push(d);
+        });
+      } catch(e) {
+        console.warn("KYC documents metadata load skipped", e);
+      }
+
+      const mapped = (data || []).map(r => ({
+        id: String(r.id),
+        userId: r.user_id,
+        userEmail: r.user_email,
+        name: r.full_name || r.name || "-",
+        mobile: r.mobile || "-",
+        docType: r.doc_type || "KYC",
+        docNumber: r.doc_number || "-",
+        dob: r.dob || "-",
+        address: r.address || "-",
+        status: r.status || "PENDING",
+        documents: r.documents || {},
+        submittedAt: r.submitted_at || r.created_at || "-",
+        docRows: docsByKyc[String(r.id)] || []
+      }));
+
+      state.kycRequests = mapped;
+      try { saveState?.(); } catch(e){}
+      return mapped;
+    }
+
+    return state.kycRequests || [];
+  }
+
+  function akPanel(){
+    let panel = document.getElementById("adminStableKycPage");
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.id = "adminStableKycPage";
+      panel.className = "ak-page";
+      panel.innerHTML = `
+        <div class="ak-head">
+          <button type="button" id="akBackBtn">‹</button>
+          <div><p class="label">User Verification</p><h2>KYC Requests</h2></div>
+          <button type="button" id="akRefreshBtn">Refresh</button>
+        </div>
+        <div id="akContent" class="ak-content"></div>
+      `;
+      document.body.appendChild(panel);
+      panel.querySelector("#akBackBtn").addEventListener("click", () => {
+        panel.classList.remove("show");
+        document.body.classList.remove("ak-page-open");
+      });
+      panel.querySelector("#akRefreshBtn").addEventListener("click", () => akOpen());
+    }
+    return panel;
+  }
+
+  function akRender(list){
+    if (!list.length) {
+      return `<div class="ak-empty">No KYC requests found. Agar user ne submit kiya hai, Supabase table kyc_requests check karein.</div>`;
+    }
+
+    return `
+      <div class="ak-list">
+        ${list.map(k => `
+          <div class="ak-card">
+            <div class="ak-top">
+              <div>
+                <span>User</span>
+                <b>${k.name || "-"}</b>
+                <small>${k.userEmail || k.userId || "-"}</small>
+              </div>
+              ${akStatus(k.status)}
+            </div>
+
+            <div class="ak-grid">
+              <p><span>User ID</span><b>${k.userId || "-"}</b></p>
+              <p><span>Mobile</span><b>${k.mobile || "-"}</b></p>
+              <p><span>Document Type</span><b>${k.docType || "KYC"}</b></p>
+              <p><span>Document No</span><b>${k.docNumber || "-"}</b></p>
+              <p><span>DOB</span><b>${k.dob || "-"}</b></p>
+              <p><span>Submitted</span><b>${k.submittedAt || "-"}</b></p>
+              <p class="wide"><span>Address</span><b>${k.address || "-"}</b></p>
+            </div>
+
+            <div class="ak-docs">
+              <h4>Documents</h4>
+              ${akDocsHtml(k)}
+              <small>Storage bucket private/read restricted hai, isliye abhi file path/name दिख रहा है. Signed URL document view next update में add कर सकते हैं.</small>
+            </div>
+
+            <div class="ak-actions">
+              <button type="button" data-ak-approve="${k.id}">Approve KYC</button>
+              <button type="button" data-ak-reject="${k.id}">Reject</button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  async function akOpen(){
+    const panel = akPanel();
+    const content = panel.querySelector("#akContent");
+    panel.classList.add("show");
+    document.body.classList.add("ak-page-open");
+    content.innerHTML = `<div class="ak-empty">Loading KYC requests...</div>`;
+
+    try {
+      const list = await akLoadKycRequests();
+      content.innerHTML = akRender(list);
+    } catch(err) {
+      console.error(err);
+      content.innerHTML = `<div class="ak-empty error">KYC requests load failed: ${err.message || err}</div>`;
+    }
+  }
+
+  async function akUpdateStatus(id, status){
+    const client = akClient();
+
+    if (client) {
+      const { error } = await client.from("kyc_requests").update({
+        status,
+        reviewed_at: new Date().toISOString()
+      }).eq("id", id);
+      if (error) throw error;
+    }
+
+    const local = (state.kycRequests || []).find(k => String(k.id) === String(id));
+    if (local) local.status = status;
+
+    try { saveState?.(); } catch(e){}
+  }
+
+  function akBind(){
+    if (!akIsAdmin()) return;
+    akEnsureButton();
+
+    document.querySelectorAll("[data-admin-stable-kyc]").forEach(btn => {
+      if (btn.dataset.akBound === "1") return;
+      btn.dataset.akBound = "1";
+      btn.addEventListener("click", function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        akOpen();
+      }, true);
+    });
+
+    const panel = akPanel();
+    if (panel.dataset.akActionsBound !== "1") {
+      panel.dataset.akActionsBound = "1";
+      panel.addEventListener("click", async function(e){
+        const approve = e.target.dataset.akApprove;
+        const reject = e.target.dataset.akReject;
+        if (!approve && !reject) return;
+
+        const id = approve || reject;
+        const status = approve ? "APPROVED" : "REJECTED";
+        const old = e.target.textContent;
+        e.target.disabled = true;
+        e.target.textContent = "Updating...";
+
+        try {
+          await akUpdateStatus(id, status);
+          await akOpen();
+        } catch(err) {
+          console.error(err);
+          alert("KYC status update failed: " + (err.message || err));
+        } finally {
+          e.target.disabled = false;
+          e.target.textContent = old;
+        }
+      });
+    }
+  }
+
+  window.openAdminKycRequestsPage = akOpen;
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(akBind, 900));
+  window.addEventListener("load", () => setTimeout(akBind, 1100));
+  setInterval(akBind, 3000);
+})();
