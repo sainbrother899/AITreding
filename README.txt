@@ -994,3 +994,11 @@ Mobile Payment Input Preserve Fix:
 - Submit still works and clears after successful submit.
 - Chart/trade/home/wallet/P&L/history untouched.
 - JS syntax check: OK
+
+
+Clean Rebuild V1:
+- index.html, admin.html, styles.css kept as design base.
+- Old app.js saved as app-old-backup.js only.
+- Active app.js rebuilt fresh; old duplicate patches/monkey patches not reused.
+- Clean KYC flow, My Payment Methods, admin KYC/Payout approval, deposit/withdraw/trade basics included.
+- Chart/Trade/Home/Wallet/P&L/History design untouched; active logic rebuilt to match current IDs.
