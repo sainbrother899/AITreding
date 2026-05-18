@@ -328,3 +328,13 @@ AI Control Permanent Fix:
 - Previous old block removed: True
 - No SQL required.
 - JS syntax check: OK
+
+
+AI Control Home Only Final Fix:
+- Removed previous AI control moving/visibility blocks.
+- Original Trade page AI percentage card is force-hidden.
+- Only one Home AI Control card is created and kept visible.
+- Duplicate Home AI Control cards are removed automatically.
+- Modern toggle retained.
+- No SQL required.
+- JS syntax check: OK

@@ -3382,200 +3382,6 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
 })();
 
 
-/* ===== HOME AI CONTROL NO BLINK + MODERN TOGGLE ===== */
-(function(){
-  let aiCardMountedOnce = false;
-  let lastAiPercent = null;
-  let lastAiAuto = null;
-  let lastAiAmount = null;
-
-  function nbIsUser(){
-    return state?.user && state.user.role !== "admin";
-  }
-  function nbMoney(n){
-    try { if (typeof money === "function") return money(n); } catch(e){}
-    return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
-  }
-  function nbWallet(){
-    try { if (typeof realWallet === "function") return Number(realWallet() || 0); } catch(e){}
-    return Number(state?.accounts?.REAL?.balance || 0);
-  }
-  function nbPercent(){
-    const p = Number(state?.user?.aiTradePercent || state?.user?.ai_trade_percent || 25);
-    return [25,50,75,100].includes(p) ? p : 25;
-  }
-  function nbAmount(){
-    return Math.floor((nbWallet() * nbPercent() / 100) * 100) / 100;
-  }
-  function nbHomeTarget(){
-    return document.getElementById("cleanHomeShell") ||
-           document.getElementById("dashboard") ||
-           document.getElementById("home") ||
-           document.querySelector('[data-page="home"]') ||
-           document.querySelector(".page.active-page") ||
-           document.getElementById("appPage");
-  }
-  function nbSetPercent(p){
-    p = Number(p || 25);
-    if (![25,50,75,100].includes(p)) p = 25;
-    if (!state.user) return;
-
-    state.user.aiTradePercent = p;
-    state.user.ai_trade_percent = p;
-
-    const u = (state.users || []).find(x =>
-      String(x.id || "") === String(state.user.id || "") ||
-      String(x.email || "").toLowerCase() === String(state.user.email || "").toLowerCase()
-    );
-    if (u) {
-      u.aiTradePercent = p;
-      u.ai_trade_percent = p;
-    }
-
-    if (typeof supabaseClient !== "undefined" && supabaseClient && state.user.id) {
-      try { supabaseClient.from("profiles").update({ ai_trade_percent: p }).eq("id", state.user.id); } catch(e){}
-    }
-
-    try { saveSession?.(); } catch(e){}
-    try { saveState?.(); } catch(e){}
-    nbUpdateOnly(true);
-  }
-  function nbSetAuto(on){
-    if (!state.user) return;
-    state.user.autoTradePermission = !!on;
-
-    const u = (state.users || []).find(x =>
-      String(x.id || "") === String(state.user.id || "") ||
-      String(x.email || "").toLowerCase() === String(state.user.email || "").toLowerCase()
-    );
-    if (u) u.autoTradePermission = !!on;
-
-    if (typeof supabaseClient !== "undefined" && supabaseClient && state.user.id) {
-      try { supabaseClient.from("profiles").update({ auto_trade_permission: !!on }).eq("id", state.user.id); } catch(e){}
-    }
-
-    try { saveSession?.(); } catch(e){}
-    try { saveState?.(); } catch(e){}
-    nbUpdateOnly(true);
-  }
-
-  function nbBuildCard(){
-    const card = document.createElement("div");
-    card.id = "homeAiTradeControlCard";
-    card.className = "card home-ai-settings-card no-blink-ai-control";
-    card.innerHTML = `
-      <div class="section-head">
-        <div>
-          <p class="label">AI Trade Control</p>
-          <h2>AI Trade Amount</h2>
-          <p class="muted small">AI trade आपके Real Wallet के selected percentage से लगेगी.</p>
-        </div>
-      </div>
-
-      <div class="percent-grid home-ai-percent-grid">
-        <button type="button" class="percent-btn" data-home-ai-percent="25">25%</button>
-        <button type="button" class="percent-btn" data-home-ai-percent="50">50%</button>
-        <button type="button" class="percent-btn" data-home-ai-percent="75">75%</button>
-        <button type="button" class="percent-btn" data-home-ai-percent="100">100%</button>
-      </div>
-
-      <div class="ai-percent-preview home-ai-preview">
-        <span>Selected</span>
-        <b id="homeAiTradePercentText">25%</b>
-        <small id="homeAiTradeAmountPreview">AI trade amount: ₹0</small>
-      </div>
-
-      <label class="modern-toggle-row home-ai-toggle-row" for="homeUserAutoAiTradeToggle">
-        <span>
-          <b>Auto AI Trade</b>
-          <small>Allow AI trades from admin signals</small>
-        </span>
-        <input type="checkbox" id="homeUserAutoAiTradeToggle" checked>
-        <em class="modern-toggle-ui" aria-hidden="true"></em>
-      </label>
-    `;
-
-    card.addEventListener("click", function(e){
-      const btn = e.target.closest("[data-home-ai-percent]");
-      if (!btn) return;
-      e.preventDefault();
-      nbSetPercent(Number(btn.dataset.homeAiPercent || 25));
-    });
-
-    card.addEventListener("change", function(e){
-      if (e.target && e.target.id === "homeUserAutoAiTradeToggle") {
-        nbSetAuto(e.target.checked);
-      }
-    });
-
-    return card;
-  }
-
-  function nbEnsureCard(){
-    if (!nbIsUser()) return null;
-
-    // Hide old duplicate AI control card once.
-    const oldGrid = document.getElementById("aiTradePercentGrid");
-    const oldCard = oldGrid?.closest(".card");
-    if (oldCard && oldCard.id !== "homeAiTradeControlCard") oldCard.classList.add("old-ai-control-hidden");
-
-    let card = document.getElementById("homeAiTradeControlCard");
-    if (!card) {
-      card = nbBuildCard();
-      aiCardMountedOnce = false;
-    }
-
-    const target = nbHomeTarget();
-    if (target && card.parentElement !== target && !aiCardMountedOnce) {
-      target.appendChild(card);
-      aiCardMountedOnce = true;
-    } else if (target && !card.parentElement) {
-      target.appendChild(card);
-      aiCardMountedOnce = true;
-    }
-
-    return card;
-  }
-
-  function nbUpdateOnly(force = false){
-    if (!nbIsUser()) return;
-    const card = nbEnsureCard();
-    if (!card) return;
-
-    const pct = nbPercent();
-    const auto = state.user.autoTradePermission !== false;
-    const amount = nbAmount();
-
-    if (force || pct !== lastAiPercent) {
-      card.querySelectorAll("[data-home-ai-percent]").forEach(btn => {
-        btn.classList.toggle("active", Number(btn.dataset.homeAiPercent) === pct);
-      });
-      const pctText = document.getElementById("homeAiTradePercentText");
-      if (pctText) pctText.textContent = pct + "%";
-      lastAiPercent = pct;
-    }
-
-    if (force || amount !== lastAiAmount) {
-      const amountText = document.getElementById("homeAiTradeAmountPreview");
-      if (amountText) amountText.textContent = "AI trade amount: " + nbMoney(amount);
-      lastAiAmount = amount;
-    }
-
-    if (force || auto !== lastAiAuto) {
-      const toggle = document.getElementById("homeUserAutoAiTradeToggle");
-      if (toggle) toggle.checked = auto;
-      lastAiAuto = auto;
-    }
-  }
-
-  window.addEventListener("load", () => setTimeout(() => nbUpdateOnly(true), 700));
-  document.addEventListener("DOMContentLoaded", () => setTimeout(() => nbUpdateOnly(true), 700));
-
-  // Slow interval only updates values, does not rebuild or move card.
-  setInterval(() => nbUpdateOnly(false), 3000);
-})();
-
-
 /* ===== TRADE PAGE OPEN POSITIONS + BIG CHART ONLY ===== */
 (function(){
   function posIsUser(){ return state?.user && state.user.role !== "admin"; }
@@ -3717,17 +3523,226 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
 })();
 
 
-/* ===== AI CONTROL VISIBILITY GUARD ===== */
+
+
+
+/* ===== AI CONTROL HOME ONLY FINAL FIX ===== */
 (function(){
-  function keepAiControlVisible(){
-    const card = document.getElementById("homeAiTradeControlCard");
-    if (!card) return;
-    card.classList.remove("old-ai-control-hidden");
-    card.classList.remove("trade-page-ai-settings-card");
-    card.style.display = "";
-    card.style.visibility = "";
-    card.style.opacity = "";
+  let built = false;
+  let lastPct = null;
+  let lastAuto = null;
+  let lastAmount = null;
+
+  function aiUser(){
+    return state?.user && state.user.role !== "admin";
   }
-  window.addEventListener("load", () => setTimeout(keepAiControlVisible, 800));
-  setInterval(keepAiControlVisible, 1500);
+  function aiMoney(n){
+    try { if (typeof money === "function") return money(n); } catch(e){}
+    return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  }
+  function aiWallet(){
+    try { if (typeof realWallet === "function") return Number(realWallet() || 0); } catch(e){}
+    return Number(state?.accounts?.REAL?.balance || 0);
+  }
+  function aiPct(){
+    const p = Number(state?.user?.aiTradePercent || state?.user?.ai_trade_percent || 25);
+    return [25,50,75,100].includes(p) ? p : 25;
+  }
+  function aiAmount(){
+    return Math.floor((aiWallet() * aiPct() / 100) * 100) / 100;
+  }
+  function aiHomeTarget(){
+    return document.getElementById("cleanHomeShell") ||
+           document.getElementById("dashboard") ||
+           document.getElementById("home") ||
+           document.querySelector('[data-page="home"]') ||
+           document.getElementById("appPage");
+  }
+  function aiSavePct(p){
+    p = Number(p || 25);
+    if (![25,50,75,100].includes(p)) p = 25;
+    if (!state.user) return;
+
+    state.user.aiTradePercent = p;
+    state.user.ai_trade_percent = p;
+
+    const u = (state.users || []).find(x =>
+      String(x.id || "") === String(state.user.id || "") ||
+      String(x.email || "").toLowerCase() === String(state.user.email || "").toLowerCase()
+    );
+    if (u) {
+      u.aiTradePercent = p;
+      u.ai_trade_percent = p;
+    }
+
+    if (typeof supabaseClient !== "undefined" && supabaseClient && state.user.id) {
+      try { supabaseClient.from("profiles").update({ ai_trade_percent: p }).eq("id", state.user.id); } catch(e){}
+    }
+
+    try { saveSession?.(); } catch(e){}
+    try { saveState?.(); } catch(e){}
+    renderAiHomeOnly(true);
+  }
+  function aiSaveAuto(on){
+    if (!state.user) return;
+
+    state.user.autoTradePermission = !!on;
+    const u = (state.users || []).find(x =>
+      String(x.id || "") === String(state.user.id || "") ||
+      String(x.email || "").toLowerCase() === String(state.user.email || "").toLowerCase()
+    );
+    if (u) u.autoTradePermission = !!on;
+
+    if (typeof supabaseClient !== "undefined" && supabaseClient && state.user.id) {
+      try { supabaseClient.from("profiles").update({ auto_trade_permission: !!on }).eq("id", state.user.id); } catch(e){}
+    }
+
+    try { saveSession?.(); } catch(e){}
+    try { saveState?.(); } catch(e){}
+    renderAiHomeOnly(true);
+  }
+
+  function buildCard(){
+    const card = document.createElement("div");
+    card.id = "homeAiTradeControlCard";
+    card.className = "card home-ai-only-card";
+    card.innerHTML = `
+      <div class="section-head">
+        <div>
+          <p class="label">AI Trade Control</p>
+          <h2>AI Trade Amount</h2>
+          <p class="muted small">AI trade आपके Real Wallet के selected percentage से लगेगी.</p>
+        </div>
+      </div>
+
+      <div class="home-ai-percent-grid">
+        <button type="button" class="home-ai-percent-btn" data-home-ai-percent="25">25%</button>
+        <button type="button" class="home-ai-percent-btn" data-home-ai-percent="50">50%</button>
+        <button type="button" class="home-ai-percent-btn" data-home-ai-percent="75">75%</button>
+        <button type="button" class="home-ai-percent-btn" data-home-ai-percent="100">100%</button>
+      </div>
+
+      <div class="home-ai-preview">
+        <span>Selected</span>
+        <b id="homeAiTradePercentText">25%</b>
+        <small id="homeAiTradeAmountPreview">AI trade amount: ₹0</small>
+      </div>
+
+      <label class="home-ai-modern-toggle" for="homeUserAutoAiTradeToggle">
+        <span>
+          <b>Auto AI Trade</b>
+          <small>Allow AI trades from admin signals</small>
+        </span>
+        <input type="checkbox" id="homeUserAutoAiTradeToggle" checked>
+        <em></em>
+      </label>
+    `;
+
+    card.addEventListener("click", function(e){
+      const btn = e.target.closest("[data-home-ai-percent]");
+      if (!btn) return;
+      e.preventDefault();
+      aiSavePct(Number(btn.dataset.homeAiPercent || 25));
+    });
+
+    card.addEventListener("change", function(e){
+      if (e.target && e.target.id === "homeUserAutoAiTradeToggle") {
+        aiSaveAuto(e.target.checked);
+      }
+    });
+
+    return card;
+  }
+
+  function removeDuplicateHomeCards(){
+    const cards = Array.from(document.querySelectorAll("#homeAiTradeControlCard"));
+    cards.slice(1).forEach(c => c.remove());
+  }
+
+  function hideOriginalTradeAiControl(){
+    // Hide every original AI percent card, except our one home card.
+    document.querySelectorAll("#aiTradePercentGrid").forEach(grid => {
+      const card = grid.closest(".card") || grid.parentElement;
+      if (card && card.id !== "homeAiTradeControlCard") {
+        card.classList.add("force-hide-original-ai-control");
+        card.style.display = "none";
+      }
+    });
+
+    // Also hide old cards by text when they are inside trade page only.
+    const tradePage = document.getElementById("tradepage") || document.getElementById("trade");
+    if (tradePage) {
+      Array.from(tradePage.querySelectorAll(".card")).forEach(card => {
+        const txt = card.textContent || "";
+        if (/AI Trade Amount|Auto AI Trade|AI trade आपके Real Wallet/i.test(txt)) {
+          if (card.id !== "homeAiTradeControlCard") {
+            card.classList.add("force-hide-original-ai-control");
+            card.style.display = "none";
+          }
+        }
+      });
+    }
+  }
+
+  function ensureHomeCard(){
+    if (!aiUser()) return null;
+
+    hideOriginalTradeAiControl();
+    removeDuplicateHomeCards();
+
+    let card = document.getElementById("homeAiTradeControlCard");
+    if (!card) card = buildCard();
+
+    const target = aiHomeTarget();
+    if (!target) return card;
+
+    if (card.parentElement !== target) {
+      target.appendChild(card);
+    }
+
+    card.classList.remove("force-hide-original-ai-control");
+    card.style.display = "";
+    built = true;
+    return card;
+  }
+
+  function renderAiHomeOnly(force = false){
+    if (!aiUser()) return;
+    const card = ensureHomeCard();
+    if (!card) return;
+
+    const pct = aiPct();
+    const amount = aiAmount();
+    const auto = state.user.autoTradePermission !== false;
+
+    if (force || pct !== lastPct) {
+      card.querySelectorAll("[data-home-ai-percent]").forEach(btn => {
+        btn.classList.toggle("active", Number(btn.dataset.homeAiPercent) === pct);
+      });
+      const t = document.getElementById("homeAiTradePercentText");
+      if (t) t.textContent = pct + "%";
+      lastPct = pct;
+    }
+
+    if (force || amount !== lastAmount) {
+      const a = document.getElementById("homeAiTradeAmountPreview");
+      if (a) a.textContent = "AI trade amount: " + aiMoney(amount);
+      lastAmount = amount;
+    }
+
+    if (force || auto !== lastAuto) {
+      const toggle = document.getElementById("homeUserAutoAiTradeToggle");
+      if (toggle) toggle.checked = auto;
+      lastAuto = auto;
+    }
+  }
+
+  window.renderAiHomeOnly = renderAiHomeOnly;
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(() => renderAiHomeOnly(true), 700));
+  window.addEventListener("load", () => setTimeout(() => renderAiHomeOnly(true), 900));
+  setInterval(() => {
+    hideOriginalTradeAiControl();
+    renderAiHomeOnly(false);
+  }, 2500);
 })();
