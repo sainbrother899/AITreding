@@ -3545,3 +3545,75 @@ body[data-admin-page="true"] #adminMassTrade #massTradeOrderType{
   width:100%!important;
   min-height:44px!important;
 }
+
+
+/* ===== ADMIN USERS PANEL UI ===== */
+.admin-user-search-row{
+  display:grid;
+  grid-template-columns:1fr 180px;
+  gap:12px;
+  margin-top:14px;
+}
+.admin-user-detail-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  margin:14px 0;
+}
+.admin-user-detail-grid div{
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.035);
+  border-radius:14px;
+  padding:12px;
+}
+.admin-user-detail-grid span{
+  display:block;
+  color:var(--muted,#8ca2c0);
+  font-size:12px;
+  margin-bottom:6px;
+}
+.admin-user-detail-grid b{
+  color:var(--text,#fff);
+  font-size:15px;
+}
+.admin-user-control-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  margin:14px 0;
+}
+.admin-user-control-grid label{
+  display:grid;
+  gap:7px;
+  color:var(--muted,#8ca2c0);
+  font-size:12px;
+}
+.admin-user-toggle{
+  margin:0!important;
+}
+.admin-wallet-adjust-box{
+  border:1px solid rgba(0,229,155,.14);
+  background:rgba(0,229,155,.045);
+  border-radius:16px;
+  padding:12px;
+  margin-top:14px;
+}
+.admin-wallet-adjust-grid{
+  display:grid;
+  grid-template-columns:150px 150px 1fr 140px;
+  gap:10px;
+}
+.admin-user-actions-row{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:14px;
+}
+@media(max-width:900px){
+  .admin-user-search-row,
+  .admin-user-detail-grid,
+  .admin-user-control-grid,
+  .admin-wallet-adjust-grid{
+    grid-template-columns:1fr;
+  }
+}

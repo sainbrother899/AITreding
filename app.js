@@ -2840,3 +2840,261 @@ document.addEventListener("click", function(e){
   if (ml) ml.value = lev;
   if (mt) mt.value = typ;
 }, true);
+
+
+/* ===== ADMIN USERS PANEL ===== */
+let selectedAdminUserId = null;
+
+function auMoney(n) {
+  try { if (typeof money === "function") return money(n); } catch(e) {}
+  return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+}
+function auUsers() {
+  return (state.users || []).filter(u => String(u.role || "user").toLowerCase() !== "admin");
+}
+function auUserKey(u) {
+  return String(u?.id || u?.email || "");
+}
+function auFindUser(id) {
+  return auUsers().find(u => auUserKey(u) === String(id) || String(u.email || "").toLowerCase() === String(id).toLowerCase());
+}
+function auLedger(uid) {
+  return (state.walletLedger || []).filter(l => String(l.userId || l.user_id || "") === String(uid));
+}
+function auApprovedDeposit(uid) {
+  const req = (state.depositRequests || [])
+    .filter(d => String(d.userId || d.user_id || "") === String(uid) && String(d.status || "").toUpperCase() === "APPROVED")
+    .reduce((a,d)=>a+Number(d.amount||0),0);
+  const led = auLedger(uid).filter(l => String(l.type).toUpperCase()==="DEPOSIT").reduce((a,l)=>a+Number(l.amount||0),0);
+  return Math.max(req, led);
+}
+function auPnlBonus(uid) {
+  return auLedger(uid)
+    .filter(l => ["TRADE_PNL","MANAGED_TRADE_PNL","MASS_TRADE_PNL","REFERRAL_BONUS","PLAN_PURCHASE","ADMIN_ADJUSTMENT"].includes(String(l.type||"").toUpperCase()))
+    .reduce((a,l)=>a+Number(l.amount||0),0);
+}
+function auWithdrawals(uid) {
+  const req = (state.withdrawalRequests || [])
+    .filter(w => String(w.userId || w.user_id || "") === String(uid) && String(w.status || "").toUpperCase() === "APPROVED")
+    .reduce((a,w)=>a+Number(w.amount||0),0);
+  const led = auLedger(uid).filter(l => String(l.type).toUpperCase()==="WITHDRAWAL").reduce((a,l)=>a+Math.abs(Number(l.amount||0)),0);
+  return Math.max(req, led);
+}
+function auWallet(u) {
+  const uid = auUserKey(u);
+  try { if (typeof realWallet === "function") return Number(realWallet(uid) || 0); } catch(e) {}
+  return Math.max(0, auApprovedDeposit(uid) + auPnlBonus(uid) - auWithdrawals(uid));
+}
+function auPlanLimit(u) {
+  try { if (typeof aiLimitForUser === "function") return aiLimitForUser(u); } catch(e) {}
+  const p = (state.plans || []).find(x => String(x.name || x.id).toLowerCase() === String(u.plan || "Free").toLowerCase());
+  return Number(p?.aiTradeLimit || p?.ai_trade_limit || 5);
+}
+function auUsed(u) {
+  try { if (typeof aiUsed === "function") return aiUsed(u); } catch(e) {}
+  const key = `${auUserKey(u)}_REAL_${new Date().toISOString().slice(0,10)}`;
+  return Number(state.aiTradeUsage?.[key] || 0);
+}
+function auPercent(u) {
+  const p = Number(u.aiTradePercent || u.ai_trade_percent || 25);
+  return [25,50,75,100].includes(p) ? p : 25;
+}
+function auStatus(u) {
+  return u.blocked || u.status === "BLOCKED" ? "BLOCKED" : "ACTIVE";
+}
+function auRenderPlanOptions() {
+  const sel = document.getElementById("adminUserPlanSelect");
+  if (!sel) return;
+  sel.innerHTML = (state.plans || [{id:"free",name:"Free"}]).map(p => `<option value="${p.name || p.id}">${p.name || p.id}</option>`).join("");
+}
+function auRenderUsers() {
+  const el = document.getElementById("adminUsersLog");
+  if (!el || state.user?.role !== "admin") return;
+
+  const q = String(document.getElementById("adminUserSearch")?.value || "").toLowerCase();
+  const filter = document.getElementById("adminUserStatusFilter")?.value || "ALL";
+
+  let users = auUsers().filter(u => {
+    const text = `${u.name||""} ${u.email||""} ${u.mobile||""}`.toLowerCase();
+    if (q && !text.includes(q)) return false;
+    if (filter === "ACTIVE" && auStatus(u) !== "ACTIVE") return false;
+    if (filter === "BLOCKED" && auStatus(u) !== "BLOCKED") return false;
+    if (filter === "AI_ON" && u.autoTradePermission === false) return false;
+    if (filter === "AI_OFF" && u.autoTradePermission !== false) return false;
+    return true;
+  });
+
+  el.innerHTML = users.map(u => {
+    const uid = auUserKey(u);
+    const used = auUsed(u), limit = auPlanLimit(u);
+    const st = auStatus(u);
+    return `<tr>
+      <td><b>${u.name || "User"}</b><br><small>${u.email || "-"} ${u.mobile ? " | " + u.mobile : ""}</small></td>
+      <td>${u.plan || "Free"}</td>
+      <td>${auMoney(auWallet(u))}</td>
+      <td>${auMoney(auApprovedDeposit(uid))}</td>
+      <td class="${auPnlBonus(uid)>=0?'pnl-plus':'pnl-minus'}">${auMoney(auPnlBonus(uid))}</td>
+      <td>${auPercent(u)}%</td>
+      <td>${used} / ${limit}</td>
+      <td>${st}<br><small>AI ${u.autoTradePermission === false ? "OFF" : "ON"}</small></td>
+      <td><button class="ghost-btn" onclick="selectAdminUser('${uid}')">View</button></td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="9" class="empty">No users found.</td></tr>`;
+}
+function selectAdminUser(id) {
+  selectedAdminUserId = String(id);
+  const u = auFindUser(id);
+  if (!u) return;
+
+  const uid = auUserKey(u);
+  const title = document.getElementById("adminSelectedUserTitle");
+  const sub = document.getElementById("adminSelectedUserSub");
+  if (title) title.textContent = u.name || u.email || "User";
+  if (sub) sub.textContent = `${u.email || "-"} ${u.mobile ? " | " + u.mobile : ""}`;
+
+  const map = {
+    adminDetailWallet: auWallet(u),
+    adminDetailDeposit: auApprovedDeposit(uid),
+    adminDetailPnl: auPnlBonus(uid)
+  };
+  Object.entries(map).forEach(([id,val]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = auMoney(val);
+  });
+
+  const ai = document.getElementById("adminDetailAiLimit");
+  if (ai) ai.textContent = `${auUsed(u)} / ${auPlanLimit(u)}`;
+
+  auRenderPlanOptions();
+  const planSel = document.getElementById("adminUserPlanSelect");
+  if (planSel) planSel.value = u.plan || "Free";
+
+  const pct = document.getElementById("adminUserAiPercentSelect");
+  if (pct) pct.value = String(auPercent(u));
+
+  const aiToggle = document.getElementById("adminUserAiToggle");
+  if (aiToggle) aiToggle.checked = u.autoTradePermission !== false;
+
+  const activeToggle = document.getElementById("adminUserActiveToggle");
+  if (activeToggle) activeToggle.checked = auStatus(u) === "ACTIVE";
+}
+window.selectAdminUser = selectAdminUser;
+
+async function saveAdminUserControls() {
+  const u = auFindUser(selectedAdminUserId);
+  if (!u) return alert("User select karo.");
+
+  const plan = document.getElementById("adminUserPlanSelect")?.value || u.plan || "Free";
+  const pct = Number(document.getElementById("adminUserAiPercentSelect")?.value || auPercent(u));
+  const aiOn = document.getElementById("adminUserAiToggle")?.checked !== false;
+  const active = document.getElementById("adminUserActiveToggle")?.checked !== false;
+
+  u.plan = plan;
+  u.aiTradePercent = pct;
+  u.ai_trade_percent = pct;
+  u.autoTradePermission = aiOn;
+  u.blocked = !active;
+  u.status = active ? "ACTIVE" : "BLOCKED";
+
+  if (typeof supabaseClient !== "undefined" && supabaseClient && u.id) {
+    try {
+      await supabaseClient.from("profiles").update({
+        plan,
+        ai_trade_percent: pct,
+        auto_trade_permission: aiOn,
+        status: u.status
+      }).eq("id", u.id);
+    } catch(e) {
+      console.warn("user controls profile update failed", e);
+    }
+  }
+
+  try { saveState?.(); } catch(e) {}
+  auRenderUsers();
+  selectAdminUser(auUserKey(u));
+  alert("User settings saved.");
+}
+
+async function adminWalletAdjust() {
+  const u = auFindUser(selectedAdminUserId);
+  if (!u) return alert("User select karo.");
+
+  const amount = Number(document.getElementById("adminWalletAdjustAmount")?.value || 0);
+  const type = document.getElementById("adminWalletAdjustType")?.value || "ADD";
+  const note = document.getElementById("adminWalletAdjustNote")?.value || "Admin wallet adjustment";
+  if (!amount || amount <= 0) return alert("Amount डालो.");
+
+  const finalAmount = type === "DEDUCT" ? -Math.abs(amount) : Math.abs(amount);
+  const led = {
+    id: "led_adj_" + Date.now(),
+    userId: auUserKey(u),
+    type: "ADMIN_ADJUSTMENT",
+    amount: finalAmount,
+    note
+  };
+
+  state.walletLedger = state.walletLedger || [];
+  state.walletLedger.unshift(led);
+
+  if (typeof supabaseClient !== "undefined" && supabaseClient) {
+    try {
+      await supabaseClient.from("wallet_ledger").insert({
+        user_id: led.userId,
+        type: "ADMIN_ADJUSTMENT",
+        amount: led.amount,
+        note: led.note
+      });
+    } catch(e) {
+      console.warn("wallet adjustment save failed", e);
+    }
+  }
+
+  document.getElementById("adminWalletAdjustAmount").value = "";
+  document.getElementById("adminWalletAdjustNote").value = "";
+  try { saveState?.(); } catch(e) {}
+  auRenderUsers();
+  selectAdminUser(auUserKey(u));
+  alert("Wallet adjustment applied.");
+}
+
+function bindAdminUsersPanel() {
+  const saveBtn = document.getElementById("adminSaveUserControlBtn");
+  if (saveBtn && !saveBtn.dataset.bound) {
+    saveBtn.dataset.bound = "1";
+    saveBtn.addEventListener("click", saveAdminUserControls);
+  }
+
+  const adjBtn = document.getElementById("adminWalletAdjustBtn");
+  if (adjBtn && !adjBtn.dataset.bound) {
+    adjBtn.dataset.bound = "1";
+    adjBtn.addEventListener("click", adminWalletAdjust);
+  }
+
+  const refreshBtn = document.getElementById("adminViewUserHistoryBtn");
+  if (refreshBtn && !refreshBtn.dataset.bound) {
+    refreshBtn.dataset.bound = "1";
+    refreshBtn.addEventListener("click", () => {
+      auRenderUsers();
+      if (selectedAdminUserId) selectAdminUser(selectedAdminUserId);
+    });
+  }
+
+  ["adminUserSearch","adminUserStatusFilter"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.dataset.bound) {
+      el.dataset.bound = "1";
+      el.addEventListener("input", auRenderUsers);
+      el.addEventListener("change", auRenderUsers);
+    }
+  });
+}
+
+function renderAdminUsersPanel() {
+  if (state.user?.role !== "admin") return;
+  bindAdminUsersPanel();
+  auRenderPlanOptions();
+  auRenderUsers();
+  if (selectedAdminUserId) selectAdminUser(selectedAdminUserId);
+}
+setInterval(renderAdminUsersPanel, 1500);
+window.addEventListener("load", () => setTimeout(renderAdminUsersPanel, 800));

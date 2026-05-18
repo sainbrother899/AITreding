@@ -31,7 +31,8 @@
     </div>
   </header>
 
-  <main>
+  <div class="admin-tabs"><button class="admin-tab" data-admin-tab="adminUsers">👥 Users</button></div>
+<main>
     <section id="authPage" class="auth-page">
       <div class="auth-grid">
         <div class="hero-copy">
@@ -242,6 +243,122 @@
           </div>
 
           <div class="admin-content">
+
+      <div id="adminUsers" class="admin-panel">
+        <div class="card admin-users-head-card">
+          <div class="section-head">
+            <div>
+              <p class="label">Users</p>
+              <h2>User Management</h2>
+              <p class="muted small">User wallet, plan, AI trade setting, KYC और status यहीं से manage करें.</p>
+            </div>
+          </div>
+
+          <div class="admin-user-search-row">
+            <input id="adminUserSearch" type="search" placeholder="Search by name, email or mobile">
+            <select id="adminUserStatusFilter">
+              <option value="ALL">All Users</option>
+              <option value="ACTIVE">Active</option>
+              <option value="BLOCKED">Blocked</option>
+              <option value="AI_ON">AI ON</option>
+              <option value="AI_OFF">AI OFF</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card table-card">
+          <div class="section-head">
+            <div>
+              <p class="label">User List</p>
+              <h2>All Users</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Plan</th>
+                  <th>Wallet</th>
+                  <th>Deposit</th>
+                  <th>P/L + Bonus</th>
+                  <th>AI Size</th>
+                  <th>AI Used</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="adminUsersLog">
+                <tr><td colspan="9" class="empty">No users yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card admin-user-detail-card" id="adminUserDetailCard">
+          <div class="section-head">
+            <div>
+              <p class="label">Selected User</p>
+              <h2 id="adminSelectedUserTitle">No user selected</h2>
+              <p class="muted small" id="adminSelectedUserSub">Select a user from list.</p>
+            </div>
+          </div>
+
+          <div class="admin-user-detail-grid">
+            <div><span>Wallet</span><b id="adminDetailWallet">₹0</b></div>
+            <div><span>Approved Deposit</span><b id="adminDetailDeposit">₹0</b></div>
+            <div><span>P/L + Bonus</span><b id="adminDetailPnl">₹0</b></div>
+            <div><span>AI Used / Limit</span><b id="adminDetailAiLimit">0 / 0</b></div>
+          </div>
+
+          <div class="admin-user-control-grid">
+            <label>
+              Plan
+              <select id="adminUserPlanSelect"></select>
+            </label>
+
+            <label>
+              AI Trade Size
+              <select id="adminUserAiPercentSelect">
+                <option value="25">25%</option>
+                <option value="50">50%</option>
+                <option value="75">75%</option>
+                <option value="100">100%</option>
+              </select>
+            </label>
+
+            <label class="toggle-row admin-user-toggle">
+              <span>AI Trade ON/OFF</span>
+              <input type="checkbox" id="adminUserAiToggle">
+            </label>
+
+            <label class="toggle-row admin-user-toggle">
+              <span>User Active/Blocked</span>
+              <input type="checkbox" id="adminUserActiveToggle" checked>
+            </label>
+          </div>
+
+          <div class="admin-wallet-adjust-box">
+            <p class="label">Wallet Adjustment</p>
+            <div class="admin-wallet-adjust-grid">
+              <input id="adminWalletAdjustAmount" type="number" placeholder="Amount">
+              <select id="adminWalletAdjustType">
+                <option value="ADD">Add Balance</option>
+                <option value="DEDUCT">Deduct Balance</option>
+              </select>
+              <input id="adminWalletAdjustNote" type="text" placeholder="Reason / Note">
+              <button id="adminWalletAdjustBtn" type="button" class="primary-btn">Apply</button>
+            </div>
+          </div>
+
+          <div class="action-row admin-user-actions-row">
+            <button id="adminSaveUserControlBtn" type="button" class="approve-btn">Save User Settings</button>
+            <button id="adminViewUserHistoryBtn" type="button" class="ghost-btn">Refresh Details</button>
+          </div>
+        </div>
+      </div>
+
+
             <div id="adminOverview" class="admin-panel active-admin-panel">
               <div id="adminQuickGrid" class="admin-quick-grid">
                 <div class="admin-mini-card"><span>Total Users</span><b id="adminTotalUsersMini">0</b></div>
@@ -695,6 +812,6 @@
 
   <div id="toast"></div>
   <script src="config.js"></script>
-  <script src="app.js?v=directlev20260518b"></script>
+  <script src="app.js?v=adminuserspanel20260518"></script>
 </body>
 </html>

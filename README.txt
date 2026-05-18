@@ -196,3 +196,13 @@ Direct Admin Leverage Fix:
 - Bulk trade click stores selected leverage/order type before opening trade.
 - No SQL required.
 - JS syntax check: OK
+
+
+Admin Users Panel Update:
+- Added Users tab to admin panel.
+- User list includes name/email, plan, wallet, deposits, P/L+bonus, AI %, AI used/limit, status.
+- User detail card with wallet summary.
+- Admin can change plan, AI trade percent, AI ON/OFF, Active/Blocked.
+- Admin can Add/Deduct wallet balance with ledger note.
+- SQL patch included for optional columns.
+- JS syntax check: OK
