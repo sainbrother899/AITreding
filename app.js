@@ -5595,3 +5595,185 @@ function restoreManualHistoryBackup(mode = state.mode) {
   window.addEventListener("load", () => setTimeout(bind, 1000));
   setInterval(bind, 2500);
 })();
+
+
+/* ===== MENU PAGES STAY + HEADER FLASH FIX ===== */
+(function(){
+  const menuPageIds = ["profilePage","kycPage","referralPage","paymentMethodsPage","supportPage"];
+  const menuTypes = ["profile","kyc","referral","paymentMethods","support"];
+
+  function isMenuOpen(){
+    return document.body.classList.contains("menu-real-page-open") ||
+      menuPageIds.some(id => {
+        const el = document.getElementById(id);
+        if (!el) return false;
+        const st = getComputedStyle(el);
+        return el.classList.contains("active-page") && st.display !== "none";
+      });
+  }
+
+  function markHeaderReady(){
+    try{
+      const cleanHeader = document.querySelector(".clean-top-header");
+      if (cleanHeader || document.body.classList.contains("pc-same-mobile")) {
+        document.documentElement.classList.remove("top-header-booting");
+        document.documentElement.classList.add("top-header-clean-ready");
+      }
+    }catch(e){
+      document.documentElement.classList.remove("top-header-booting");
+      document.documentElement.classList.add("top-header-boot-fallback");
+    }
+  }
+
+  function showOnlyMenuPage(activeId){
+    menuPageIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const show = id === activeId;
+      el.classList.toggle("active-page", show);
+      el.classList.toggle("force-page-hidden", !show);
+      el.style.setProperty("display", show ? "block" : "none", "important");
+    });
+
+    ["dashboard","home","trade","tradepage","wallet","pnl","history","plans","more"].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove("active-page");
+      el.classList.add("force-page-hidden");
+      el.style.setProperty("display", "none", "important");
+    });
+  }
+
+  function keepMenuPageAlive(){
+    try{
+      markHeaderReady();
+
+      if (!isMenuOpen()) return;
+
+      let activeId = null;
+      for (const id of menuPageIds) {
+        const el = document.getElementById(id);
+        if (el && el.classList.contains("active-page")) {
+          activeId = id;
+          break;
+        }
+      }
+
+      if (!activeId) {
+        const activeType = document.body.dataset.activePage;
+        const idx = menuTypes.indexOf(activeType);
+        activeId = idx >= 0 ? menuPageIds[idx] : "profilePage";
+      }
+
+      document.body.classList.add("menu-real-page-open");
+      document.body.dataset.menuPageOpen = "true";
+      showOnlyMenuPage(activeId);
+    }catch(e){}
+  }
+
+  // Patch existing visibility fix so it does not force dashboard while menu pages are open.
+  function patchVisibilityFunction(){
+    try{
+      if (window.__menuStayVisibilityPatched) return;
+      window.__menuStayVisibilityPatched = true;
+
+      const oldFix = window.fixTradePageVisibility;
+      if (typeof oldFix === "function") {
+        window.fixTradePageVisibility = function(){
+          if (isMenuOpen()) {
+            keepMenuPageAlive();
+            return;
+          }
+          return oldFix.apply(this, arguments);
+        };
+      }
+
+      const oldSet = window.setActiveAppPageSafe;
+      if (typeof oldSet === "function") {
+        window.setActiveAppPageSafe = function(page){
+          if (isMenuOpen() && menuTypes.includes(String(document.body.dataset.activePage || ""))) {
+            keepMenuPageAlive();
+            return;
+          }
+          return oldSet.apply(this, arguments);
+        };
+      }
+    }catch(e){}
+  }
+
+  // Rebind menu click in capture phase and keep page open.
+  function bindMenuStay(){
+    patchVisibilityFunction();
+    markHeaderReady();
+
+    const menu = document.getElementById("topHeaderMenuPanel");
+    if (menu && menu.dataset.menuStayBound !== "1") {
+      menu.dataset.menuStayBound = "1";
+      menu.addEventListener("click", function(e){
+        const type = e.target?.dataset?.menuPanel;
+        if (!type) return;
+
+        setTimeout(function(){
+          const map = {
+            profile:"profilePage",
+            kyc:"kycPage",
+            referral:"referralPage",
+            paymentMethods:"paymentMethodsPage",
+            support:"supportPage"
+          };
+          const id = map[type];
+          if (!id) return;
+
+          document.body.dataset.activePage = type;
+          document.body.classList.add("menu-real-page-open");
+          document.body.dataset.menuPageOpen = "true";
+          showOnlyMenuPage(id);
+        }, 80);
+      }, true);
+    }
+
+    document.querySelectorAll("[data-menu-back]").forEach(btn => {
+      if (btn.dataset.menuStayBackBound === "1") return;
+      btn.dataset.menuStayBackBound = "1";
+      btn.addEventListener("click", function(){
+        document.body.classList.remove("menu-real-page-open");
+        document.body.dataset.menuPageOpen = "false";
+      }, true);
+    });
+
+    // Bottom nav should close menu-real pages.
+    document.querySelectorAll(".bottom-nav button,.mobile-nav button,[data-page],[data-tab]").forEach(btn => {
+      if (btn.dataset.menuStayNavBound === "1") return;
+      btn.dataset.menuStayNavBound = "1";
+      btn.addEventListener("click", function(){
+        if (btn.closest("#topHeaderMenuPanel")) return;
+        const pg = btn.dataset.page || btn.dataset.tab || "";
+        if (pg && !menuTypes.includes(pg)) {
+          document.body.classList.remove("menu-real-page-open");
+          document.body.dataset.menuPageOpen = "false";
+          menuPageIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.classList.remove("active-page");
+            el.classList.add("force-page-hidden");
+            el.style.setProperty("display","none","important");
+          });
+        }
+      }, true);
+    });
+  }
+
+  window.keepMenuRealPageAlive = keepMenuPageAlive;
+
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(bindMenuStay, 500);
+    setTimeout(markHeaderReady, 800);
+  });
+  window.addEventListener("load", () => {
+    setTimeout(bindMenuStay, 700);
+    setTimeout(markHeaderReady, 900);
+  });
+
+  setInterval(bindMenuStay, 1200);
+  setInterval(keepMenuPageAlive, 700);
+})();

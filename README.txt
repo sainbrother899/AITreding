@@ -699,3 +699,13 @@ Menu Real Pages Final:
 - Bottom nav pages remain Home/Trade/Wallet/PnL/History.
 - No SQL required for this local/UI version.
 - JS syntax check: OK
+
+
+Menu Pages Stay + Header Flash Fix:
+- Fixes menu real pages closing immediately and returning to Home.
+- Page visibility logic now respects Profile/KYC/Referral/Payment Methods/Support pages.
+- Menu pages stay open until Back or bottom nav is clicked.
+- Added early header boot hide so old top header does not flash on refresh.
+- Clean header becomes visible after JS applies the clean header.
+- No SQL required.
+- JS syntax check: OK

@@ -37,6 +37,39 @@ body[data-user-clean-ui="true"] #appPage{
 }
 </style>
 
+
+<script id="top-header-boot-hide-script">
+(function(){
+  try{
+    document.documentElement.classList.add("top-header-booting");
+    setTimeout(function(){
+      document.documentElement.classList.remove("top-header-booting");
+      document.documentElement.classList.add("top-header-boot-fallback");
+    },2500);
+  }catch(e){}
+})();
+</script>
+<style id="top-header-boot-hide-style">
+html.top-header-booting body[data-user-clean-ui="true"] header,
+html.top-header-booting body[data-user-clean-ui="true"] .app-header,
+html.top-header-booting body[data-user-clean-ui="true"] .top-header,
+html.top-header-booting body[data-user-clean-ui="true"] .brand-row{
+  opacity:0!important;
+  visibility:hidden!important;
+}
+html.top-header-clean-ready body[data-user-clean-ui="true"] header,
+html.top-header-clean-ready body[data-user-clean-ui="true"] .app-header,
+html.top-header-clean-ready body[data-user-clean-ui="true"] .top-header,
+html.top-header-clean-ready body[data-user-clean-ui="true"] .brand-row,
+html.top-header-boot-fallback body[data-user-clean-ui="true"] header,
+html.top-header-boot-fallback body[data-user-clean-ui="true"] .app-header,
+html.top-header-boot-fallback body[data-user-clean-ui="true"] .top-header,
+html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
+  opacity:1!important;
+  visibility:visible!important;
+}
+</style>
+
 </head>
 <body data-premium-ui="true" data-user-clean-ui="true">
   <div class="neon-bg"><span></span><span></span><span></span><span></span></div>
@@ -625,7 +658,7 @@ body[data-user-clean-ui="true"] #appPage{
 
   <div id="toast"></div>
   <script src="config.js"></script>
-  <script src="app.js?v=menurealpagesfinal20260518"></script>
+  <script src="app.js?v=menustayheaderfix20260518"></script>
 
 <!-- ===== MENU REAL PAGES FINAL ===== -->
 <section id="profilePage" class="page menu-real-page force-page-hidden">

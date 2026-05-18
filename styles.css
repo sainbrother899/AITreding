@@ -5803,3 +5803,42 @@ body.pc-same-mobile .menu-real-page{
     max-width:460px!important;
   }
 }
+
+
+/* ===== MENU PAGES STAY + HEADER FLASH FIX ===== */
+body.menu-real-page-open #profilePage.active-page,
+body.menu-real-page-open #kycPage.active-page,
+body.menu-real-page-open #referralPage.active-page,
+body.menu-real-page-open #paymentMethodsPage.active-page,
+body.menu-real-page-open #supportPage.active-page{
+  display:block!important;
+}
+body.menu-real-page-open #dashboard,
+body.menu-real-page-open #home,
+body.menu-real-page-open #trade,
+body.menu-real-page-open #tradepage,
+body.menu-real-page-open #wallet,
+body.menu-real-page-open #pnl,
+body.menu-real-page-open #history,
+body.menu-real-page-open #plans,
+body.menu-real-page-open #more{
+  display:none!important;
+}
+html.top-header-booting body[data-user-clean-ui="true"] header,
+html.top-header-booting body[data-user-clean-ui="true"] .app-header,
+html.top-header-booting body[data-user-clean-ui="true"] .top-header,
+html.top-header-booting body[data-user-clean-ui="true"] .brand-row{
+  opacity:0!important;
+  visibility:hidden!important;
+}
+html.top-header-clean-ready body[data-user-clean-ui="true"] header,
+html.top-header-clean-ready body[data-user-clean-ui="true"] .app-header,
+html.top-header-clean-ready body[data-user-clean-ui="true"] .top-header,
+html.top-header-clean-ready body[data-user-clean-ui="true"] .brand-row,
+html.top-header-boot-fallback body[data-user-clean-ui="true"] header,
+html.top-header-boot-fallback body[data-user-clean-ui="true"] .app-header,
+html.top-header-boot-fallback body[data-user-clean-ui="true"] .top-header,
+html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
+  opacity:1!important;
+  visibility:visible!important;
+}
