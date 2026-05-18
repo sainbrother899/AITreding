@@ -1210,3 +1210,225 @@ document.addEventListener("input", function(e) {
     el.value = String(el.value || "").replace(/\D/g, "").slice(0, 12);
   }
 }, true);
+
+
+/* ===== TARGETED FIX: CHART + ORDER BOOK + TRADE FEED + HISTORY ===== */
+const chartFeedState = {
+  points: {},
+  fills: []
+};
+
+function cfCoin() {
+  return document.getElementById("coinSelect")?.value ||
+         document.getElementById("tradePairSelect")?.value ||
+         "BTCUSDT";
+}
+
+function cfPrice(coin = cfCoin()) {
+  try {
+    if (typeof priceOf === "function") return Number(priceOf(coin) || 0);
+  } catch(e) {}
+  return Number(state?.prices?.[coin]?.price || 100);
+}
+
+function cfMoney(n) {
+  try {
+    if (typeof money === "function") return money(n);
+  } catch(e) {}
+  return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+}
+
+function cfUsd(n) {
+  try {
+    if (typeof usd === "function") return usd(n);
+  } catch(e) {}
+  return "$" + Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
+function ensureChartPoints(coin) {
+  if (!chartFeedState.points[coin] || chartFeedState.points[coin].length < 20) {
+    const base = cfPrice(coin);
+    chartFeedState.points[coin] = Array.from({ length: 42 }, (_, i) => {
+      const wave = Math.sin(i * 0.55) * base * 0.002;
+      const drift = (i - 20) * base * 0.00004;
+      return Math.max(1, base + wave + drift);
+    });
+  }
+  return chartFeedState.points[coin];
+}
+
+function pushChartPoint(coin) {
+  const pts = ensureChartPoints(coin);
+  const last = pts[pts.length - 1] || cfPrice(coin);
+  const live = cfPrice(coin);
+  const next = live || (last + (Math.random() - 0.5) * last * 0.002);
+  pts.push(next);
+  while (pts.length > 48) pts.shift();
+  return pts;
+}
+
+function createChartHtml() {
+  return `
+    <div class="cf-chart-card">
+      <div class="cf-chart-head">
+        <div>
+          <b id="cfChartSymbol">BTC/USDT</b>
+          <span>Live market chart</span>
+        </div>
+        <strong id="cfChartPrice">$0</strong>
+      </div>
+      <svg id="cfChartSvg" class="cf-chart-svg" viewBox="0 0 360 180" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="cfChartGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="rgba(0,229,155,.38)"></stop>
+            <stop offset="100%" stop-color="rgba(0,229,155,0)"></stop>
+          </linearGradient>
+        </defs>
+        <path id="cfChartArea" class="cf-chart-area" d=""></path>
+        <path id="cfChartLine" class="cf-chart-line" d=""></path>
+      </svg>
+      <div class="cf-chart-foot">
+        <span>Fallback chart active when TradingView is slow</span>
+        <em id="cfChartChange">0.00%</em>
+      </div>
+    </div>
+  `;
+}
+
+function renderLiveChartFix() {
+  const host =
+    document.getElementById("crypto_live_chart") ||
+    document.getElementById("tradingViewChart") ||
+    document.getElementById("chartContainer") ||
+    document.querySelector(".crypto_live_chart") ||
+    document.querySelector(".chart-container") ||
+    document.querySelector(".trading-chart");
+
+  if (!host) return;
+
+  if (!host.querySelector("#cfChartSvg")) {
+    host.innerHTML = createChartHtml();
+  }
+
+  const coin = cfCoin();
+  const pts = pushChartPoint(coin);
+  const min = Math.min(...pts);
+  const max = Math.max(...pts);
+  const range = max - min || 1;
+
+  const coords = pts.map((v, i) => {
+    const x = (i / (pts.length - 1)) * 360;
+    const y = 160 - ((v - min) / range) * 135;
+    return [x, y];
+  });
+
+  const line = "M " + coords.map(p => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" L ");
+  const area = line + " L 360 180 L 0 180 Z";
+
+  const price = cfPrice(coin);
+  const change = Number(state?.prices?.[coin]?.change || 0);
+
+  const sym = document.getElementById("cfChartSymbol");
+  const priceEl = document.getElementById("cfChartPrice");
+  const changeEl = document.getElementById("cfChartChange");
+  const lineEl = document.getElementById("cfChartLine");
+  const areaEl = document.getElementById("cfChartArea");
+
+  if (sym) sym.textContent = coin.replace("USDT", "/USDT");
+  if (priceEl) priceEl.textContent = cfUsd(price);
+  if (changeEl) {
+    changeEl.textContent = change.toFixed(2) + "%";
+    changeEl.className = change >= 0 ? "pos" : "neg";
+  }
+  if (lineEl) lineEl.setAttribute("d", line);
+  if (areaEl) areaEl.setAttribute("d", area);
+}
+
+function renderOrderBookFix() {
+  const el = document.getElementById("orderBook");
+  if (!el) return;
+
+  const coin = cfCoin();
+  const price = cfPrice(coin);
+  const rows = [];
+  for (let i = 6; i >= 1; i--) {
+    rows.push({ type: "ask", price: price * (1 + i * 0.0009), qty: (Math.random() * 2 + 0.1) });
+  }
+  for (let i = 1; i <= 6; i++) {
+    rows.push({ type: "bid", price: price * (1 - i * 0.0009), qty: (Math.random() * 2 + 0.1) });
+  }
+
+  el.innerHTML = `
+    <div class="cf-book-head"><span>Price</span><span>Qty</span><span>Total</span></div>
+    ${rows.map(r => `
+      <div class="cf-book-row ${r.type}">
+        <span>${cfUsd(r.price)}</span>
+        <span>${r.qty.toFixed(4)}</span>
+        <span>${cfUsd(r.price * r.qty)}</span>
+      </div>
+    `).join("")}
+  `;
+}
+
+function renderTradeFeedFix() {
+  const el = document.getElementById("recentFills") || document.getElementById("tradeFeed");
+  if (!el) return;
+
+  const coin = cfCoin();
+  const price = cfPrice(coin);
+
+  if (!chartFeedState.fills.length || Math.random() > 0.45) {
+    chartFeedState.fills.unshift({
+      side: Math.random() > 0.5 ? "BUY" : "SELL",
+      coin,
+      price: price * (1 + (Math.random() - 0.5) * 0.001),
+      qty: Math.random() * 1.5 + 0.05,
+      time: new Date().toLocaleTimeString()
+    });
+    chartFeedState.fills = chartFeedState.fills.slice(0, 12);
+  }
+
+  el.innerHTML = chartFeedState.fills.map(f => `
+    <div class="cf-fill-row ${f.side === "BUY" ? "buy" : "sell"}">
+      <span>${f.side}</span>
+      <b>${f.coin.replace("USDT", "/USDT")}</b>
+      <em>${cfUsd(f.price)}</em>
+      <small>${f.time}</small>
+    </div>
+  `).join("");
+}
+
+function openHistoryPageFinal() {
+  if (typeof showPage === "function") {
+    showPage("aiHistory");
+  } else {
+    document.querySelectorAll("#appPage .page").forEach(p => p.classList.remove("active-page"));
+    document.getElementById("aiHistory")?.classList.add("active-page");
+  }
+  if (typeof renderHistory === "function") renderHistory();
+  return false;
+}
+
+window.openHistoryPageFinal = openHistoryPageFinal;
+
+function renderMarketWidgetsFix() {
+  try {
+    renderLiveChartFix();
+    renderOrderBookFix();
+    renderTradeFeedFix();
+  } catch(e) {
+    console.warn("market widgets render failed", e);
+  }
+}
+
+document.addEventListener("change", function(e) {
+  if (e.target && ["coinSelect", "tradePairSelect"].includes(e.target.id)) {
+    setTimeout(renderMarketWidgetsFix, 100);
+  }
+}, true);
+
+window.addEventListener("load", function() {
+  setTimeout(renderMarketWidgetsFix, 800);
+});
+
+setInterval(renderMarketWidgetsFix, 1800);

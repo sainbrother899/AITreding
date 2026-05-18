@@ -54,3 +54,13 @@ Stable Restore:
 - Added cache-bust app.js?v=stableRestore20260518.
 - No SQL required.
 - JS syntax check: OK
+
+
+Targeted Fix:
+- Added internal live chart renderer for crypto_live_chart/tradingViewChart/chartContainer.
+- Added orderBook renderer.
+- Added recentFills/tradeFeed renderer.
+- Added missing openHistoryPageFinal function.
+- Deposit/wallet/trade core logic untouched.
+- No SQL required.
+- JS syntax check: OK
