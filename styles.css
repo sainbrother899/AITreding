@@ -4551,3 +4551,48 @@ html.clean-home-boot-fallback body[data-user-clean-ui="true"] #appPage{
     max-width:116px!important;
   }
 }
+
+
+/* ===== TRADE CHART BIGGER FIX ===== */
+.trade-chart-bigger-card{
+  min-height:570px!important;
+  padding:12px!important;
+  overflow:hidden!important;
+}
+.trade-chart-bigger,
+.trade-chart-bigger iframe,
+.trade-chart-bigger-frame{
+  width:100%!important;
+  min-height:540px!important;
+  height:540px!important;
+  border-radius:20px!important;
+  overflow:hidden!important;
+}
+body.trade-chart-bigger-ready #trade .card:has(.trade-chart-bigger),
+body.trade-chart-bigger-ready #tradepage .card:has(.trade-chart-bigger){
+  margin-top:10px!important;
+}
+@media(max-width:700px){
+  .trade-chart-bigger-card{
+    min-height:540px!important;
+    padding:10px!important;
+  }
+  .trade-chart-bigger,
+  .trade-chart-bigger iframe,
+  .trade-chart-bigger-frame{
+    min-height:510px!important;
+    height:510px!important;
+  }
+}
+@media(max-width:430px){
+  .trade-chart-bigger-card{
+    min-height:520px!important;
+    padding:8px!important;
+  }
+  .trade-chart-bigger,
+  .trade-chart-bigger iframe,
+  .trade-chart-bigger-frame{
+    min-height:495px!important;
+    height:495px!important;
+  }
+}

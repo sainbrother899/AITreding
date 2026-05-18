@@ -475,3 +475,13 @@ Clean Top Header Menu:
 - Duplicate Home header remains removed.
 - No SQL required.
 - JS syntax check: OK
+
+
+Trade Chart Bigger Fix:
+- Trade chart height increased.
+- Mobile chart height around 495-510px.
+- Desktop/tablet chart height around 540px.
+- Chart card spacing optimized.
+- No trade logic changes.
+- No SQL required.
+- JS syntax check: OK

@@ -4347,3 +4347,40 @@ function restoreManualHistoryBackup(mode = state.mode) {
   document.addEventListener("DOMContentLoaded", () => setTimeout(thApply, 500));
   setInterval(thApply, 2500);
 })();
+
+
+/* ===== TRADE CHART BIGGER FIX ===== */
+(function(){
+  function makeTradeChartBigger(){
+    try {
+      const charts = [
+        document.getElementById("crypto_live_chart"),
+        document.getElementById("tradingViewChart"),
+        document.getElementById("chartContainer")
+      ].filter(Boolean);
+
+      charts.forEach(chart => {
+        chart.classList.add("trade-chart-bigger");
+        const card = chart.closest(".card") || chart.parentElement;
+        if (card) card.classList.add("trade-chart-bigger-card");
+      });
+
+      document.querySelectorAll("iframe").forEach(frame => {
+        const src = frame.getAttribute("src") || "";
+        if (src.includes("tradingview") || src.includes("widgetembed")) {
+          frame.classList.add("trade-chart-bigger-frame");
+          const card = frame.closest(".card") || frame.parentElement;
+          if (card) card.classList.add("trade-chart-bigger-card");
+        }
+      });
+
+      document.body.classList.add("trade-chart-bigger-ready");
+    } catch(e) {
+      console.warn("Chart bigger fix skipped", e);
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(makeTradeChartBigger, 500));
+  window.addEventListener("load", () => setTimeout(makeTradeChartBigger, 700));
+  setInterval(makeTradeChartBigger, 2500);
+})();
