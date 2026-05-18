@@ -554,3 +554,13 @@ Referral First Deposit 10% Update:
 - Example: first deposit ₹100000 => referrer bonus ₹10000.
 - SQL same referral_code/referred_by columns use karta hai.
 - JS syntax check: OK
+
+
+Referral Admin Auto 10% Fix:
+- Admin referral page no longer shows old ₹50 JOINED approval rows.
+- Removed referral Approve/Hold action UI.
+- Admin referral page now shows only PAID automatic bonus records.
+- Columns: Referrer, Joined User, Deposit, Bonus, Status.
+- Rule: First approved deposit ka 10% automatic wallet_ledger me add hota hai.
+- No SQL required if latest referral SQL already run.
+- JS syntax check: OK

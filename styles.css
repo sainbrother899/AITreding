@@ -3132,3 +3132,11 @@ body.real-mode-active .pro-bottom-nav .nav-btn[data-page="wallet"]{
     font-size:11px!important;
   }
 }
+
+
+/* Referral admin auto bonus cleanup */
+#adminReferralsLog .approve-btn,
+#adminReferralsLog .reject-btn,
+#adminReferralsLog button{
+  display:none!important;
+}

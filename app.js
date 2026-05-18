@@ -302,7 +302,7 @@ async function register() {
   state.users.push(user);
 
   if (referredBy) {
-    const ref = { code: referredBy, userEmail: email, bonus: 50, status: "JOINED" };
+    const ref = { code: referredBy, userEmail: email, bonus: 0, status: "JOINED" };
     state.referrals.push(ref);
     await saveReferralToSupabase(ref);
   }
@@ -2442,25 +2442,32 @@ function renderAdminTrades() {
   `).join("") || `<tr><td colspan="8" class="empty">No trades found.</td></tr>`;
 }
 
-function renderAdminReferrals() {
-  const el = $("adminReferralLog");
-  if (!el) return;
 
-  el.innerHTML = (state.referrals || []).map((r, i) => `
+function renderAdminReferrals() {
+  const el = $("adminReferralsLog") || $("referralAdminLog") || $("adminReferralLog");
+  if (!el || state.user?.role !== "admin") return;
+
+  const rows = (state.referrals || [])
+    .filter(r => String(r.status || "").toUpperCase() === "PAID")
+    .map(r => ({
+      referrer: r.referrerEmail || r.referrer_email || r.referrerId || r.referrer_id || "-",
+      joined: r.userEmail || r.user_email || r.userId || r.user_id || "-",
+      deposit: Number(r.depositAmount || r.deposit_amount || 0),
+      bonus: Number(r.bonusAmount || r.bonus_amount || 0),
+      status: r.status || "PAID"
+    }));
+
+  el.innerHTML = rows.map(r => `
     <tr>
-      <td>${r.code || "-"}</td>
-      <td>${r.userEmail || "-"}</td>
-      <td>${rupee(r.bonus || 0)}</td>
-      <td>${r.status || "JOINED"}</td>
-      <td>
-        <div class="action-row">
-          <button class="approve-btn" onclick="setReferralStatus(${i}, 'APPROVED')">Approve</button>
-          <button class="reject-btn" onclick="setReferralStatus(${i}, 'HOLD')">Hold</button>
-        </div>
-      </td>
+      <td>${r.referrer}</td>
+      <td>${r.joined}</td>
+      <td>${money(r.deposit)}</td>
+      <td>${money(r.bonus)}</td>
+      <td>${r.status}</td>
     </tr>
-  `).join("") || `<tr><td colspan="5" class="empty">No referrals found.</td></tr>`;
+  `).join("") || `<tr><td colspan="5" class="empty">No paid referral bonus yet.</td></tr>`;
 }
+
 
 function setReferralStatus(index, status) {
   if (!state.referrals[index]) return;
