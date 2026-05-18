@@ -655,3 +655,12 @@ Wallet History Big Cards:
 - Existing wallet balance/withdrawable minimal fix remains untouched.
 - No SQL required.
 - JS syntax check: OK
+
+
+Wallet History Only New Cards:
+- Keeps the new big Deposit/Withdrawal history cards visible.
+- Hides old wallet history tables and old generated small cards.
+- Existing wallet balance/withdrawable logic untouched.
+- Mobile layout untouched except old duplicate history hidden.
+- No SQL required.
+- JS syntax check: OK

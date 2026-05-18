@@ -5009,3 +5009,68 @@ function restoreManualHistoryBackup(mode = state.mode) {
   window.addEventListener("load", () => setTimeout(whRun, 800));
   setInterval(whRun, 2500);
 })();
+
+
+/* ===== WALLET HISTORY ONLY NEW CARDS ===== */
+(function(){
+  function hideOldWalletHistory(){
+    try{
+      const wallet = document.getElementById("wallet");
+      if (!wallet) return;
+
+      const newDeposit = document.getElementById("walletBigDepositHistory");
+      const newWithdrawal = document.getElementById("walletBigWithdrawalHistory");
+      if (!newDeposit && !newWithdrawal) return;
+
+      // Hide old table sections for deposit/withdrawal history.
+      ["userDepositLog", "userWithdrawalLog"].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        const table = el.closest("table");
+        const wrap = table?.closest(".table-wrap") || table?.parentElement;
+        const card = table?.closest(".card") || wrap?.closest(".card");
+
+        [table, wrap, card].filter(Boolean).forEach(node => {
+          if (node.id === "walletBigDepositHistory" || node.id === "walletBigWithdrawalHistory") return;
+          node.classList.add("wallet-hide-old-history-final");
+          node.style.setProperty("display", "none", "important");
+        });
+      });
+
+      // Hide old generated small wallet history boxes/cards, but never hide the new big card sections.
+      Array.from(wallet.querySelectorAll(".card, .mobile-table-card, .clean-record-card, .premium-history-card, .wallet-history-card-box")).forEach(node => {
+        if (node.id === "walletBigDepositHistory" || node.id === "walletBigWithdrawalHistory") return;
+        if (node.closest("#walletBigDepositHistory") || node.closest("#walletBigWithdrawalHistory")) return;
+
+        const txt = (node.textContent || "").trim();
+        const isOldHistory =
+          /Deposit Requests|Withdrawal Requests|Deposit History|Withdrawal History/i.test(txt) &&
+          /UTR|TXN|Method|Status|No deposit|No withdrawal|withdrawals|deposits/i.test(txt);
+
+        const isOldTinyBox = node.id === "walletDepositCards" || node.id === "walletWithdrawalCards";
+
+        if (isOldHistory || isOldTinyBox) {
+          node.classList.add("wallet-hide-old-history-final");
+          node.style.setProperty("display", "none", "important");
+        }
+      });
+
+      // Ensure new big sections visible.
+      [newDeposit, newWithdrawal].filter(Boolean).forEach(node => {
+        node.classList.remove("wallet-hide-old-history-final");
+        node.style.setProperty("display", "block", "important");
+      });
+
+      document.body.classList.add("wallet-history-only-new-ready");
+    } catch(e){
+      console.warn("wallet old history hide skipped", e);
+    }
+  }
+
+  window.hideOldWalletHistoryFinal = hideOldWalletHistory;
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(hideOldWalletHistory, 900));
+  window.addEventListener("load", () => setTimeout(hideOldWalletHistory, 1100));
+  setInterval(hideOldWalletHistory, 2000);
+})();

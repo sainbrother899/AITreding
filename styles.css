@@ -5414,3 +5414,17 @@ body.pc-same-mobile .wallet-big-history-section{
     max-width:460px!important;
   }
 }
+
+
+/* ===== WALLET HISTORY ONLY NEW CARDS ===== */
+.wallet-hide-old-history-final{
+  display:none!important;
+}
+#walletBigDepositHistory,
+#walletBigWithdrawalHistory{
+  display:block!important;
+}
+#walletBigDepositHistory .wallet-big-history-card,
+#walletBigWithdrawalHistory .wallet-big-history-card{
+  display:block!important;
+}
