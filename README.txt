@@ -466,24 +466,9 @@ Referral 5% Auto Bonus Update:
 - If you use Supabase, run latest referral SQL columns once.
 
 
-Final More Page Button Fix:
-- Top 3-dot opens More page via direct onclick.
-- KYC, Plans, Referral and Profile buttons use direct navigation.
-- Added/ensured Profile page exists.
-- Removed older conflicting More navigation handlers.
-- No SQL required.
+Login Restore + Safe More Fix:
+- Rebuilt from stable working version to restore login/register.
+- Added 3-dot More dropdown without touching login/register code.
+- Removed hard CSS/JS page-switch rules that could break auth screen.
+- JS syntax check: OK
 
-
-Hard More Page Fix:
-- Added hardOpenUserPage() independent navigation.
-- More page buttons use direct inline hardOpenUserPage().
-- CSS force-hides inactive pages and force-shows active page.
-- This bypasses old nav-handler conflicts.
-- No SQL required.
-
-
-More Dropdown Fix:
-- Replaced More page dependency with top 3-dot dropdown menu.
-- Dropdown buttons open KYC, Plans, Referral and Profile directly.
-- This avoids old navigation conflicts.
-- No SQL required.

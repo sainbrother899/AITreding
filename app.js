@@ -1,68 +1,3 @@
-
-/* MORE DROPDOWN FINAL FIX */
-(function(){
-  function showDirectPage(pageId){
-    var target = document.getElementById(pageId);
-    if(!target) {
-      console.warn("Page missing:", pageId);
-      return;
-    }
-
-    document.querySelectorAll("#appPage .page").forEach(function(p){
-      p.classList.remove("active-page");
-      p.style.display = "none";
-    });
-
-    target.classList.add("active-page");
-    target.style.display = "block";
-
-    document.querySelectorAll(".nav-btn").forEach(function(btn){
-      btn.classList.toggle("active", btn.getAttribute("data-page") === pageId);
-    });
-
-    if(pageId === "profilepage"){
-      var s = window.state || {};
-      var u = s.user || {};
-      function set(id, val){ var el = document.getElementById(id); if(el) el.textContent = val; }
-      set("profileNameText", u.name || "User");
-      set("profileEmailText", u.email || "-");
-      set("profilePlanText", u.plan || "Free");
-      set("profileModeText", s.mode || "DEMO");
-    }
-
-    var dd = document.getElementById("topMoreDropdown");
-    if(dd) dd.classList.remove("show");
-    window.scrollTo({top:0, behavior:"smooth"});
-  }
-
-  window.showDirectPage = showDirectPage;
-
-  document.addEventListener("click", function(e){
-    var moreBtn = e.target.closest("#topMoreMenuBtn");
-    if(moreBtn){
-      e.preventDefault();
-      e.stopPropagation();
-      var dd = document.getElementById("topMoreDropdown");
-      if(dd) dd.classList.toggle("show");
-      return;
-    }
-
-    var pageBtn = e.target.closest("[data-direct-page]");
-    if(pageBtn){
-      e.preventDefault();
-      e.stopPropagation();
-      showDirectPage(pageBtn.getAttribute("data-direct-page"));
-      return;
-    }
-
-    var dd = document.getElementById("topMoreDropdown");
-    if(dd && !e.target.closest(".top-more-wrap")) dd.classList.remove("show");
-  }, true);
-})();
-
-
-});
-
 const CONFIG = window.APP_CONFIG || {};
 const IS_ADMIN_PAGE = document.body?.dataset?.adminPage === "true";
 const MIN_DEPOSIT_AMOUNT = 1000;
@@ -3500,6 +3435,30 @@ window.cancelManagedTradeById = cancelManagedTradeById;
 window.cancelSelectedManagedTrade = cancelSelectedManagedTrade;
 
 
+/* Top More / data-page direct navigation fix */
+function safeOpenPageFromButton(btn) {
+  const page = btn?.dataset?.page;
+  if (!page) return;
+  if (typeof showPage === "function") {
+    showPage(page);
+    return;
+  }
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active-page"));
+  document.getElementById(page)?.classList.add("active-page");
+}
+
+document.addEventListener("click", function(e){
+  const btn = e.target.closest("[data-page]");
+  if (!btn) return;
+
+  // Allow all non-nav shortcut buttons like top 3-dot and More page cards.
+  if (btn.id === "topMoreMenuBtn" || btn.classList.contains("more-open-btn") || btn.classList.contains("history-open-btn")) {
+    e.preventDefault();
+    safeOpenPageFromButton(btn);
+  }
+});
+
+
 function syncManagedPnLIntoMetrics() {
   try {
     if (!state.user || state.user.role === "admin") return;
@@ -3803,5 +3762,97 @@ window.closeSelectedMassTrade = closeSelectedMassTrade;
 window.closeAllMassTrades = closeAllMassTrades;
 
 
+/* More page internal buttons navigation fix */
+function openUserPageDirect(pageId) {
+  if (!pageId) return;
+
+  const target = document.getElementById(pageId);
+  if (!target) {
+    console.warn("Page not found:", pageId);
+    return;
+  }
+
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active-page"));
+  target.classList.add("active-page");
+
+  document.querySelectorAll(".nav-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.page === pageId);
+  });
+
+  try {
+    if (pageId === "profilepage") {
+      if ($("profileNameText")) $("profileNameText").textContent = state.user?.name || "User";
+      if ($("profileEmailText")) $("profileEmailText").textContent = state.user?.email || "-";
+      if ($("profilePlanText")) $("profilePlanText").textContent = state.user?.plan || getPlan?.() || "Free";
+      if ($("profileModeText")) $("profileModeText").textContent = state.mode || "DEMO";
+    }
+    if (typeof render === "function") setTimeout(() => { try { render(); } catch(e){} }, 50);
+  } catch(e) {}
+}
+
+document.addEventListener("click", function(e){
+  const moreBtn = e.target.closest(".more-open-btn, #topMoreMenuBtn, .ghost-btn[data-page]");
+  if (!moreBtn) return;
+  const pageId = moreBtn.dataset.page;
+  if (!pageId) return;
+  e.preventDefault();
+  e.stopPropagation();
+  openUserPageDirect(pageId);
+}, true);
 
 
+/* SAFE MORE DROPDOWN FIX - does not touch login/register */
+(function(){
+  function safeOpenMorePage(pageId){
+    var target = document.getElementById(pageId);
+    if(!target) return false;
+
+    // Only switch pages inside logged-in app area. Auth page remains untouched.
+    document.querySelectorAll("#appPage .page").forEach(function(p){
+      p.classList.remove("active-page");
+    });
+    target.classList.add("active-page");
+
+    document.querySelectorAll(".nav-btn").forEach(function(btn){
+      btn.classList.toggle("active", btn.getAttribute("data-page") === pageId);
+    });
+
+    if(pageId === "profilepage"){
+      var s = window.state || {};
+      var u = s.user || {};
+      function set(id, val){ var el = document.getElementById(id); if(el) el.textContent = val; }
+      set("profileNameText", u.name || "User");
+      set("profileEmailText", u.email || "-");
+      set("profilePlanText", u.plan || "Free");
+      set("profileModeText", s.mode || "DEMO");
+    }
+
+    var dd = document.getElementById("topMoreDropdown");
+    if(dd) dd.classList.remove("show");
+    return false;
+  }
+
+  window.safeOpenMorePage = safeOpenMorePage;
+
+  document.addEventListener("click", function(e){
+    var moreBtn = e.target.closest("#topMoreMenuBtn");
+    if(moreBtn){
+      e.preventDefault();
+      e.stopPropagation();
+      var dd = document.getElementById("topMoreDropdown");
+      if(dd) dd.classList.toggle("show");
+      return;
+    }
+
+    var direct = e.target.closest("[data-direct-page]");
+    if(direct){
+      e.preventDefault();
+      e.stopPropagation();
+      safeOpenMorePage(direct.getAttribute("data-direct-page"));
+      return;
+    }
+
+    var dd = document.getElementById("topMoreDropdown");
+    if(dd && !e.target.closest(".top-more-wrap")) dd.classList.remove("show");
+  });
+})();

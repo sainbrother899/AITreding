@@ -2781,69 +2781,7 @@ body[data-admin-page="true"] .table-card:hover{
 }
 
 
-/* Final More Page Button Fix CSS */
-.page{display:none;}
-.page.active-page{display:block;}
-#morepage,.more-grid,.profile-page-card{
-  width:430px!important;
-  max-width:430px!important;
-  margin-left:auto!important;
-  margin-right:auto!important;
-}
-.more-open-btn{
-  cursor:pointer!important;
-  pointer-events:auto!important;
-}
-.profile-info-grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:12px;
-}
-.profile-info-grid div{
-  border:1px solid var(--line);
-  background:rgba(255,255,255,.035);
-  border-radius:15px;
-  padding:14px;
-}
-.profile-info-grid span{
-  display:block;
-  color:var(--muted);
-  font-size:12px;
-  margin-bottom:6px;
-}
-.profile-info-grid b{
-  color:var(--text);
-  font-size:14px;
-  word-break:break-word;
-}
-@media(max-width:520px){
-  #morepage,.more-grid,.profile-page-card{
-    width:100%!important;
-    max-width:100%!important;
-  }
-  .profile-info-grid{grid-template-columns:1fr;}
-}
-
-
-/* HARD MORE NAV FIX CSS */
-#appPage .page{display:none!important;}
-#appPage .page.active-page{display:block!important;}
-#morepage.active-page,
-#kyc.active-page,
-#subscription.active-page,
-#referral.active-page,
-#profilepage.active-page{
-  display:block!important;
-}
-.more-open-btn,
-#topMoreMenuBtn{
-  pointer-events:auto!important;
-  position:relative;
-  z-index:50;
-}
-
-
-/* MORE DROPDOWN FINAL FIX CSS */
+/* SAFE MORE DROPDOWN CSS */
 .top-more-wrap{
   position:relative;
   margin-left:auto;
@@ -2891,10 +2829,6 @@ body[data-admin-page="true"] .table-card:hover{
   text-align:left;
   padding:0 12px;
   cursor:pointer;
-}
-.top-more-dropdown button:hover{
-  border-color:rgba(0,229,155,.28);
-  color:#00e59b;
 }
 .profile-page-card{
   width:430px!important;
