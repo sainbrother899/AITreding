@@ -922,3 +922,14 @@ Payment Method No Blink + One Warning Fix:
 - Max 2 UPI IDs and max 2 Bank Accounts limit remains.
 - Design/layout/sidebar/header untouched.
 - JS syntax check: OK
+
+
+Clean Logic Locked Base:
+- Cleaned only conflicting KYC/Admin-KYC/Payment-Methods patch blocks.
+- Did NOT touch chart, trade page, home page, wallet history, P&L, history, bottom nav, header/sidebar layout.
+- Added one consolidated KYC + Payment Methods logic block.
+- KYC admin table: DB cache render, de-duplicate rows, no blinking, approve/reject locked after final status.
+- User KYC page: Approved/Pending hides form, Rejected allows resubmit.
+- Payment Methods: stable UPI/BANK selection, one warning only, max 2 UPI + 2 Bank.
+- Removed old patch markers: [{"marker": "ADMIN KYC STABLE RENDERER FIX", "js": 1, "css": 1}, {"marker": "KYC APPROVE REJECT LOCK FIX", "js": 1, "css": 1}, {"marker": "PAYMENT METHOD NO BLINK ONE WARNING FIX", "js": 1, "css": 1}]
+- JS syntax check: OK
