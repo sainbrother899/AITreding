@@ -4384,14 +4384,3 @@ button,
 /* ===== FINAL STABILITY PACK UI SAFETY ===== */
 .plc-profit,.profit,.pnl-plus,.pos{color:#00e7a8!important}
 .plc-loss,.loss,.pnl-minus,.neg{color:#ff456b!important}
-
-
-/* ===== OLD HOME UI REMOVE FINAL ===== */
-body[data-user-clean-ui="true"] #dashboard > *:not(#cleanHomeMount):not(#homeAiTradeControlCard):not(#manualOpenPositionsMount),
-body[data-user-clean-ui="true"] #home > *:not(#cleanHomeMount):not(#homeAiTradeControlCard):not(#manualOpenPositionsMount){
-  display:none!important;
-}
-body.old-home-ui-removed #cleanHomeMount,
-body.old-home-ui-removed #homeAiTradeControlCard{
-  display:block!important;
-}
