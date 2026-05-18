@@ -4235,3 +4235,115 @@ function restoreManualHistoryBackup(mode = state.mode) {
   // Light guard only; no HTML removal.
   setTimeout(markCleanReady, 1800);
 })();
+
+
+/* ===== CLEAN TOP HEADER MENU ===== */
+(function(){
+  function thIsUser(){
+    return state?.user && state.user.role !== "admin";
+  }
+
+  function thUserName(){
+    return state?.user?.name || state?.user?.email?.split("@")[0] || "User";
+  }
+
+  function thInitial(){
+    return (thUserName()[0] || "U").toUpperCase();
+  }
+
+  function thLogout(){
+    try {
+      if (typeof logout === "function") return logout();
+    } catch(e) {}
+    try {
+      state.user = null;
+      localStorage.removeItem("ai_user_session_v1");
+      localStorage.removeItem("ai_admin_session_v1");
+      localStorage.removeItem("ai_session");
+    } catch(e) {}
+    location.reload();
+  }
+
+  function thFindHeader(){
+    return document.querySelector(".app-header, .top-header, .brand-row, header") || document.getElementById("appPage")?.firstElementChild;
+  }
+
+  function thBuildMenu(){
+    let menu = document.getElementById("topHeaderMenuPanel");
+    if (!menu) {
+      menu = document.createElement("div");
+      menu.id = "topHeaderMenuPanel";
+      menu.className = "top-header-menu-panel";
+      menu.innerHTML = `
+        <button type="button" data-goto-page="dashboard">Home</button>
+        <button type="button" data-goto-page="trade">Trade</button>
+        <button type="button" data-goto-page="wallet">Wallet</button>
+        <button type="button" data-goto-page="pnl">PnL</button>
+        <button type="button" data-goto-page="history">History</button>
+        <button type="button" id="topHeaderLogoutBtn">Logout</button>
+      `;
+      document.body.appendChild(menu);
+
+      menu.addEventListener("click", function(e){
+        const page = e.target?.dataset?.gotoPage;
+        if (page) {
+          e.preventDefault();
+          document.querySelector(`[data-page="${page}"]`)?.click();
+          document.querySelector(`[data-tab="${page}"]`)?.click();
+          document.getElementById(page)?.scrollIntoView?.({behavior:"smooth", block:"start"});
+          menu.classList.remove("show");
+        }
+        if (e.target?.id === "topHeaderLogoutBtn") {
+          e.preventDefault();
+          thLogout();
+        }
+      });
+    }
+    return menu;
+  }
+
+  function thApply(){
+    if (!thIsUser()) return;
+
+    const header = thFindHeader();
+    if (!header || header.dataset.cleanHeaderApplied === "1") {
+      // Still update username/avatar when state changes.
+      const name = document.getElementById("topHeaderUserName");
+      const av = document.getElementById("topHeaderAvatar");
+      if (name) name.textContent = thUserName();
+      if (av) av.textContent = thInitial();
+      return;
+    }
+
+    header.dataset.cleanHeaderApplied = "1";
+    header.classList.add("clean-top-header");
+
+    header.innerHTML = `
+      <button type="button" id="topHeaderMenuBtn" class="top-header-menu-btn" aria-label="Open menu">☰</button>
+      <div class="top-header-title">
+        <span>AI Trading Assistant</span>
+      </div>
+      <button type="button" id="topHeaderUserBtn" class="top-header-user-btn">
+        <em id="topHeaderAvatar">${thInitial()}</em>
+        <span id="topHeaderUserName">${thUserName()}</span>
+      </button>
+    `;
+
+    const menu = thBuildMenu();
+    const menuBtn = document.getElementById("topHeaderMenuBtn");
+    menuBtn?.addEventListener("click", function(e){
+      e.preventDefault();
+      menu.classList.toggle("show");
+    });
+
+    document.addEventListener("click", function(e){
+      if (!menu.classList.contains("show")) return;
+      if (e.target.closest("#topHeaderMenuPanel") || e.target.closest("#topHeaderMenuBtn")) return;
+      menu.classList.remove("show");
+    });
+  }
+
+  window.addEventListener("load", () => setTimeout(thApply, 500));
+  document.addEventListener("DOMContentLoaded", () => setTimeout(thApply, 500));
+  setInterval(thApply, 2500);
+})();

@@ -466,3 +466,12 @@ Duplicate Home Header Removed:
 - Home cards, account cards, rate cards, AI Control, floating bar, trade/wallet/admin logic untouched.
 - No SQL required.
 - Summary: {"removed_exact_header_blocks": 0, "removed_fallback_header_blocks": 2, "syntax": "OK"}
+
+
+Clean Top Header Menu:
+- Top header changed to: ☰  AI Trading Assistant  Sain Brother.
+- Confusing 3-dot button removed/replaced by clear menu icon.
+- Menu opens Home, Trade, Wallet, PnL, History, Logout.
+- Duplicate Home header remains removed.
+- No SQL required.
+- JS syntax check: OK
