@@ -527,3 +527,11 @@ Referral Fixed ₹500 Bonus Update:
 - Bonus is paid only once per referred user.
 - Uses referrals table and wallet_ledger REFERRAL_BONUS.
 - No SQL required if referral columns already exist.
+
+
+Referral 500 DB Final Fix:
+- Added database-backed referral_code and referred_by support.
+- Deposit approval finds referrer from profiles.referred_by.
+- Referrer gets fixed 500 automatically after referred user's first approved deposit.
+- No referral approval needed.
+- Run the new SQL for profiles referral_code/referred_by columns.

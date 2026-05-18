@@ -268,3 +268,22 @@ alter table public.referrals add column if not exists status text default 'PAID'
 
 
 -- Fixed referral bonus uses bonus_amount = 500 and percent = 0 after referred user's first approved deposit.
+
+
+
+alter table public.profiles add column if not exists referral_code text;
+alter table public.profiles add column if not exists referred_by text;
+
+alter table public.referrals add column if not exists referrer_id text;
+alter table public.referrals add column if not exists referrer_email text;
+alter table public.referrals add column if not exists user_id text;
+alter table public.referrals add column if not exists user_email text;
+alter table public.referrals add column if not exists deposit_id text;
+alter table public.referrals add column if not exists deposit_amount numeric default 0;
+alter table public.referrals add column if not exists bonus_amount numeric default 0;
+alter table public.referrals add column if not exists percent numeric default 0;
+alter table public.referrals add column if not exists status text default 'PAID';
+
+create index if not exists idx_profiles_referral_code on public.profiles(referral_code);
+create index if not exists idx_profiles_referred_by on public.profiles(referred_by);
+create index if not exists idx_referrals_user_id_bonus on public.referrals(user_id, bonus_amount, status);
