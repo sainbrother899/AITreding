@@ -983,3 +983,14 @@ KYC + Payment Route Lock Final:
 - KYC: approved/pending hides form, rejected allows resubmit.
 - Removed previous user payment patch blocks: [{"marker": "USER PAYMENT METHODS OLD CODE REMOVED FINAL", "js": 1, "css": 1}]
 - JS syntax check: OK
+
+
+Mobile Payment Input Preserve Fix:
+- Fixes mobile Payment Methods form clearing while typing.
+- Cause: route-lock/observer re-rendered page on mobile keyboard/input DOM changes.
+- Preserves input/select values while user is typing.
+- Blocks payment page re-render during active input editing.
+- Restores values if old renderer clears fields.
+- Submit still works and clears after successful submit.
+- Chart/trade/home/wallet/P&L/history untouched.
+- JS syntax check: OK

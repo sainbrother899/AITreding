@@ -7987,3 +7987,188 @@ function restoreManualHistoryBackup(mode = state.mode) {
     setTimeout(cleanupIfOldRouteAppears, 900);
   });
 })();
+
+
+/* ===== MOBILE PAYMENT INPUT PRESERVE FIX ===== */
+(function(){
+  let pmEditing = false;
+  let editTimer = null;
+  let cachedValues = {};
+  let lastRenderAt = 0;
+
+  function page(){
+    return document.getElementById("paymentMethodsPage");
+  }
+
+  function isPaymentOpen(){
+    const p = page();
+    return !!(p && p.classList.contains("active-page") && getComputedStyle(p).display !== "none");
+  }
+
+  function form(){
+    return document.getElementById("routePaymentForm") ||
+      document.getElementById("finalUserPaymentMethodForm") ||
+      document.getElementById("userPaymentMethodCleanForm") ||
+      page()?.querySelector("form");
+  }
+
+  function collectValues(){
+    const f = form();
+    if (!f) return;
+    cachedValues = {};
+    f.querySelectorAll("input,select,textarea").forEach(el => {
+      const key = el.name || el.id;
+      if (!key) return;
+      if (el.type === "checkbox" || el.type === "radio") cachedValues[key] = el.checked;
+      else cachedValues[key] = el.value;
+    });
+  }
+
+  function restoreValues(){
+    const f = form();
+    if (!f || !cachedValues || !Object.keys(cachedValues).length) return;
+    f.querySelectorAll("input,select,textarea").forEach(el => {
+      const key = el.name || el.id;
+      if (!key || !(key in cachedValues)) return;
+      if (el.readOnly) return;
+      if (el.type === "checkbox" || el.type === "radio") el.checked = !!cachedValues[key];
+      else el.value = cachedValues[key];
+    });
+
+    const type = cachedValues.type || cachedValues.routePayType || cachedValues.finalUserPayType || cachedValues.userPmType;
+    if (type) {
+      try {
+        localStorage.setItem("route_pm_type", String(type).toUpperCase());
+        localStorage.setItem("user_pm_final_type", String(type).toUpperCase());
+      } catch(e){}
+      const p = page();
+      if (p) {
+        const isBank = String(type).toUpperCase() === "BANK";
+        p.classList.toggle("route-pm-bank-selected", isBank);
+        p.classList.toggle("final-pm-bank-selected", isBank);
+        p.classList.toggle("user-pm-bank-selected", isBank);
+        p.querySelectorAll(".route-pm-bank,.final-pm-bank-fields,.user-pm-bank-fields").forEach(x => x.style.setProperty("display", isBank ? "grid" : "none", "important"));
+        p.querySelectorAll(".route-pm-upi,.final-pm-upi-field,.user-pm-upi-field").forEach(x => x.style.setProperty("display", isBank ? "none" : "grid", "important"));
+      }
+    }
+  }
+
+  function startEditing(){
+    if (!isPaymentOpen()) return;
+    pmEditing = true;
+    collectValues();
+    clearTimeout(editTimer);
+    editTimer = setTimeout(() => {
+      collectValues();
+      // keep edit lock while mobile keyboard/input is active
+      if (document.activeElement && page()?.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) {
+        startEditing();
+      } else {
+        pmEditing = false;
+      }
+    }, 1800);
+  }
+
+  function patchRenderFunctions(){
+    if (window.__mobilePaymentInputPreservePatched) return;
+    window.__mobilePaymentInputPreservePatched = true;
+
+    const wrap = (name) => {
+      try {
+        if (typeof window[name] !== "function") return;
+        const old = window[name];
+        window[name] = function(){
+          if (isPaymentOpen() && pmEditing) {
+            restoreValues();
+            return;
+          }
+          collectValues();
+          const result = old.apply(this, arguments);
+          setTimeout(restoreValues, 50);
+          return result;
+        };
+      } catch(e){}
+    };
+
+    ["renderRoutePaymentMethods","renderFinalUserPaymentMethods","renderUserPaymentMethodsClean","applyPaymentMethodsClean","applyPaymentKycAdminApproval"].forEach(wrap);
+  }
+
+  function bind(){
+    const p = page();
+    if (!p) return;
+
+    p.querySelectorAll("input,select,textarea").forEach(el => {
+      if (el.dataset.mobilePreserveBound === "1") return;
+      el.dataset.mobilePreserveBound = "1";
+      ["input","change","focus","keydown","keyup","compositionstart","compositionend"].forEach(evt => {
+        el.addEventListener(evt, startEditing, true);
+      });
+      el.addEventListener("blur", () => {
+        collectValues();
+        clearTimeout(editTimer);
+        editTimer = setTimeout(() => { pmEditing = false; }, 700);
+      }, true);
+    });
+
+    const f = form();
+    if (f && f.dataset.mobileSubmitPreserveBound !== "1") {
+      f.dataset.mobileSubmitPreserveBound = "1";
+      f.addEventListener("submit", () => {
+        pmEditing = false;
+        cachedValues = {};
+      }, true);
+    }
+  }
+
+  // Guard against MutationObserver/render while typing: immediately restore if old render clears fields.
+  function startWatch(){
+    const p = page();
+    if (!p || p.dataset.mobilePreserveObserved === "1") return;
+    p.dataset.mobilePreserveObserved = "1";
+
+    const obs = new MutationObserver(() => {
+      if (!isPaymentOpen()) return;
+      patchRenderFunctions();
+      bind();
+
+      if (pmEditing) {
+        setTimeout(restoreValues, 0);
+        setTimeout(restoreValues, 80);
+      }
+    });
+    obs.observe(p, { childList:true, subtree:true, attributes:false });
+  }
+
+  document.addEventListener("click", function(e){
+    const txt = (e.target?.textContent || "").toLowerCase();
+    if (txt.includes("payment method") || txt.includes("payment methods")) {
+      setTimeout(() => { patchRenderFunctions(); bind(); startWatch(); restoreValues(); }, 400);
+      setTimeout(() => { patchRenderFunctions(); bind(); startWatch(); restoreValues(); }, 1000);
+    }
+  }, true);
+
+  window.preserveMobilePaymentInputs = function(){
+    collectValues();
+    restoreValues();
+  };
+
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(patchRenderFunctions, 500);
+    setTimeout(bind, 1000);
+    setTimeout(startWatch, 1200);
+  });
+  window.addEventListener("load", () => {
+    setTimeout(patchRenderFunctions, 600);
+    setTimeout(bind, 1100);
+    setTimeout(startWatch, 1300);
+  });
+
+  setInterval(() => {
+    if (isPaymentOpen()) {
+      patchRenderFunctions();
+      bind();
+      startWatch();
+      if (pmEditing) restoreValues();
+    }
+  }, 1500);
+})();
