@@ -581,3 +581,14 @@ TradingView Responsive Chart Fix:
 - Order Ticket, Order Book, Trade Feed untouched.
 - No SQL required.
 - JS syntax check: OK
+
+
+TradingView Full Fit Final:
+- Removed conflicting previous chart sizing blocks: ['TRADINGVIEW RESPONSIVE CHART FIX', 'TRADE PAGE CLEAN CHART + ORDER TEXT']
+- Final hierarchy fixed: card auto height, chart host responsive height, iframe 100% height.
+- Chart height is responsive via visualViewport/window size, not fixed px.
+- Prevents giant empty box while keeping TradingView bottom axis/controls visible.
+- Duplicate outer rate/timeframe/header hidden.
+- Order Ticket, Order Book, Trade Feed untouched.
+- No SQL required.
+- JS syntax check: OK

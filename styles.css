@@ -4661,96 +4661,6 @@ body[data-user-clean-ui="true"] [data-page="trade"] .action-row button{
 }
 
 
-/* ===== TRADE PAGE CLEAN CHART + ORDER TEXT ===== */
-.hide-outer-timeframe,
-.hide-empty-timeframe-row,
-.hide-outer-chart-ui,
-.hide-sim-badge,
-.hide-simulation-warning{
-  display:none!important;
-}
-
-/* Keep actual chart area and make it use the freed space */
-.clean-expanded-chart-card,
-.trade-chart-bigger-card.clean-expanded-chart-card{
-  min-height:610px!important;
-  padding:8px!important;
-}
-
-.clean-expanded-chart,
-.clean-expanded-chart iframe,
-.clean-expanded-chart-card iframe,
-.trade-chart-bigger-frame.clean-expanded-chart{
-  width:100%!important;
-  min-height:585px!important;
-  height:585px!important;
-  border-radius:20px!important;
-  overflow:hidden!important;
-}
-
-/* Order ticket polish */
-.clean-order-title{
-  letter-spacing:-.025em!important;
-}
-
-body[data-user-clean-ui="true"] #trade .card,
-body[data-user-clean-ui="true"] #tradepage .card{
-  overflow:hidden!important;
-}
-
-/* Remove extra bottom warning space after buttons */
-body[data-user-clean-ui="true"] #trade .hide-simulation-warning,
-body[data-user-clean-ui="true"] #tradepage .hide-simulation-warning{
-  margin:0!important;
-  padding:0!important;
-  height:0!important;
-}
-
-/* Compact order ticket spacing */
-body[data-user-clean-ui="true"] #trade input,
-body[data-user-clean-ui="true"] #trade select,
-body[data-user-clean-ui="true"] #tradepage input,
-body[data-user-clean-ui="true"] #tradepage select{
-  min-height:52px!important;
-}
-
-body[data-user-clean-ui="true"] #trade .action-row,
-body[data-user-clean-ui="true"] #tradepage .action-row{
-  margin-top:10px!important;
-  margin-bottom:0!important;
-}
-
-@media(max-width:700px){
-  .clean-expanded-chart-card,
-  .trade-chart-bigger-card.clean-expanded-chart-card{
-    min-height:585px!important;
-    padding:6px!important;
-  }
-  .clean-expanded-chart,
-  .clean-expanded-chart iframe,
-  .clean-expanded-chart-card iframe,
-  .trade-chart-bigger-frame.clean-expanded-chart{
-    min-height:565px!important;
-    height:565px!important;
-  }
-}
-
-@media(max-width:430px){
-  .clean-expanded-chart-card,
-  .trade-chart-bigger-card.clean-expanded-chart-card{
-    min-height:560px!important;
-    padding:5px!important;
-  }
-  .clean-expanded-chart,
-  .clean-expanded-chart iframe,
-  .clean-expanded-chart-card iframe,
-  .trade-chart-bigger-frame.clean-expanded-chart{
-    min-height:542px!important;
-    height:542px!important;
-  }
-}
-
-
 /* ===== ORDER BOOK + TRADE FEED RESTORE FIX ===== */
 .force-show-order-feed{
   display:block!important;
@@ -4989,13 +4899,21 @@ body[data-active-page="more"] #more{
 
 
 
-/* ===== TRADINGVIEW RESPONSIVE CHART FIX ===== */
-/* No fixed px box. Chart height follows screen using dvh/vh and stays inside the card. */
-.tv-responsive-card,
-.exact-chart-card.tv-responsive-card,
-.mt-chart-card.tv-responsive-card,
-.clean-expanded-chart-card.tv-responsive-card,
-.trade-chart-bigger-card.tv-responsive-card{
+
+
+
+/* ===== TRADINGVIEW FULL FIT FINAL ===== */
+/* Final chart hierarchy:
+   card = auto height
+   host = responsive height
+   iframe = 100% of host
+   No parent clips the bottom axis/controls.
+*/
+.tv-full-fit-card,
+.exact-chart-card.tv-full-fit-card,
+.mt-chart-card.tv-full-fit-card,
+.trade-chart-bigger-card.tv-full-fit-card,
+.clean-expanded-chart-card.tv-full-fit-card{
   width:100%!important;
   max-width:none!important;
   height:auto!important;
@@ -5006,24 +4924,24 @@ body[data-active-page="more"] #more{
   border-radius:18px!important;
 }
 
-/* Responsive chart box: not too tall, not too small */
-.tv-responsive-host,
-.exact-chart-host.tv-responsive-host,
-#crypto_live_chart.tv-responsive-host,
-#tradingViewChart.tv-responsive-host,
-#chartContainer.tv-responsive-host{
+.tv-full-fit-host,
+.exact-chart-host.tv-full-fit-host,
+#crypto_live_chart.tv-full-fit-host,
+#tradingViewChart.tv-full-fit-host,
+#chartContainer.tv-full-fit-host{
   width:100%!important;
-  height:clamp(430px, 62dvh, 610px)!important;
-  min-height:clamp(430px, 62dvh, 610px)!important;
-  max-height:clamp(430px, 62dvh, 610px)!important;
+  height:var(--tv-fit-height, clamp(460px, 64dvh, 620px))!important;
+  min-height:var(--tv-fit-height, clamp(460px, 64dvh, 620px))!important;
+  max-height:var(--tv-fit-height, clamp(460px, 64dvh, 620px))!important;
   overflow:hidden!important;
   border-radius:16px!important;
   display:block!important;
+  position:relative!important;
   background:#070b13!important;
 }
 
-.tv-responsive-frame,
-.tv-responsive-host iframe,
+.tv-full-fit-frame,
+.tv-full-fit-host iframe,
 .exact-chart-host iframe,
 .clean-tv-only-frame,
 .real-tv-chart-frame,
@@ -5038,7 +4956,7 @@ body[data-active-page="more"] #more{
   border-radius:16px!important;
 }
 
-/* Override previous fixed height rules still attached to classes */
+/* Hard override all older fixed-height chart classes */
 .exact-chart-host,
 .exact-chart-host iframe,
 .exact-chart-frame,
@@ -5050,69 +4968,47 @@ body[data-active-page="more"] #more{
 .trade-chart-bigger iframe,
 .trade-chart-bigger-frame,
 .clean-expanded-chart,
-.clean-expanded-chart iframe{
-  height:clamp(430px, 62dvh, 610px)!important;
-  min-height:clamp(430px, 62dvh, 610px)!important;
-  max-height:clamp(430px, 62dvh, 610px)!important;
+.clean-expanded-chart iframe,
+#crypto_live_chart,
+#tradingViewChart,
+#chartContainer{
+  height:var(--tv-fit-height, clamp(460px, 64dvh, 620px))!important;
+  min-height:var(--tv-fit-height, clamp(460px, 64dvh, 620px))!important;
+  max-height:var(--tv-fit-height, clamp(460px, 64dvh, 620px))!important;
 }
 
-/* Mobile tuning */
-@media(max-width:430px){
-  .tv-responsive-card,
-  .exact-chart-card.tv-responsive-card{
+/* Hide duplicate outer controls; TradingView's internal controls remain. */
+.pro-pair-line,
+.pro-time-tabs,
+.real-tv-chart-head,
+.chart-hint{
+  display:none!important;
+}
+
+/* Trade page chart card should not create a giant empty box */
+body[data-active-page="trade"] .tv-full-fit-card{
+  margin-top:10px!important;
+  margin-bottom:12px!important;
+}
+
+/* Mobile fine tuning */
+@media(max-width:480px){
+  .tv-full-fit-card,
+  .exact-chart-card.tv-full-fit-card{
     padding:5px!important;
     border-radius:17px!important;
   }
 
-  .tv-responsive-host,
-  .exact-chart-host.tv-responsive-host,
-  #crypto_live_chart.tv-responsive-host,
-  #tradingViewChart.tv-responsive-host,
-  #chartContainer.tv-responsive-host,
+  .tv-full-fit-host,
+  .tv-full-fit-frame,
+  .tv-full-fit-host iframe,
   .exact-chart-host,
   .exact-chart-host iframe,
-  .exact-chart-frame,
   .clean-tv-only-frame,
-  .real-tv-chart-frame{
-    height:clamp(410px, 58dvh, 540px)!important;
-    min-height:clamp(410px, 58dvh, 540px)!important;
-    max-height:clamp(410px, 58dvh, 540px)!important;
+  .real-tv-chart-frame,
+  #crypto_live_chart,
+  #tradingViewChart,
+  #chartContainer{
     border-radius:14px!important;
-  }
-}
-
-/* Very small phones */
-@media(max-width:380px){
-  .tv-responsive-host,
-  .exact-chart-host.tv-responsive-host,
-  #crypto_live_chart.tv-responsive-host,
-  #tradingViewChart.tv-responsive-host,
-  #chartContainer.tv-responsive-host,
-  .exact-chart-host,
-  .exact-chart-host iframe,
-  .exact-chart-frame,
-  .clean-tv-only-frame,
-  .real-tv-chart-frame{
-    height:clamp(390px, 56dvh, 510px)!important;
-    min-height:clamp(390px, 56dvh, 510px)!important;
-    max-height:clamp(390px, 56dvh, 510px)!important;
-  }
-}
-
-/* Desktop/tablet can be a little larger */
-@media(min-width:768px){
-  .tv-responsive-host,
-  .exact-chart-host.tv-responsive-host,
-  #crypto_live_chart.tv-responsive-host,
-  #tradingViewChart.tv-responsive-host,
-  #chartContainer.tv-responsive-host,
-  .exact-chart-host,
-  .exact-chart-host iframe,
-  .exact-chart-frame,
-  .clean-tv-only-frame,
-  .real-tv-chart-frame{
-    height:clamp(520px, 68vh, 680px)!important;
-    min-height:clamp(520px, 68vh, 680px)!important;
-    max-height:clamp(520px, 68vh, 680px)!important;
   }
 }
