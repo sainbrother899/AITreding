@@ -4185,3 +4185,107 @@ document.addEventListener("click", function(e){
 
 
 
+
+
+/* ===== FINAL DEPOSIT SUBMIT FIX ===== */
+function getDepositAmountFinal() {
+  const ids = ["depositAmount", "depositAmountInput", "depositInput", "walletDepositAmount"];
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (el && el.value !== undefined) {
+      const n = Number(String(el.value).replace(/,/g, "").trim());
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return 0;
+}
+
+function getDepositTxnFinal() {
+  const ids = ["depositTxn", "depositTxnInput", "transactionId", "utrInput", "depositUtr"];
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (el && el.value !== undefined) return String(el.value || "").trim();
+  }
+  return "";
+}
+
+async function submitDepositFinal() {
+  try {
+    if (!state.user) {
+      toast("Please login first.");
+      return;
+    }
+
+    const amount = getDepositAmountFinal();
+    const txn = getDepositTxnFinal();
+
+    if (!amount || amount < 1000) {
+      toast("Minimum deposit ₹1000 है.");
+      return;
+    }
+
+    const req = {
+      id: "dep_" + Date.now() + "_" + Math.random().toString(16).slice(2),
+      userId: state.user.id || "local",
+      userEmail: state.user.email || "",
+      userName: state.user.name || "",
+      amount,
+      txn,
+      status: "PENDING",
+      createdAt: new Date().toLocaleString()
+    };
+
+    state.depositRequests = state.depositRequests || [];
+    state.depositRequests.unshift(req);
+
+    if (supabaseClient) {
+      try {
+        await supabaseClient.from("deposit_requests").insert({
+          id: req.id,
+          user_id: req.userId,
+          user_email: req.userEmail,
+          user_name: req.userName,
+          amount: req.amount,
+          txn: req.txn,
+          status: req.status,
+          created_at_text: req.createdAt
+        });
+      } catch (e) {
+        console.warn("Supabase deposit insert failed, local saved:", e);
+      }
+    }
+
+    saveState?.();
+    render?.();
+
+    ["depositAmount", "depositAmountInput", "depositInput", "walletDepositAmount"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+    ["depositTxn", "depositTxnInput", "transactionId", "utrInput", "depositUtr"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+
+    toast("Deposit request submitted. Admin approval pending.");
+  } catch (e) {
+    console.error("Deposit submit failed:", e);
+    toast("Deposit submit failed. Please check amount and try again.");
+  }
+}
+
+window.submitDepositFinal = submitDepositFinal;
+
+document.addEventListener("click", function(e) {
+  const btn = e.target.closest("#depositBtn, #submitDepositBtn, #depositSubmitBtn, [data-action='deposit-submit']");
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  submitDepositFinal();
+}, true);
+
+
+/* Deposit submit compatibility aliases */
+window.submitDeposit = submitDepositFinal;
+window.createDepositRequest = submitDepositFinal;
+window.handleDepositSubmit = submitDepositFinal;

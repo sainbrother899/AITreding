@@ -581,3 +581,12 @@ Referral Working Final Fix:
 - No referral approval needed.
 - If nothing adds, verify referred user's profiles.referred_by has referrer's referral_code.
 - JS syntax check: OK
+
+
+Deposit Submit Fix:
+- Deposit submit button now works with multiple button/input IDs.
+- Minimum deposit ₹1000 enforced.
+- Saves pending deposit locally and to Supabase deposit_requests.
+- Admin panel should show pending deposit after refresh/load.
+- SQL may be required if deposit_requests columns are missing.
+- JS syntax check: OK

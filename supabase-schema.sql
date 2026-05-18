@@ -290,3 +290,9 @@ create index if not exists idx_referrals_user_id_bonus on public.referrals(user_
 
 
 create index if not exists idx_referrals_user_percent on public.referrals(user_id, percent, status);
+
+
+
+alter table public.deposit_requests add column if not exists user_name text;
+alter table public.deposit_requests add column if not exists txn text;
+alter table public.deposit_requests add column if not exists created_at_text text;
