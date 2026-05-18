@@ -64,3 +64,13 @@ Targeted Fix:
 - Deposit/wallet/trade core logic untouched.
 - No SQL required.
 - JS syntax check: OK
+
+
+Real Chart + Fast PnL Fix:
+- Removed fallback chart.
+- Chart area now loads real TradingView iframe immediately.
+- Pair change reloads TradingView symbol.
+- Price/PnL/wallet/history refresh runs every 1 second.
+- Order book and trade feed still populate, but chart is real TradingView.
+- No SQL required.
+- JS syntax check: OK

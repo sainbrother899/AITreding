@@ -3155,82 +3155,71 @@ body.real-mode-active .pro-bottom-nav .nav-btn[data-page="wallet"]{
 }
 
 
-/* ===== TARGETED FIX: CHART + ORDER BOOK + TRADE FEED ===== */
-.cf-chart-card{
+
+
+
+/* ===== REAL TRADINGVIEW CHART + FAST PRICE PNL FIX ===== */
+.real-tv-chart-shell{
   width:100%;
-  min-height:260px;
+  min-height:420px;
   border-radius:20px;
   border:1px solid rgba(255,255,255,.08);
-  background:linear-gradient(180deg,rgba(7,18,34,.96),rgba(3,7,16,.98));
-  padding:14px;
-  box-sizing:border-box;
+  background:#071120;
+  overflow:hidden;
   box-shadow:inset 0 0 0 1px rgba(0,229,155,.04);
 }
-.cf-chart-head,
-.cf-chart-foot{
+.real-tv-chart-head{
+  height:54px;
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:12px;
+  padding:0 14px;
+  background:linear-gradient(180deg,rgba(10,22,42,.98),rgba(5,12,24,.98));
+  border-bottom:1px solid rgba(255,255,255,.08);
 }
-.cf-chart-head b{
+.real-tv-chart-head b{
   display:block;
   color:var(--text,#fff);
-  font-size:16px;
+  font-size:15px;
 }
-.cf-chart-head span,
-.cf-chart-foot span{
+.real-tv-chart-head span{
   color:var(--muted,#8ca2c0);
   font-size:12px;
 }
-.cf-chart-head strong{
+.real-tv-chart-head strong{
   color:var(--green,#00e59b);
-  font-size:18px;
+  font-size:16px;
 }
-.cf-chart-svg{
+.real-tv-chart-frame{
   width:100%;
-  height:180px;
-  margin:10px 0;
+  height:366px;
+  display:block;
+  border:0;
+  background:#071120;
 }
-.cf-chart-area{fill:url(#cfChartGrad);}
-.cf-chart-line{
-  fill:none;
-  stroke:var(--green,#00e59b);
-  stroke-width:3;
-  stroke-linecap:round;
-  stroke-linejoin:round;
-}
-#cfChartChange,
-#cfChartChange.pos{
-  color:var(--green,#00e59b);
-  font-style:normal;
-  font-weight:900;
-}
-#cfChartChange.neg{
-  color:var(--red,#ff4d6d);
-}
-.cf-book-head,
-.cf-book-row{
+.real-book-head,
+.real-book-row{
   display:grid;
   grid-template-columns:1.2fr .8fr 1fr;
   gap:8px;
   align-items:center;
 }
-.cf-book-head{
+.real-book-head{
   color:var(--muted,#8ca2c0);
   font-size:12px;
   padding:8px 0;
 }
-.cf-book-row{
+.real-book-row{
   padding:8px 10px;
   border-radius:12px;
   margin-bottom:6px;
   background:rgba(255,255,255,.035);
   font-size:12px;
 }
-.cf-book-row.ask span:first-child{color:var(--red,#ff4d6d);}
-.cf-book-row.bid span:first-child{color:var(--green,#00e59b);}
-.cf-fill-row{
+.real-book-row.ask span:first-child{color:var(--red,#ff4d6d);}
+.real-book-row.bid span:first-child{color:var(--green,#00e59b);}
+.real-fill-row{
   display:grid;
   grid-template-columns:.7fr 1fr 1fr .9fr;
   gap:8px;
@@ -3241,21 +3230,21 @@ body.real-mode-active .pro-bottom-nav .nav-btn[data-page="wallet"]{
   margin-bottom:7px;
   font-size:12px;
 }
-.cf-fill-row span{
+.real-fill-row span{
   font-weight:900;
 }
-.cf-fill-row.buy span{color:var(--green,#00e59b);}
-.cf-fill-row.sell span{color:var(--red,#ff4d6d);}
-.cf-fill-row em{
+.real-fill-row.buy span{color:var(--green,#00e59b);}
+.real-fill-row.sell span{color:var(--red,#ff4d6d);}
+.real-fill-row em{
   font-style:normal;
   color:var(--text,#fff);
 }
-.cf-fill-row small{
+.real-fill-row small{
   color:var(--muted,#8ca2c0);
 }
 @media(max-width:520px){
-  .cf-chart-card{min-height:230px;padding:12px;}
-  .cf-chart-svg{height:150px;}
-  .cf-fill-row{grid-template-columns:.65fr 1fr 1fr;font-size:11px;}
-  .cf-fill-row small{display:none;}
+  .real-tv-chart-shell{min-height:360px;border-radius:18px;}
+  .real-tv-chart-frame{height:306px;}
+  .real-fill-row{grid-template-columns:.65fr 1fr 1fr;font-size:11px;}
+  .real-fill-row small{display:none;}
 }
