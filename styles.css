@@ -4553,51 +4553,6 @@ html.clean-home-boot-fallback body[data-user-clean-ui="true"] #appPage{
 }
 
 
-/* ===== TRADE CHART BIGGER FIX ===== */
-.trade-chart-bigger-card{
-  min-height:570px!important;
-  padding:12px!important;
-  overflow:hidden!important;
-}
-.trade-chart-bigger,
-.trade-chart-bigger iframe,
-.trade-chart-bigger-frame{
-  width:100%!important;
-  min-height:540px!important;
-  height:540px!important;
-  border-radius:20px!important;
-  overflow:hidden!important;
-}
-body.trade-chart-bigger-ready #trade .card:has(.trade-chart-bigger),
-body.trade-chart-bigger-ready #tradepage .card:has(.trade-chart-bigger){
-  margin-top:10px!important;
-}
-@media(max-width:700px){
-  .trade-chart-bigger-card{
-    min-height:540px!important;
-    padding:10px!important;
-  }
-  .trade-chart-bigger,
-  .trade-chart-bigger iframe,
-  .trade-chart-bigger-frame{
-    min-height:510px!important;
-    height:510px!important;
-  }
-}
-@media(max-width:430px){
-  .trade-chart-bigger-card{
-    min-height:520px!important;
-    padding:8px!important;
-  }
-  .trade-chart-bigger,
-  .trade-chart-bigger iframe,
-  .trade-chart-bigger-frame{
-    min-height:495px!important;
-    height:495px!important;
-  }
-}
-
-
 /* ===== TRADE CARDS WIDER FIX ===== */
 body[data-user-clean-ui="true"] #trade,
 body[data-user-clean-ui="true"] #tradepage,
@@ -5031,55 +4986,59 @@ body[data-active-page="more"] #more{
 
 
 
-/* ===== TRADINGVIEW CHART BIGGER BOX FIX ===== */
-/* This fix keeps chart BIG and prevents bottom crop by making parent + iframe same height */
-.tv-big-box-card,
-.exact-chart-card.tv-big-box-card,
-.trade-chart-bigger-card.tv-big-box-card,
-.clean-expanded-chart-card.tv-big-box-card,
-.mt-chart-card.tv-big-box-card{
+
+
+
+/* ===== TRADINGVIEW RESPONSIVE CHART FIX ===== */
+/* No fixed px box. Chart height follows screen using dvh/vh and stays inside the card. */
+.tv-responsive-card,
+.exact-chart-card.tv-responsive-card,
+.mt-chart-card.tv-responsive-card,
+.clean-expanded-chart-card.tv-responsive-card,
+.trade-chart-bigger-card.tv-responsive-card{
   width:100%!important;
   max-width:none!important;
-  min-height:calc(var(--tv-big-box-height, 620px) + 18px)!important;
   height:auto!important;
+  min-height:auto!important;
   max-height:none!important;
   overflow:visible!important;
-  padding:8px!important;
+  padding:6px!important;
   border-radius:18px!important;
 }
 
-.tv-big-box-host,
-.exact-chart-host.tv-big-box-host,
-#crypto_live_chart.tv-big-box-host,
-#tradingViewChart.tv-big-box-host,
-#chartContainer.tv-big-box-host{
+/* Responsive chart box: not too tall, not too small */
+.tv-responsive-host,
+.exact-chart-host.tv-responsive-host,
+#crypto_live_chart.tv-responsive-host,
+#tradingViewChart.tv-responsive-host,
+#chartContainer.tv-responsive-host{
   width:100%!important;
-  height:var(--tv-big-box-height, 620px)!important;
-  min-height:var(--tv-big-box-height, 620px)!important;
-  max-height:none!important;
+  height:clamp(430px, 62dvh, 610px)!important;
+  min-height:clamp(430px, 62dvh, 610px)!important;
+  max-height:clamp(430px, 62dvh, 610px)!important;
   overflow:hidden!important;
   border-radius:16px!important;
   display:block!important;
   background:#070b13!important;
 }
 
-.tv-big-box-frame,
-.tv-big-box-host iframe,
+.tv-responsive-frame,
+.tv-responsive-host iframe,
 .exact-chart-host iframe,
 .clean-tv-only-frame,
 .real-tv-chart-frame,
 .trade-chart-bigger-frame,
 .mt-chart-frame{
   width:100%!important;
-  height:var(--tv-big-box-height, 620px)!important;
-  min-height:var(--tv-big-box-height, 620px)!important;
-  max-height:none!important;
+  height:100%!important;
+  min-height:100%!important;
+  max-height:100%!important;
   display:block!important;
   border:0!important;
   border-radius:16px!important;
 }
 
-/* Override older smaller chart heights */
+/* Override previous fixed height rules still attached to classes */
 .exact-chart-host,
 .exact-chart-host iframe,
 .exact-chart-frame,
@@ -5092,65 +5051,68 @@ body[data-active-page="more"] #more{
 .trade-chart-bigger-frame,
 .clean-expanded-chart,
 .clean-expanded-chart iframe{
-  height:var(--tv-big-box-height, 620px)!important;
-  min-height:var(--tv-big-box-height, 620px)!important;
-  max-height:none!important;
+  height:clamp(430px, 62dvh, 610px)!important;
+  min-height:clamp(430px, 62dvh, 610px)!important;
+  max-height:clamp(430px, 62dvh, 610px)!important;
 }
 
-/* Mobile specific: big box but still usable */
+/* Mobile tuning */
 @media(max-width:430px){
-  .tv-big-box-card,
-  .exact-chart-card.tv-big-box-card{
-    min-height:638px!important;
-    padding:6px!important;
+  .tv-responsive-card,
+  .exact-chart-card.tv-responsive-card{
+    padding:5px!important;
     border-radius:17px!important;
   }
 
-  .tv-big-box-host,
-  .tv-big-box-frame,
-  .tv-big-box-host iframe,
+  .tv-responsive-host,
+  .exact-chart-host.tv-responsive-host,
+  #crypto_live_chart.tv-responsive-host,
+  #tradingViewChart.tv-responsive-host,
+  #chartContainer.tv-responsive-host,
   .exact-chart-host,
   .exact-chart-host iframe,
+  .exact-chart-frame,
   .clean-tv-only-frame,
   .real-tv-chart-frame{
-    height:620px!important;
-    min-height:620px!important;
+    height:clamp(410px, 58dvh, 540px)!important;
+    min-height:clamp(410px, 58dvh, 540px)!important;
+    max-height:clamp(410px, 58dvh, 540px)!important;
     border-radius:14px!important;
   }
 }
 
-@media(min-width:431px) and (max-width:768px){
-  .tv-big-box-card,
-  .exact-chart-card.tv-big-box-card{
-    min-height:678px!important;
-  }
-
-  .tv-big-box-host,
-  .tv-big-box-frame,
-  .tv-big-box-host iframe,
+/* Very small phones */
+@media(max-width:380px){
+  .tv-responsive-host,
+  .exact-chart-host.tv-responsive-host,
+  #crypto_live_chart.tv-responsive-host,
+  #tradingViewChart.tv-responsive-host,
+  #chartContainer.tv-responsive-host,
   .exact-chart-host,
   .exact-chart-host iframe,
+  .exact-chart-frame,
   .clean-tv-only-frame,
   .real-tv-chart-frame{
-    height:660px!important;
-    min-height:660px!important;
+    height:clamp(390px, 56dvh, 510px)!important;
+    min-height:clamp(390px, 56dvh, 510px)!important;
+    max-height:clamp(390px, 56dvh, 510px)!important;
   }
 }
 
-@media(min-width:769px){
-  .tv-big-box-card,
-  .exact-chart-card.tv-big-box-card{
-    min-height:718px!important;
-  }
-
-  .tv-big-box-host,
-  .tv-big-box-frame,
-  .tv-big-box-host iframe,
+/* Desktop/tablet can be a little larger */
+@media(min-width:768px){
+  .tv-responsive-host,
+  .exact-chart-host.tv-responsive-host,
+  #crypto_live_chart.tv-responsive-host,
+  #tradingViewChart.tv-responsive-host,
+  #chartContainer.tv-responsive-host,
   .exact-chart-host,
   .exact-chart-host iframe,
+  .exact-chart-frame,
   .clean-tv-only-frame,
   .real-tv-chart-frame{
-    height:700px!important;
-    min-height:700px!important;
+    height:clamp(520px, 68vh, 680px)!important;
+    min-height:clamp(520px, 68vh, 680px)!important;
+    max-height:clamp(520px, 68vh, 680px)!important;
   }
 }

@@ -570,3 +570,14 @@ TradingView Chart Bigger Box Fix:
 - Order Ticket, Order Book, Trade Feed untouched.
 - No SQL required.
 - JS syntax check: OK
+
+
+TradingView Responsive Chart Fix:
+- Removed fixed px chart box logic that made the box too big.
+- Added responsive chart height using clamp() + dvh/vh.
+- Chart host and iframe use matched responsive height.
+- Mobile height is balanced around 410-540px depending on screen.
+- Desktop/tablet can grow to 680px.
+- Order Ticket, Order Book, Trade Feed untouched.
+- No SQL required.
+- JS syntax check: OK

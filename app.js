@@ -4339,43 +4339,6 @@ function restoreManualHistoryBackup(mode = state.mode) {
 })();
 
 
-/* ===== TRADE CHART BIGGER FIX ===== */
-(function(){
-  function makeTradeChartBigger(){
-    try {
-      const charts = [
-        document.getElementById("crypto_live_chart"),
-        document.getElementById("tradingViewChart"),
-        document.getElementById("chartContainer")
-      ].filter(Boolean);
-
-      charts.forEach(chart => {
-        chart.classList.add("trade-chart-bigger");
-        const card = chart.closest(".card") || chart.parentElement;
-        if (card) card.classList.add("trade-chart-bigger-card");
-      });
-
-      document.querySelectorAll("iframe").forEach(frame => {
-        const src = frame.getAttribute("src") || "";
-        if (src.includes("tradingview") || src.includes("widgetembed")) {
-          frame.classList.add("trade-chart-bigger-frame");
-          const card = frame.closest(".card") || frame.parentElement;
-          if (card) card.classList.add("trade-chart-bigger-card");
-        }
-      });
-
-      document.body.classList.add("trade-chart-bigger-ready");
-    } catch(e) {
-      console.warn("Chart bigger fix skipped", e);
-    }
-  }
-
-  document.addEventListener("DOMContentLoaded", () => setTimeout(makeTradeChartBigger, 500));
-  window.addEventListener("load", () => setTimeout(makeTradeChartBigger, 700));
-  setInterval(makeTradeChartBigger, 2500);
-})();
-
-
 /* ===== TRADE PAGE CLEAN CHART + ORDER TEXT ===== */
 (function(){
   function cleanTradePage(){
@@ -4719,68 +4682,48 @@ function restoreManualHistoryBackup(mode = state.mode) {
 
 
 
-/* ===== TRADINGVIEW CHART BIGGER BOX FIX ===== */
-(function(){
-  function chartBigBoxHeight(){
-    const w = window.innerWidth || 390;
-    if (w <= 430) return 620;   // mobile
-    if (w <= 768) return 660;   // tablet
-    return 700;                 // desktop
-  }
 
-  function applyChartBiggerBox(){
+
+
+/* ===== TRADINGVIEW RESPONSIVE CHART FIX ===== */
+(function(){
+  function applyResponsiveTradingViewChart(){
     try {
-      const h = chartBigBoxHeight();
-      const hosts = [
+      const tradePage = document.getElementById("tradepage") || document.getElementById("trade");
+      if (!tradePage) return;
+
+      const candidates = [
         document.getElementById("crypto_live_chart"),
         document.getElementById("tradingViewChart"),
         document.getElementById("chartContainer")
       ].filter(Boolean);
 
-      document.querySelectorAll("iframe[src*='tradingview'], iframe[src*='widgetembed']").forEach(frame => {
-        if (!hosts.includes(frame)) hosts.push(frame);
+      tradePage.querySelectorAll("iframe[src*='tradingview'], iframe[src*='widgetembed']").forEach(frame => {
+        if (!candidates.includes(frame)) candidates.push(frame);
       });
 
-      hosts.forEach(el => {
+      candidates.forEach(el => {
         const host = el.tagName === "IFRAME" ? (el.parentElement || el) : el;
         const iframe = el.tagName === "IFRAME" ? el : el.querySelector("iframe");
 
-        host.classList.add("tv-big-box-host");
-        host.style.setProperty("--tv-big-box-height", h + "px");
-        host.style.height = h + "px";
-        host.style.minHeight = h + "px";
-        host.style.maxHeight = "none";
-        host.style.overflow = "hidden";
-
-        if (iframe) {
-          iframe.classList.add("tv-big-box-frame");
-          iframe.style.height = h + "px";
-          iframe.style.minHeight = h + "px";
-          iframe.style.maxHeight = "none";
-          iframe.style.width = "100%";
-          iframe.style.display = "block";
-        }
+        host.classList.add("tv-responsive-host");
+        if (iframe) iframe.classList.add("tv-responsive-frame");
 
         const card = host.closest(".card") || host.closest(".exact-chart-card") || host.parentElement;
-        if (card) {
-          card.classList.add("tv-big-box-card");
-          card.style.height = "auto";
-          card.style.minHeight = (h + 18) + "px";
-          card.style.maxHeight = "none";
-          card.style.overflow = "visible";
-        }
+        if (card) card.classList.add("tv-responsive-card");
       });
 
-      document.body.classList.add("tv-big-box-ready");
+      document.body.classList.add("tv-responsive-ready");
     } catch(e) {
-      console.warn("Chart bigger box fix skipped", e);
+      console.warn("Responsive chart fix skipped", e);
     }
   }
 
-  window.applyChartBiggerBox = applyChartBiggerBox;
+  window.applyResponsiveTradingViewChart = applyResponsiveTradingViewChart;
 
-  document.addEventListener("DOMContentLoaded", () => setTimeout(applyChartBiggerBox, 600));
-  window.addEventListener("load", () => setTimeout(applyChartBiggerBox, 800));
-  window.addEventListener("resize", () => setTimeout(applyChartBiggerBox, 200));
-  setInterval(applyChartBiggerBox, 2500);
+  document.addEventListener("DOMContentLoaded", () => setTimeout(applyResponsiveTradingViewChart, 600));
+  window.addEventListener("load", () => setTimeout(applyResponsiveTradingViewChart, 800));
+  window.addEventListener("resize", () => setTimeout(applyResponsiveTradingViewChart, 180));
+  window.visualViewport?.addEventListener("resize", () => setTimeout(applyResponsiveTradingViewChart, 180));
+  setInterval(applyResponsiveTradingViewChart, 3000);
 })();
