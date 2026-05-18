@@ -882,3 +882,12 @@ KYC Approve Reject Lock Fix:
 - Submit is blocked if user is already APPROVED or PENDING.
 - Design/layout/sidebar/header untouched; only KYC state logic and small status cards added.
 - JS syntax check: OK
+
+
+Payment Method Select Stable Fix:
+- Fixes My Payment Methods method type resetting from Bank Account back to UPI.
+- Selected type is preserved while user edits the form.
+- Bank fields stay visible when Bank Account is selected.
+- UPI field hides when Bank Account is selected.
+- Design/layout/sidebar/header untouched.
+- JS syntax check: OK

@@ -7450,3 +7450,162 @@ function restoreManualHistoryBackup(mode = state.mode) {
 
   setInterval(klLockAdminActions, 3000);
 })();
+
+
+/* ===== PAYMENT METHOD SELECT STABLE FIX ===== */
+(function(){
+  let selectedPayType = localStorage.getItem("selected_payment_method_type") || "UPI";
+  let userTouchedPaymentForm = false;
+
+  function page(){
+    return document.getElementById("paymentMethodsPage");
+  }
+
+  function selectEl(){
+    return document.getElementById("securePayType") ||
+      document.getElementById("realPayType") ||
+      document.querySelector("#paymentMethodsPage select[name='type']");
+  }
+
+  function applyType(type){
+    type = String(type || selectedPayType || "UPI").toUpperCase();
+    selectedPayType = type;
+    localStorage.setItem("selected_payment_method_type", type);
+
+    const p = page();
+    const sel = selectEl();
+
+    if (sel && sel.value !== type) sel.value = type;
+
+    if (p) {
+      p.classList.toggle("pay-bank-mode", type === "BANK");
+      p.classList.toggle("payment-bank-selected", type === "BANK");
+      p.dataset.selectedPayType = type;
+    }
+
+    document.querySelectorAll("#paymentMethodsPage .secure-pay-bank-fields,#paymentMethodsPage .real-pay-bank-fields,#paymentMethodsPage .pay-bank-fields").forEach(el => {
+      el.style.setProperty("display", type === "BANK" ? "grid" : "none", "important");
+    });
+
+    document.querySelectorAll("#paymentMethodsPage .secure-pay-upi,#paymentMethodsPage .real-pay-upi,.pay-upi-field").forEach(el => {
+      el.style.setProperty("display", type === "BANK" ? "none" : "grid", "important");
+    });
+  }
+
+  function protectCurrentFormValues(){
+    const p = page();
+    if (!p || !p.classList.contains("active-page")) return;
+
+    const form = p.querySelector("#securePaymentMethodForm,#realPaymentMethodForm,#menuPaymentMethodForm");
+    if (!form) return;
+
+    if (userTouchedPaymentForm) {
+      // Mark form as user editing; render functions should not reset it.
+      form.dataset.userEditing = "1";
+    }
+
+    applyType(selectedPayType);
+  }
+
+  function bind(){
+    const p = page();
+    if (!p) return;
+
+    const sel = selectEl();
+    if (sel && sel.dataset.payTypeStableBound !== "1") {
+      sel.dataset.payTypeStableBound = "1";
+      sel.value = selectedPayType;
+      sel.addEventListener("change", function(){
+        userTouchedPaymentForm = true;
+        applyType(sel.value);
+      }, true);
+    }
+
+    p.querySelectorAll("input,select,textarea").forEach(inp => {
+      if (inp.dataset.payFormTouchBound === "1") return;
+      inp.dataset.payFormTouchBound = "1";
+      inp.addEventListener("input", () => {
+        userTouchedPaymentForm = true;
+        const s = selectEl();
+        if (s) applyType(s.value);
+      }, true);
+      inp.addEventListener("change", () => {
+        userTouchedPaymentForm = true;
+        const s = selectEl();
+        if (s) applyType(s.value);
+      }, true);
+    });
+
+    applyType(selectedPayType);
+  }
+
+  // Patch old payment render if present: don't let it reset select while user is editing.
+  function patchOldRender(){
+    try {
+      if (window.__paymentMethodSelectRenderPatched) return;
+      window.__paymentMethodSelectRenderPatched = true;
+
+      if (typeof window.applyPaymentKycAdminApproval === "function") {
+        const old = window.applyPaymentKycAdminApproval;
+        window.applyPaymentKycAdminApproval = function(){
+          const p = page();
+          const editing = userTouchedPaymentForm && p && p.classList.contains("active-page");
+          if (editing) {
+            protectCurrentFormValues();
+            return;
+          }
+          const r = old.apply(this, arguments);
+          setTimeout(() => {
+            bind();
+            applyType(selectedPayType);
+          }, 50);
+          return r;
+        };
+      }
+    } catch(e){}
+  }
+
+  document.addEventListener("click", function(e){
+    const txt = (e.target?.textContent || "").toLowerCase();
+    if (txt.includes("payment method") || txt.includes("payment methods")) {
+      userTouchedPaymentForm = false;
+      setTimeout(() => {
+        bind();
+        applyType(selectedPayType);
+      }, 450);
+      setTimeout(() => {
+        bind();
+        applyType(selectedPayType);
+      }, 1000);
+    }
+  }, true);
+
+  document.addEventListener("submit", function(e){
+    if (e.target?.id === "securePaymentMethodForm" || e.target?.id === "realPaymentMethodForm" || e.target?.id === "menuPaymentMethodForm") {
+      const s = selectEl();
+      if (s) {
+        selectedPayType = String(s.value || "UPI").toUpperCase();
+        localStorage.setItem("selected_payment_method_type", selectedPayType);
+      }
+      // After submit, allow re-render to update saved methods.
+      setTimeout(() => { userTouchedPaymentForm = false; }, 800);
+    }
+  }, true);
+
+  window.applyPaymentMethodSelectedType = applyType;
+
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(patchOldRender, 600);
+    setTimeout(bind, 900);
+  });
+  window.addEventListener("load", () => {
+    setTimeout(patchOldRender, 700);
+    setTimeout(bind, 1000);
+  });
+
+  setInterval(() => {
+    patchOldRender();
+    bind();
+    protectCurrentFormValues();
+  }, 1500);
+})();

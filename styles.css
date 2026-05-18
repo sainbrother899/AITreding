@@ -6616,3 +6616,21 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
   background:rgba(255,255,255,.06)!important;
   font-weight:850!important;
 }
+
+
+/* ===== PAYMENT METHOD SELECT STABLE FIX ===== */
+#paymentMethodsPage.payment-bank-selected .secure-pay-bank-fields,
+#paymentMethodsPage.payment-bank-selected .real-pay-bank-fields,
+#paymentMethodsPage.payment-bank-selected .pay-bank-fields{
+  display:grid!important;
+}
+#paymentMethodsPage.payment-bank-selected .secure-pay-upi,
+#paymentMethodsPage.payment-bank-selected .real-pay-upi,
+#paymentMethodsPage.payment-bank-selected .pay-upi-field{
+  display:none!important;
+}
+#paymentMethodsPage:not(.payment-bank-selected) .secure-pay-bank-fields,
+#paymentMethodsPage:not(.payment-bank-selected) .real-pay-bank-fields,
+#paymentMethodsPage:not(.payment-bank-selected) .pay-bank-fields{
+  display:none!important;
+}
