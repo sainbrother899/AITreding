@@ -971,3 +971,15 @@ User Payment Methods Old Code Removed Final:
 - Saves local + upserts to user_payout_methods.
 - Removed payment markers: [{"marker": "USER MY PAYMENT METHODS CLEAN FINAL", "js": 1, "css": 1}]
 - JS syntax check: OK
+
+
+KYC + Payment Route Lock Final:
+- Route-level lock added for user-side KYC and My Payment Methods.
+- When paymentMethodsPage is active, old payment renderer is prevented from overwriting final UI.
+- When kycPage is active, final KYC status card/form state is reapplied if old UI appears.
+- MutationObserver watches only for route overwrite and restores KYC/Payment pages.
+- Design/header/sidebar/trade/chart/home/wallet/P&L/history untouched.
+- Payment Methods: stable UPI/BANK, one warning, 2 UPI + 2 Bank limit, DB upsert.
+- KYC: approved/pending hides form, rejected allows resubmit.
+- Removed previous user payment patch blocks: [{"marker": "USER PAYMENT METHODS OLD CODE REMOVED FINAL", "js": 1, "css": 1}]
+- JS syntax check: OK
