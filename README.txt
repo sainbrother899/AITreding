@@ -550,3 +550,14 @@ Trade Exact Structure Fix:
 - Removed blocks: {"pro_pair_line": 1, "pro_time_tabs": 1}
 - Replaced chart function: True
 - JS syntax check: OK
+
+
+TradingView Chart Height Responsive Fix:
+- Fixes chart bottom getting cut off.
+- Chart parent/card and iframe now use the same responsive viewport-based height.
+- Uses visualViewport where available to handle mobile browser address bars.
+- Removes max-height/clipping and sets overflow visible on chart card/host.
+- Overrides older fixed height CSS that could crop the bottom toolbar/price scale.
+- Order Ticket, Order Book, Trade Feed untouched.
+- No SQL required.
+- JS syntax check: OK

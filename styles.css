@@ -5026,3 +5026,88 @@ body[data-active-page="more"] #more{
     font-size:20px!important;
   }
 }
+
+
+/* ===== TRADINGVIEW CHART HEIGHT RESPONSIVE FIX ===== */
+/* Main fix: parent and iframe use the same responsive height, so bottom is not cropped */
+.tv-height-fixed-card,
+.exact-chart-card.tv-height-fixed-card,
+.trade-chart-bigger-card.tv-height-fixed-card,
+.clean-expanded-chart-card.tv-height-fixed-card{
+  height:auto!important;
+  min-height:auto!important;
+  max-height:none!important;
+  overflow:visible!important;
+  padding:6px!important;
+}
+
+.tv-height-fixed-host,
+.exact-chart-host.tv-height-fixed-host,
+#crypto_live_chart.tv-height-fixed-host,
+#tradingViewChart.tv-height-fixed-host,
+#chartContainer.tv-height-fixed-host{
+  width:100%!important;
+  height:var(--tv-chart-height, 560px)!important;
+  min-height:var(--tv-chart-height, 560px)!important;
+  max-height:none!important;
+  overflow:visible!important;
+  border-radius:16px!important;
+  display:block!important;
+}
+
+.tv-height-fixed-frame,
+.tv-height-fixed-host iframe,
+.exact-chart-host iframe,
+.clean-tv-only-frame,
+.real-tv-chart-frame{
+  width:100%!important;
+  height:var(--tv-chart-height, 560px)!important;
+  min-height:var(--tv-chart-height, 560px)!important;
+  max-height:none!important;
+  display:block!important;
+  border:0!important;
+  border-radius:16px!important;
+}
+
+/* Override earlier fixed chart heights that were causing bottom crop */
+.exact-chart-host,
+.exact-chart-host iframe,
+.exact-chart-frame,
+.clean-tv-only-frame,
+.real-tv-chart-frame,
+.mt-chart-frame,
+.mt-chart-card iframe,
+.trade-chart-bigger,
+.trade-chart-bigger iframe,
+.trade-chart-bigger-frame,
+.clean-expanded-chart,
+.clean-expanded-chart iframe{
+  height:var(--tv-chart-height, 560px)!important;
+  min-height:var(--tv-chart-height, 560px)!important;
+  max-height:none!important;
+}
+
+/* Keep the chart card inside the viewport without clipping the iframe */
+body[data-active-page="trade"] .exact-chart-card,
+body[data-active-page="trade"] .mt-chart-card,
+body[data-active-page="trade"] .trade-chart-bigger-card{
+  overflow:visible!important;
+}
+
+@media(max-width:430px){
+  .tv-height-fixed-card,
+  .exact-chart-card.tv-height-fixed-card{
+    padding:5px!important;
+    border-radius:17px!important;
+  }
+
+  .tv-height-fixed-host,
+  .tv-height-fixed-frame,
+  .tv-height-fixed-host iframe,
+  .exact-chart-host,
+  .exact-chart-host iframe,
+  .clean-tv-only-frame,
+  .real-tv-chart-frame{
+    border-radius:14px!important;
+  }
+}
