@@ -447,3 +447,13 @@ Final Stability Pack:
 - setInterval count after pack: 21
 - Markers: {"final_pack": true, "manual_table_sql": true, "global_color": true, "floating_bar": true, "home_static": true}
 - JS syntax check: OK
+
+
+Old UI Flash Safe Fix:
+- Non-destructive fix: old Home HTML was NOT removed.
+- App is hidden briefly during refresh until Clean Home UI is ready, preventing old UI flash.
+- Clean UI renderer is triggered early after load.
+- Safety fallback shows app after 2.5 seconds even if clean UI fails, so no blank page.
+- Existing logic/UI/features untouched.
+- No SQL required.
+- Summary: {"boot_script_added": true, "boot_style_added": true, "runtime_guard_added": true, "syntax": "OK"}

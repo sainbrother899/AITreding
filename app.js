@@ -4217,3 +4217,39 @@ function restoreManualHistoryBackup(mode = state.mode) {
   // Light sync, not heavy. Keeps cross-render stability without spamming.
   setInterval(fsSyncManualHistory, 15000);
 })();
+
+
+/* ===== OLD UI FLASH SAFE FIX ===== */
+(function(){
+  function markCleanReady(){
+    try {
+      // Build clean home if user is logged in and renderer exists.
+      if (state?.user && state.user.role !== "admin") {
+        try { if (typeof uiRenderHomeShell === "function") uiRenderHomeShell(); } catch(e) {}
+        try { if (typeof updateCleanHomeRates === "function") updateCleanHomeRates(); } catch(e) {}
+        try { if (typeof renderCleanHomeAiControl === "function") renderCleanHomeAiControl(true); } catch(e) {}
+      }
+
+      const hasClean = !!document.getElementById("cleanHomeShell") || !!document.getElementById("cleanHomeMount") || !state?.user || state.user?.role === "admin";
+      if (hasClean) {
+        document.documentElement.classList.remove("clean-home-booting");
+        document.documentElement.classList.add("clean-home-ready");
+      }
+    } catch(e) {
+      document.documentElement.classList.remove("clean-home-booting");
+      document.documentElement.classList.add("clean-home-boot-fallback");
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", function(){
+    setTimeout(markCleanReady, 350);
+    setTimeout(markCleanReady, 900);
+  });
+  window.addEventListener("load", function(){
+    setTimeout(markCleanReady, 350);
+    setTimeout(markCleanReady, 1200);
+  });
+
+  // Light guard only; no HTML removal.
+  setTimeout(markCleanReady, 1800);
+})();

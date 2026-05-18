@@ -4384,3 +4384,13 @@ button,
 /* ===== FINAL STABILITY PACK UI SAFETY ===== */
 .plc-profit,.profit,.pnl-plus,.pos{color:#00e7a8!important}
 .plc-loss,.loss,.pnl-minus,.neg{color:#ff456b!important}
+
+
+/* ===== OLD UI FLASH SAFE FIX ===== */
+html.clean-home-booting body[data-user-clean-ui="true"] #appPage{
+  opacity:0!important;
+}
+html.clean-home-ready body[data-user-clean-ui="true"] #appPage,
+html.clean-home-boot-fallback body[data-user-clean-ui="true"] #appPage{
+  opacity:1!important;
+}

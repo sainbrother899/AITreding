@@ -10,6 +10,33 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://s3.tradingview.com/tv.js"></script>
   <link rel="stylesheet" href="styles.css"/>
+
+<script id="clean-ui-boot-script">
+(function(){
+  try {
+    document.documentElement.classList.add("clean-home-booting");
+    setTimeout(function(){
+      document.documentElement.classList.remove("clean-home-booting");
+      document.documentElement.classList.add("clean-home-boot-fallback");
+    }, 2500);
+  } catch(e) {}
+})();
+</script>
+<style id="clean-ui-boot-style">
+html.clean-home-booting body[data-user-clean-ui="true"] #appPage{
+  opacity:0!important;
+  pointer-events:none!important;
+}
+html.clean-home-ready body[data-user-clean-ui="true"] #appPage,
+html.clean-home-boot-fallback body[data-user-clean-ui="true"] #appPage{
+  opacity:1!important;
+  pointer-events:auto!important;
+}
+body[data-user-clean-ui="true"] #appPage{
+  transition:opacity .18s ease;
+}
+</style>
+
 </head>
 <body data-premium-ui="true" data-user-clean-ui="true">
   <div class="neon-bg"><span></span><span></span><span></span><span></span></div>
@@ -611,6 +638,6 @@
 
   <div id="toast"></div>
   <script src="config.js"></script>
-  <script src="app.js?v=finalstabilitypack20260518"></script>
+  <script src="app.js?v=olduiflashsafe20260518"></script>
 </body>
 </html>
