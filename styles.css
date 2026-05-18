@@ -6345,3 +6345,31 @@ body[data-admin-active-section="paymentSettings"] #adminPaymentSettingsPanel{
     grid-template-columns:1fr!important;
   }
 }
+
+
+/* ===== ADMIN PAYMENT SECTIONS STAY FIX ===== */
+.admin-pay-stay-normal-hidden{
+  display:none!important;
+}
+#adminPayoutRequestsPanel.admin-pay-stay-visible,
+#adminPaymentSettingsPanel.admin-pay-stay-visible,
+#adminPayoutRequestsPanel.active-admin-pay-panel,
+#adminPaymentSettingsPanel.active-admin-pay-panel{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
+body[data-admin-active-section="payoutMethods"] #adminPayoutRequestsPanel{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
+body[data-admin-active-section="paymentSettings"] #adminPaymentSettingsPanel{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
+body[data-admin-active-section="payoutMethods"] #adminPaymentSettingsPanel,
+body[data-admin-active-section="paymentSettings"] #adminPayoutRequestsPanel{
+  display:none!important;
+}

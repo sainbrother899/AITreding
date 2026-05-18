@@ -762,3 +762,13 @@ Admin Payment Menu Force Fix:
 - Existing admin/payment logic retained.
 - No SQL required.
 - JS syntax check: OK
+
+
+Admin Payment Sections Stay Fix:
+- Fixes Payment Settings / Payout Method Requests opening then disappearing after a few seconds.
+- Keeps the selected payment admin section locked open until another normal admin option is clicked.
+- Uses localStorage/adminActiveSection to survive old admin render intervals.
+- Payment panels stay hidden by default until clicked.
+- Payout Method Requests and Payment Settings inner content remains visible.
+- No SQL required.
+- JS syntax check: OK
