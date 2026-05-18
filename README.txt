@@ -206,3 +206,12 @@ Admin Users Panel Update:
 - Admin can Add/Deduct wallet balance with ledger note.
 - SQL patch included for optional columns.
 - JS syntax check: OK
+
+
+Admin Users Force Visible Fix:
+- Users tab and panel are now created by JavaScript if missing from admin.html.
+- This fixes issue where Users option did not appear on admin panel.
+- User list, wallet, plan, AI %, status, AI ON/OFF, and wallet adjustment included.
+- Cache-busted admin app.js.
+- SQL patch included for optional columns.
+- JS syntax check: OK

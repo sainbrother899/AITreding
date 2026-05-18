@@ -3098,3 +3098,383 @@ function renderAdminUsersPanel() {
 }
 setInterval(renderAdminUsersPanel, 1500);
 window.addEventListener("load", () => setTimeout(renderAdminUsersPanel, 800));
+
+
+/* ===== ADMIN USERS FORCE VISIBLE PANEL ===== */
+(function(){
+  let selectedForceUserId = null;
+
+  function fMoney(n){
+    try { if (typeof money === "function") return money(n); } catch(e){}
+    return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  }
+  function fUsers(){
+    return (state.users || []).filter(u => String(u.role || "user").toLowerCase() !== "admin");
+  }
+  function fKey(u){ return String(u?.id || u?.email || ""); }
+  function fFind(id){
+    return fUsers().find(u => fKey(u) === String(id) || String(u.email || "").toLowerCase() === String(id).toLowerCase());
+  }
+  function fLedger(uid){
+    return (state.walletLedger || []).filter(l => String(l.userId || l.user_id || "") === String(uid));
+  }
+  function fDeposit(uid){
+    const req = (state.depositRequests || [])
+      .filter(d => String(d.userId || d.user_id || "") === String(uid) && String(d.status || "").toUpperCase() === "APPROVED")
+      .reduce((a,d)=>a+Number(d.amount||0),0);
+    const led = fLedger(uid).filter(l => String(l.type||"").toUpperCase()==="DEPOSIT").reduce((a,l)=>a+Number(l.amount||0),0);
+    return Math.max(req, led);
+  }
+  function fPnl(uid){
+    return fLedger(uid)
+      .filter(l => ["TRADE_PNL","MANAGED_TRADE_PNL","MASS_TRADE_PNL","REFERRAL_BONUS","PLAN_PURCHASE","ADMIN_ADJUSTMENT"].includes(String(l.type||"").toUpperCase()))
+      .reduce((a,l)=>a+Number(l.amount||0),0);
+  }
+  function fWithdraw(uid){
+    const req = (state.withdrawalRequests || [])
+      .filter(w => String(w.userId || w.user_id || "") === String(uid) && String(w.status || "").toUpperCase() === "APPROVED")
+      .reduce((a,w)=>a+Number(w.amount||0),0);
+    const led = fLedger(uid).filter(l => String(l.type||"").toUpperCase()==="WITHDRAWAL").reduce((a,l)=>a+Math.abs(Number(l.amount||0)),0);
+    return Math.max(req, led);
+  }
+  function fWallet(u){
+    const uid = fKey(u);
+    try { if (typeof realWallet === "function") return Number(realWallet(uid) || 0); } catch(e){}
+    return Math.max(0, fDeposit(uid) + fPnl(uid) - fWithdraw(uid));
+  }
+  function fAiLimit(u){
+    try { if (typeof aiLimitForUser === "function") return aiLimitForUser(u); } catch(e){}
+    const p = (state.plans || []).find(x => String(x.name || x.id).toLowerCase() === String(u.plan || "Free").toLowerCase());
+    return Number(p?.aiTradeLimit || p?.ai_trade_limit || 5);
+  }
+  function fAiUsed(u){
+    try { if (typeof aiUsed === "function") return aiUsed(u); } catch(e){}
+    const key = `${fKey(u)}_REAL_${new Date().toISOString().slice(0,10)}`;
+    return Number(state.aiTradeUsage?.[key] || 0);
+  }
+  function fPercent(u){
+    const p = Number(u.aiTradePercent || u.ai_trade_percent || 25);
+    return [25,50,75,100].includes(p) ? p : 25;
+  }
+  function fStatus(u){
+    return u.blocked || String(u.status || "").toUpperCase() === "BLOCKED" ? "BLOCKED" : "ACTIVE";
+  }
+
+  function ensureAdminTabs(){
+    if (state?.user?.role !== "admin") return;
+
+    let tabs = document.querySelector(".admin-tabs");
+    if (!tabs) {
+      const main = document.querySelector("main") || document.getElementById("appPage") || document.body;
+      tabs = document.createElement("div");
+      tabs.className = "admin-tabs";
+      main.prepend(tabs);
+    }
+
+    if (!document.querySelector('[data-admin-tab="adminUsers"]')) {
+      const btn = document.createElement("button");
+      btn.className = "admin-tab force-users-tab";
+      btn.dataset.adminTab = "adminUsers";
+      btn.type = "button";
+      btn.textContent = "👥 Users";
+      tabs.prepend(btn);
+    }
+
+    if (!document.getElementById("adminUsers")) {
+      const panel = document.createElement("div");
+      panel.id = "adminUsers";
+      panel.className = "admin-panel force-users-panel";
+      panel.innerHTML = `
+        <div class="card admin-users-head-card">
+          <div class="section-head">
+            <div>
+              <p class="label">Users</p>
+              <h2>User Management</h2>
+              <p class="muted small">User wallet, plan, AI trade setting और status manage करें.</p>
+            </div>
+          </div>
+          <div class="admin-user-search-row">
+            <input id="forceAdminUserSearch" type="search" placeholder="Search by name, email or mobile">
+            <select id="forceAdminUserStatusFilter">
+              <option value="ALL">All Users</option>
+              <option value="ACTIVE">Active</option>
+              <option value="BLOCKED">Blocked</option>
+              <option value="AI_ON">AI ON</option>
+              <option value="AI_OFF">AI OFF</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card table-card">
+          <div class="section-head">
+            <div><p class="label">User List</p><h2>All Users</h2></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>User</th><th>Plan</th><th>Wallet</th><th>Deposit</th><th>P/L + Bonus</th>
+                  <th>AI Size</th><th>AI Used</th><th>Status</th><th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="forceAdminUsersLog"><tr><td colspan="9" class="empty">No users yet.</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card admin-user-detail-card">
+          <div class="section-head">
+            <div>
+              <p class="label">Selected User</p>
+              <h2 id="forceSelectedUserTitle">No user selected</h2>
+              <p class="muted small" id="forceSelectedUserSub">Select a user from list.</p>
+            </div>
+          </div>
+
+          <div class="admin-user-detail-grid">
+            <div><span>Wallet</span><b id="forceDetailWallet">₹0</b></div>
+            <div><span>Approved Deposit</span><b id="forceDetailDeposit">₹0</b></div>
+            <div><span>P/L + Bonus</span><b id="forceDetailPnl">₹0</b></div>
+            <div><span>AI Used / Limit</span><b id="forceDetailAiLimit">0 / 0</b></div>
+          </div>
+
+          <div class="admin-user-control-grid">
+            <label>Plan<select id="forceUserPlanSelect"></select></label>
+            <label>AI Trade Size<select id="forceUserAiPercentSelect">
+              <option value="25">25%</option><option value="50">50%</option><option value="75">75%</option><option value="100">100%</option>
+            </select></label>
+            <label class="toggle-row admin-user-toggle"><span>AI Trade ON/OFF</span><input type="checkbox" id="forceUserAiToggle"></label>
+            <label class="toggle-row admin-user-toggle"><span>User Active/Blocked</span><input type="checkbox" id="forceUserActiveToggle" checked></label>
+          </div>
+
+          <div class="admin-wallet-adjust-box">
+            <p class="label">Wallet Adjustment</p>
+            <div class="admin-wallet-adjust-grid">
+              <input id="forceWalletAdjustAmount" type="number" placeholder="Amount">
+              <select id="forceWalletAdjustType"><option value="ADD">Add Balance</option><option value="DEDUCT">Deduct Balance</option></select>
+              <input id="forceWalletAdjustNote" type="text" placeholder="Reason / Note">
+              <button id="forceWalletAdjustBtn" type="button" class="primary-btn">Apply</button>
+            </div>
+          </div>
+
+          <div class="action-row admin-user-actions-row">
+            <button id="forceSaveUserControlBtn" type="button" class="approve-btn">Save User Settings</button>
+            <button id="forceRefreshUserBtn" type="button" class="ghost-btn">Refresh Details</button>
+          </div>
+        </div>
+      `;
+
+      const main = document.querySelector("main") || document.getElementById("appPage") || document.body;
+      main.appendChild(panel);
+    }
+
+    bindUsersTab();
+  }
+
+  function bindUsersTab(){
+    document.querySelectorAll('[data-admin-tab]').forEach(btn => {
+      if (btn.dataset.forceUsersBound) return;
+      btn.dataset.forceUsersBound = "1";
+      btn.addEventListener("click", function(e){
+        const tab = btn.dataset.adminTab;
+        document.querySelectorAll(".admin-tab").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        document.querySelectorAll(".admin-panel").forEach(p => p.classList.remove("active-admin-panel"));
+        const target = document.getElementById(tab);
+        if (target) target.classList.add("active-admin-panel");
+        renderForceUsers();
+      });
+    });
+
+    ["forceAdminUserSearch","forceAdminUserStatusFilter"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && !el.dataset.bound) {
+        el.dataset.bound = "1";
+        el.addEventListener("input", renderForceUsers);
+        el.addEventListener("change", renderForceUsers);
+      }
+    });
+
+    const save = document.getElementById("forceSaveUserControlBtn");
+    if (save && !save.dataset.bound) {
+      save.dataset.bound = "1";
+      save.addEventListener("click", saveForceUser);
+    }
+
+    const adj = document.getElementById("forceWalletAdjustBtn");
+    if (adj && !adj.dataset.bound) {
+      adj.dataset.bound = "1";
+      adj.addEventListener("click", adjustForceWallet);
+    }
+
+    const ref = document.getElementById("forceRefreshUserBtn");
+    if (ref && !ref.dataset.bound) {
+      ref.dataset.bound = "1";
+      ref.addEventListener("click", () => {
+        renderForceUsers();
+        if (selectedForceUserId) selectForceUser(selectedForceUserId);
+      });
+    }
+  }
+
+  function renderPlanOptions(){
+    const sel = document.getElementById("forceUserPlanSelect");
+    if (!sel) return;
+    sel.innerHTML = (state.plans || [{id:"free",name:"Free"}])
+      .map(p => `<option value="${p.name || p.id}">${p.name || p.id}</option>`).join("");
+  }
+
+  function renderForceUsers(){
+    const el = document.getElementById("forceAdminUsersLog");
+    if (!el || state?.user?.role !== "admin") return;
+
+    const q = String(document.getElementById("forceAdminUserSearch")?.value || "").toLowerCase();
+    const filter = document.getElementById("forceAdminUserStatusFilter")?.value || "ALL";
+
+    let users = fUsers().filter(u => {
+      const text = `${u.name||""} ${u.email||""} ${u.mobile||""}`.toLowerCase();
+      if (q && !text.includes(q)) return false;
+      if (filter === "ACTIVE" && fStatus(u) !== "ACTIVE") return false;
+      if (filter === "BLOCKED" && fStatus(u) !== "BLOCKED") return false;
+      if (filter === "AI_ON" && u.autoTradePermission === false) return false;
+      if (filter === "AI_OFF" && u.autoTradePermission !== false) return false;
+      return true;
+    });
+
+    el.innerHTML = users.map(u => {
+      const uid = fKey(u);
+      const used = fAiUsed(u), limit = fAiLimit(u);
+      const pnl = fPnl(uid);
+      return `<tr>
+        <td><b>${u.name || "User"}</b><br><small>${u.email || "-"} ${u.mobile ? " | " + u.mobile : ""}</small></td>
+        <td>${u.plan || "Free"}</td>
+        <td>${fMoney(fWallet(u))}</td>
+        <td>${fMoney(fDeposit(uid))}</td>
+        <td class="${pnl>=0?'pnl-plus':'pnl-minus'}">${fMoney(pnl)}</td>
+        <td>${fPercent(u)}%</td>
+        <td>${used} / ${limit}</td>
+        <td>${fStatus(u)}<br><small>AI ${u.autoTradePermission === false ? "OFF" : "ON"}</small></td>
+        <td><button class="ghost-btn" onclick="selectForceUser('${uid}')">View</button></td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="9" class="empty">No users found.</td></tr>`;
+
+    renderPlanOptions();
+  }
+
+  function selectForceUser(id){
+    selectedForceUserId = String(id);
+    const u = fFind(id);
+    if (!u) return;
+
+    const uid = fKey(u);
+    const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    setText("forceSelectedUserTitle", u.name || u.email || "User");
+    setText("forceSelectedUserSub", `${u.email || "-"} ${u.mobile ? " | " + u.mobile : ""}`);
+    setText("forceDetailWallet", fMoney(fWallet(u)));
+    setText("forceDetailDeposit", fMoney(fDeposit(uid)));
+    setText("forceDetailPnl", fMoney(fPnl(uid)));
+    setText("forceDetailAiLimit", `${fAiUsed(u)} / ${fAiLimit(u)}`);
+
+    renderPlanOptions();
+
+    const plan = document.getElementById("forceUserPlanSelect");
+    if (plan) plan.value = u.plan || "Free";
+
+    const pct = document.getElementById("forceUserAiPercentSelect");
+    if (pct) pct.value = String(fPercent(u));
+
+    const ai = document.getElementById("forceUserAiToggle");
+    if (ai) ai.checked = u.autoTradePermission !== false;
+
+    const active = document.getElementById("forceUserActiveToggle");
+    if (active) active.checked = fStatus(u) === "ACTIVE";
+  }
+  window.selectForceUser = selectForceUser;
+
+  async function saveForceUser(){
+    const u = fFind(selectedForceUserId);
+    if (!u) return alert("User select karo.");
+
+    const plan = document.getElementById("forceUserPlanSelect")?.value || u.plan || "Free";
+    const pct = Number(document.getElementById("forceUserAiPercentSelect")?.value || fPercent(u));
+    const aiOn = document.getElementById("forceUserAiToggle")?.checked !== false;
+    const active = document.getElementById("forceUserActiveToggle")?.checked !== false;
+
+    u.plan = plan;
+    u.aiTradePercent = pct;
+    u.ai_trade_percent = pct;
+    u.autoTradePermission = aiOn;
+    u.blocked = !active;
+    u.status = active ? "ACTIVE" : "BLOCKED";
+
+    if (typeof supabaseClient !== "undefined" && supabaseClient && u.id) {
+      try {
+        await supabaseClient.from("profiles").update({
+          plan: plan,
+          ai_trade_percent: pct,
+          auto_trade_permission: aiOn,
+          status: u.status
+        }).eq("id", u.id);
+      } catch(e) {
+        console.warn("profile user setting save failed", e);
+      }
+    }
+
+    try { saveState?.(); } catch(e){}
+    renderForceUsers();
+    selectForceUser(fKey(u));
+    alert("User settings saved.");
+  }
+
+  async function adjustForceWallet(){
+    const u = fFind(selectedForceUserId);
+    if (!u) return alert("User select karo.");
+
+    const amount = Number(document.getElementById("forceWalletAdjustAmount")?.value || 0);
+    const type = document.getElementById("forceWalletAdjustType")?.value || "ADD";
+    const note = document.getElementById("forceWalletAdjustNote")?.value || "Admin wallet adjustment";
+    if (!amount || amount <= 0) return alert("Amount डालो.");
+
+    const finalAmount = type === "DEDUCT" ? -Math.abs(amount) : Math.abs(amount);
+    const uid = fKey(u);
+
+    const led = {
+      id: "led_adj_" + Date.now(),
+      userId: uid,
+      type: "ADMIN_ADJUSTMENT",
+      amount: finalAmount,
+      note: note
+    };
+    state.walletLedger = state.walletLedger || [];
+    state.walletLedger.unshift(led);
+
+    if (typeof supabaseClient !== "undefined" && supabaseClient) {
+      try {
+        await supabaseClient.from("wallet_ledger").insert({
+          user_id: uid,
+          type: "ADMIN_ADJUSTMENT",
+          amount: finalAmount,
+          note: note
+        });
+      } catch(e) {
+        console.warn("wallet adjustment save failed", e);
+      }
+    }
+
+    document.getElementById("forceWalletAdjustAmount").value = "";
+    document.getElementById("forceWalletAdjustNote").value = "";
+    try { saveState?.(); } catch(e){}
+    renderForceUsers();
+    selectForceUser(uid);
+    alert("Wallet adjustment applied.");
+  }
+
+  function start(){
+    ensureAdminTabs();
+    renderForceUsers();
+  }
+
+  setInterval(start, 1000);
+  window.addEventListener("load", () => setTimeout(start, 500));
+  document.addEventListener("DOMContentLoaded", () => setTimeout(start, 500));
+})();
