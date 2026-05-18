@@ -38,3 +38,22 @@ Deposit Bigint Hard Fix:
 - 12 digit UTR validation and duplicate check kept.
 - If same error appears, browser is still serving old cached app.js.
 - JS syntax check: OK
+
+
+No dep_ ID + Cache Fix:
+- Removed remaining dep_ ID generation from app.js.
+- Added Supabase deposit_requests insert monkey patch: it strips id before insert even if old handler runs.
+- index/admin now load app.js?v=clean20260518a to avoid old cache.
+- Added no-cache meta tags.
+- JS syntax check: OK
+
+
+Chart + Withdrawal Fix:
+- Added chart fallback so chart area does not remain blank.
+- Pair change triggers chart/fallback refresh.
+- Withdrawal formula updated:
+  withdrawable = min(approved deposit, completed trade volume) + positive profit/bonus - approved withdrawals - pending withdrawals.
+- Wallet page gets automatic withdrawal breakdown card.
+- Minimum withdrawal ₹1000 validation kept.
+- No SQL required.
+- JS syntax check: OK
