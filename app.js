@@ -4638,3 +4638,122 @@ function restoreManualHistoryBackup(mode = state.mode) {
   window.addEventListener("load", () => setTimeout(fixVisibility, 600));
   setInterval(fixVisibility, 1200);
 })();
+
+
+/* ===== MOBILE TRADE LAYOUT FINAL ===== */
+(function(){
+  function mtTradePage(){
+    return document.getElementById("trade") || document.getElementById("tradepage") || document.querySelector('[data-page="trade"]');
+  }
+
+  function mtText(el){
+    return (el?.textContent || "").trim();
+  }
+
+  function mtIsOrderBookText(t){ return /Order Book|BTC\/USDT Depth|Depth/i.test(t || ""); }
+  function mtIsTradeFeedText(t){ return /Trade Feed|Recent Fills/i.test(t || ""); }
+
+  function mtFindCardByText(re){
+    const page = mtTradePage();
+    if (!page) return null;
+    let found = null;
+    Array.from(page.querySelectorAll(".card, section, div")).some(el => {
+      const txt = mtText(el);
+      if (txt && txt.length < 1200 && re.test(txt)) {
+        found = el.closest(".card") || el;
+        return true;
+      }
+      return false;
+    });
+    return found;
+  }
+
+  function mtMakeLayout(){
+    try {
+      const page = mtTradePage();
+      if (!page) return;
+
+      page.classList.add("mobile-trade-page-final");
+
+      // Chart card
+      const chart =
+        document.getElementById("crypto_live_chart") ||
+        document.getElementById("tradingViewChart") ||
+        document.getElementById("chartContainer") ||
+        document.querySelector("iframe[src*='tradingview'], iframe[src*='widgetembed']");
+
+      let chartCard = null;
+      if (chart) {
+        chartCard = chart.closest(".card") || chart.parentElement;
+        chartCard?.classList.add("mt-chart-card");
+        chart.classList.add("mt-chart-frame");
+
+        // Hide duplicate outer controls/rates above chart, but never hide the actual chart/iframe.
+        if (chartCard) {
+          Array.from(chartCard.children).forEach(child => {
+            if (child === chart || child.contains(chart)) return;
+            const txt = mtText(child);
+            if (!txt) return;
+            if (
+              /REAL ACCOUNT|TRADING|5m candles|BTC\/USDT|Live TradingView Chart|\$[\d,]+|1m\s+5m|15m|1H|4H|D/i.test(txt) &&
+              txt.length < 350
+            ) {
+              child.classList.add("mt-hide-chart-duplicate");
+            }
+          });
+        }
+      }
+
+      // Order title + warning cleanup
+      Array.from(page.querySelectorAll("h1,h2,h3,b,strong,p,span,div")).forEach(el => {
+        const t = mtText(el);
+        if (/^Place (Simulation|Buy\/Sell) Order$/i.test(t)) el.textContent = "Place Buy/Sell Order";
+        if (/^SIM$/i.test(t)) (el.closest("button,.badge,.pill,span,div") || el).classList.add("mt-hide-sim");
+        if (/Simulation only|Real exchange order\/API is not connected/i.test(t)) el.classList.add("mt-hide-sim-warning");
+      });
+
+      // Mark key cards
+      const openPositions = mtFindCardByText(/Open Positions|Live Positions/i);
+      if (openPositions) openPositions.classList.add("mt-open-positions-card");
+
+      const orderCard = mtFindCardByText(/Place Buy\/Sell Order|Place Simulation Order|Order Ticket/i);
+      if (orderCard) orderCard.classList.add("mt-order-card");
+
+      const orderBook = mtFindCardByText(/Order Book|BTC\/USDT Depth|Depth/i);
+      if (orderBook) {
+        orderBook.classList.remove("hide-outer-chart-ui","hide-empty-timeframe-row","hide-outer-timeframe","force-page-hidden");
+        orderBook.classList.add("mt-orderbook-card","force-show-order-feed");
+        orderBook.style.display = "";
+      }
+
+      const tradeFeed = mtFindCardByText(/Trade Feed|Recent Fills/i);
+      if (tradeFeed) {
+        tradeFeed.classList.remove("hide-outer-chart-ui","hide-empty-timeframe-row","hide-outer-timeframe","force-page-hidden");
+        tradeFeed.classList.add("mt-tradefeed-card","force-show-order-feed");
+        tradeFeed.style.display = "";
+      }
+
+      // Reorder sections into final mobile flow where possible:
+      // chart -> open positions -> order card -> order book -> trade feed
+      const flow = [chartCard, openPositions, orderCard, orderBook, tradeFeed].filter(Boolean);
+      const seen = new Set();
+      flow.forEach(el => {
+        if (seen.has(el)) return;
+        seen.add(el);
+        if (el.parentElement === page) {
+          page.appendChild(el);
+        }
+      });
+
+      document.body.classList.add("mobile-trade-layout-ready");
+    } catch(e) {
+      console.warn("Mobile trade layout skipped", e);
+    }
+  }
+
+  window.applyMobileTradeLayoutFinal = mtMakeLayout;
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(mtMakeLayout, 700));
+  window.addEventListener("load", () => setTimeout(mtMakeLayout, 900));
+  setInterval(mtMakeLayout, 2500);
+})();

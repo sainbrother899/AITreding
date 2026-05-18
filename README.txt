@@ -535,3 +535,28 @@ Trade Page Visibility Fix:
 - Floating live position bar still works across pages.
 - No SQL required.
 - JS syntax check: OK
+
+
+Mobile Trade Layout Final:
+- Trade page arranged like the approved mobile mockup.
+- Full-width large TradingView chart.
+- Duplicate outer timeframe/rate rows hidden.
+- Open Positions below chart.
+- Compact Place Buy/Sell Order card.
+- Order Book and Trade Feed remain visible below order ticket.
+- Floating live position bar remains above bottom nav.
+- Trade page visibility fix retained.
+- No SQL required.
+- JS syntax check: /mnt/data/AI-Trading-Mobile-Trade-Layout-Final/app.js:4719
+      const orderCard = mtFindCardByText(/Place Buy\/Sell Order|Place Buy/Sell Order|Order Ticket/i);
+                                         ^
+
+SyntaxError: Invalid regular expression flags
+[90m    at wrapSafe (node:internal/modules/cjs/loader:1662:18)[39m
+[90m    at checkSyntax (node:internal/main/check_syntax:78:3)[39m
+
+Node.js v22.16.0
+
+
+
+Syntax fix applied for Buy/Sell regex. JS syntax check: OK
