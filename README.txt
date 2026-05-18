@@ -485,3 +485,12 @@ Trade Chart Bigger Fix:
 - No trade logic changes.
 - No SQL required.
 - JS syntax check: OK
+
+
+Trade Cards Wider Fix:
+- Trade page cards widened by reducing side padding.
+- Chart card and order ticket use more screen width.
+- Inputs/selects/buttons remain full-width and balanced.
+- Home/Wallet/Admin unchanged.
+- No SQL required.
+- JS syntax check: OK

@@ -4596,3 +4596,111 @@ body.trade-chart-bigger-ready #tradepage .card:has(.trade-chart-bigger){
     height:495px!important;
   }
 }
+
+
+/* ===== TRADE CARDS WIDER FIX ===== */
+body[data-user-clean-ui="true"] #trade,
+body[data-user-clean-ui="true"] #tradepage,
+body[data-user-clean-ui="true"] [data-page="trade"]{
+  padding-left:6px!important;
+  padding-right:6px!important;
+}
+
+body[data-user-clean-ui="true"] #trade .card,
+body[data-user-clean-ui="true"] #tradepage .card,
+body[data-user-clean-ui="true"] [data-page="trade"] .card{
+  width:100%!important;
+  max-width:none!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+  border-radius:22px!important;
+}
+
+body[data-user-clean-ui="true"] #trade .card:not(.trade-chart-bigger-card),
+body[data-user-clean-ui="true"] #tradepage .card:not(.trade-chart-bigger-card),
+body[data-user-clean-ui="true"] [data-page="trade"] .card:not(.trade-chart-bigger-card){
+  padding-left:16px!important;
+  padding-right:16px!important;
+}
+
+.trade-chart-bigger-card{
+  width:100%!important;
+  max-width:none!important;
+}
+
+/* Order ticket form looks wider and less cramped */
+body[data-user-clean-ui="true"] #trade select,
+body[data-user-clean-ui="true"] #trade input,
+body[data-user-clean-ui="true"] #tradepage select,
+body[data-user-clean-ui="true"] #tradepage input,
+body[data-user-clean-ui="true"] [data-page="trade"] select,
+body[data-user-clean-ui="true"] [data-page="trade"] input{
+  width:100%!important;
+  max-width:100%!important;
+}
+
+/* BUY / SELL row wider and cleaner */
+body[data-user-clean-ui="true"] #trade .action-row,
+body[data-user-clean-ui="true"] #tradepage .action-row,
+body[data-user-clean-ui="true"] [data-page="trade"] .action-row{
+  display:grid!important;
+  grid-template-columns:1fr 1fr!important;
+  gap:12px!important;
+}
+
+body[data-user-clean-ui="true"] #trade .action-row button,
+body[data-user-clean-ui="true"] #tradepage .action-row button,
+body[data-user-clean-ui="true"] [data-page="trade"] .action-row button{
+  width:100%!important;
+  min-height:56px!important;
+}
+
+/* Mobile: reduce outside margin so card uses more screen width */
+@media(max-width:700px){
+  body[data-user-clean-ui="true"] #appPage,
+  body[data-user-clean-ui="true"] main{
+    padding-left:8px!important;
+    padding-right:8px!important;
+  }
+
+  body[data-user-clean-ui="true"] #trade,
+  body[data-user-clean-ui="true"] #tradepage,
+  body[data-user-clean-ui="true"] [data-page="trade"]{
+    padding-left:2px!important;
+    padding-right:2px!important;
+  }
+
+  body[data-user-clean-ui="true"] #trade .card,
+  body[data-user-clean-ui="true"] #tradepage .card,
+  body[data-user-clean-ui="true"] [data-page="trade"] .card{
+    border-radius:20px!important;
+  }
+
+  body[data-user-clean-ui="true"] #trade .card:not(.trade-chart-bigger-card),
+  body[data-user-clean-ui="true"] #tradepage .card:not(.trade-chart-bigger-card),
+  body[data-user-clean-ui="true"] [data-page="trade"] .card:not(.trade-chart-bigger-card){
+    padding-left:14px!important;
+    padding-right:14px!important;
+  }
+}
+
+@media(max-width:430px){
+  body[data-user-clean-ui="true"] #appPage,
+  body[data-user-clean-ui="true"] main{
+    padding-left:6px!important;
+    padding-right:6px!important;
+  }
+
+  body[data-user-clean-ui="true"] #trade,
+  body[data-user-clean-ui="true"] #tradepage,
+  body[data-user-clean-ui="true"] [data-page="trade"]{
+    padding-left:0!important;
+    padding-right:0!important;
+  }
+
+  body[data-user-clean-ui="true"] #trade .action-row,
+  body[data-user-clean-ui="true"] #tradepage .action-row,
+  body[data-user-clean-ui="true"] [data-page="trade"] .action-row{
+    gap:10px!important;
+  }
+}
