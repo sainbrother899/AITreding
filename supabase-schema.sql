@@ -303,3 +303,17 @@ alter table public.deposit_requests add column if not exists txn text;
 create unique index if not exists idx_deposit_requests_unique_txn
 on public.deposit_requests(txn)
 where txn is not null and txn <> '';
+
+
+-- DEPOSIT FINAL WORKING FIX SQL
+
+alter table public.deposit_requests add column if not exists user_name text;
+alter table public.deposit_requests add column if not exists txn text;
+alter table public.deposit_requests add column if not exists created_at_text text;
+
+drop index if exists public.idx_deposit_requests_unique_txn;
+
+create unique index if not exists idx_deposit_requests_unique_txn
+on public.deposit_requests(txn)
+where txn is not null
+and txn ~ '^[0-9]{12}$';

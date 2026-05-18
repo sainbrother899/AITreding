@@ -599,3 +599,13 @@ UTR 12 Digit + Duplicate Fix:
 - Supabase duplicate check added.
 - SQL unique index added for txn duplicate prevention.
 - JS syntax check: OK
+
+
+Deposit Final Working Fix:
+- Deposit submit fully rewired.
+- Requires minimum ₹1000.
+- UTR must be exactly 12 digits.
+- Duplicate UTR blocked locally and in Supabase.
+- Supabase insert errors now show clear alert.
+- SQL included for missing columns and unique UTR index.
+- JS syntax check: OK
