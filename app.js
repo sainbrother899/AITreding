@@ -3213,7 +3213,13 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
 
   document.addEventListener("DOMContentLoaded", () => setTimeout(uiRun, 300));
   window.addEventListener("load", () => setTimeout(uiRun, 500));
-  setInterval(uiRun, 1500);
+  setInterval(function(){
+    try {
+      uiShortWalletNote();
+      uiMobileTableCards();
+      document.body.classList.add("clean-bottom-safe");
+    } catch(e) {}
+  }, 3000);
 })();
 
 
@@ -3380,11 +3386,14 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
   function cAmount(){ return Math.floor((cWallet() * cPct() / 100) * 100) / 100; }
 
   function cTarget(){
-    return document.getElementById("cleanHomeShell") ||
-           document.getElementById("dashboard") ||
+    // IMPORTANT: do NOT append inside cleanHomeShell because that shell is rebuilt by home renderer.
+    const shell = document.getElementById("cleanHomeShell");
+    const dashboard = document.getElementById("dashboard") ||
            document.getElementById("home") ||
            document.querySelector('[data-page="home"]') ||
+           shell?.parentElement?.parentElement ||
            document.getElementById("appPage");
+    return dashboard;
   }
 
   function cSavePct(p){
@@ -3543,4 +3552,35 @@ window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));
   document.addEventListener("DOMContentLoaded", () => setTimeout(() => cRender(true), 700));
   window.addEventListener("load", () => setTimeout(() => cRender(true), 900));
   setInterval(() => cRender(false), 3000);
+})();
+
+
+/* ===== AI CONTROL BLINK ROOT FIX ===== */
+(function(){
+  function stableAiCardParent(){
+    const card = document.getElementById("homeAiTradeControlCard");
+    if (!card) return;
+
+    const shell = document.getElementById("cleanHomeShell");
+    const mount = document.getElementById("cleanHomeMount");
+    const dashboard = document.getElementById("dashboard") ||
+      document.getElementById("home") ||
+      document.querySelector('[data-page="home"]') ||
+      document.getElementById("appPage");
+
+    if (!dashboard) return;
+
+    // If card is inside rebuilt shell/mount, move it outside as a stable sibling.
+    if ((shell && shell.contains(card)) || (mount && mount.contains(card))) {
+      dashboard.appendChild(card);
+    }
+
+    card.style.display = "";
+    card.style.visibility = "";
+    card.style.opacity = "";
+  }
+
+  window.addEventListener("load", () => setTimeout(stableAiCardParent, 1200));
+  document.addEventListener("DOMContentLoaded", () => setTimeout(stableAiCardParent, 1200));
+  setInterval(stableAiCardParent, 3000);
 })();

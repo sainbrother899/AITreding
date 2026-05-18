@@ -361,3 +361,15 @@ Old UI Code Cleaned:
 - Verification: {'index_has_old_ai_grid': False, 'app_old_ai_grid_refs': 1, 'app_old_ui_markers_left': [], 'css_old_markers_left': [], 'removed_js_blocks': ['Admin mass trade advanced field bridge', 'Admin page guest/demo guard'], 'removed_css_blocks': ['ADMIN BULK LEVERAGE FORCE VISIBLE UI'], 'removed_func_count': 0, 'removed_html_count': 0}
 - No SQL required.
 - JS syntax check: OK
+
+
+AI Control Blink Root Fix:
+- Root cause found: cleanHomeShell was being rebuilt every 1.5s using innerHTML.
+- That rebuild was deleting the AI Control card and recreating it, causing blinking.
+- Stopped repeated home shell rebuild interval.
+- AI Control card is now appended outside cleanHomeShell, so it remains stable.
+- Added guard to move card out if cached/old render puts it inside rebuilt shell.
+- interval_replaced=True
+- ctarget_replaced=True
+- No SQL required.
+- JS syntax check: OK

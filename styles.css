@@ -4277,3 +4277,13 @@ body[data-user-clean-ui="true"] .table-wrap{
     grid-template-columns:repeat(2,minmax(0,1fr))!important;
   }
 }
+
+
+/* ===== AI CONTROL BLINK ROOT FIX ===== */
+#homeAiTradeControlCard.clean-home-ai-control{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  transform:none!important;
+  animation:none!important;
+}
