@@ -4723,3 +4723,222 @@ function restoreManualHistoryBackup(mode = state.mode) {
   window.addEventListener("load", applyPcSameMobile);
   window.addEventListener("resize", applyPcSameMobile);
 })();
+
+
+/* ===== WALLET CLEAN UPDATE ===== */
+(function(){
+  function wcMoney(n){
+    try { if (typeof money === "function") return money(n); } catch(e){}
+    return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  }
+  function wcIsUser(){
+    return state?.user && state.user.role !== "admin";
+  }
+  function wcRealWallet(){
+    try { if (typeof realWallet === "function") return Number(realWallet() || 0); } catch(e){}
+    return Number(state?.accounts?.REAL?.balance || 0);
+  }
+  function wcOpenPnl(){
+    try { if (typeof openPnl === "function") return Number(openPnl("REAL") || 0); } catch(e){}
+    const acc = state?.accounts?.REAL || {};
+    return (acc.trades || []).reduce((sum,t)=>sum+Number(t.pnl || 0),0);
+  }
+  function wcEquity(){
+    return wcRealWallet() + wcOpenPnl();
+  }
+  function wcApprovedDeposits(){
+    return (state?.deposits || [])
+      .filter(d => String(d.userId || d.user_id || "") === String(state.user?.id || state.user?.email || "") && String(d.status || "").toUpperCase() === "APPROVED")
+      .reduce((a,d)=>a+Number(d.amount || 0),0);
+  }
+  function wcPendingWithdrawals(){
+    return (state?.withdrawals || [])
+      .filter(w => String(w.userId || w.user_id || "") === String(state.user?.id || state.user?.email || "") && String(w.status || "").toUpperCase() === "PENDING")
+      .reduce((a,w)=>a+Number(w.amount || 0),0);
+  }
+  function wcApprovedWithdrawals(){
+    return (state?.withdrawals || [])
+      .filter(w => String(w.userId || w.user_id || "") === String(state.user?.id || state.user?.email || "") && String(w.status || "").toUpperCase() === "APPROVED")
+      .reduce((a,w)=>a+Number(w.amount || 0),0);
+  }
+  function wcClosedProfit(){
+    const acc = state?.accounts?.REAL || {};
+    return (acc.closedTrades || []).reduce((a,t)=>a+Math.max(0, Number(t.pnl || 0)),0);
+  }
+  function wcTradeVolume(){
+    const acc = state?.accounts?.REAL || {};
+    const closed = (acc.closedTrades || []).reduce((a,t)=>a+Number(t.amount || 0),0);
+    const open = (acc.trades || []).reduce((a,t)=>a+Number(t.amount || 0),0);
+    return closed + open;
+  }
+  function wcWithdrawable(){
+    try { if (typeof withdrawableAmount === "function") return Number(withdrawableAmount() || 0); } catch(e){}
+    const base = Math.min(wcApprovedDeposits(), wcTradeVolume());
+    return Math.max(0, base + wcClosedProfit() - wcApprovedWithdrawals() - wcPendingWithdrawals());
+  }
+  function wcStatusClass(s){
+    s = String(s || "PENDING").toUpperCase();
+    if (s === "APPROVED" || s === "SUCCESS" || s === "COMPLETED") return "approved";
+    if (s === "REJECTED" || s === "FAILED" || s === "CANCELLED") return "rejected";
+    return "pending";
+  }
+  function wcUserRows(list){
+    const uid = String(state.user?.id || state.user?.email || "");
+    return (list || []).filter(x => String(x.userId || x.user_id || "") === uid || !x.userId && !x.user_id);
+  }
+  function wcCreateOrUpdateSummary(){
+    const walletPage = document.getElementById("wallet");
+    if (!walletPage || !wcIsUser()) return;
+
+    let box = document.getElementById("walletCleanSummary");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "walletCleanSummary";
+      box.className = "card wallet-clean-summary";
+      const firstCard = walletPage.querySelector(".card");
+      if (firstCard) firstCard.insertAdjacentElement("beforebegin", box);
+      else walletPage.prepend(box);
+    }
+
+    const pnl = wcOpenPnl();
+    const equity = wcEquity();
+    const withdrawable = wcWithdrawable();
+
+    box.innerHTML = `
+      <div class="wallet-summary-head">
+        <div>
+          <p class="label">Wallet Overview</p>
+          <h2>${wcMoney(equity)}</h2>
+          <span>Real Wallet Equity</span>
+        </div>
+        <b class="${pnl >= 0 ? "plc-profit" : "plc-loss"}">${pnl >= 0 ? "+" : ""}${wcMoney(pnl)}</b>
+      </div>
+
+      <div class="wallet-breakdown-grid">
+        <div><span>Real Balance</span><b>${wcMoney(wcRealWallet())}</b></div>
+        <div><span>Open PnL</span><b class="${pnl >= 0 ? "plc-profit" : "plc-loss"}">${pnl >= 0 ? "+" : ""}${wcMoney(pnl)}</b></div>
+        <div><span>Approved Deposit</span><b>${wcMoney(wcApprovedDeposits())}</b></div>
+        <div><span>Trade Volume</span><b>${wcMoney(wcTradeVolume())}</b></div>
+        <div><span>Profit Balance</span><b class="plc-profit">${wcMoney(wcClosedProfit())}</b></div>
+        <div><span>Pending Withdrawal</span><b>${wcMoney(wcPendingWithdrawals())}</b></div>
+      </div>
+
+      <div class="wallet-withdrawable-box">
+        <span>Available for Withdrawal</span>
+        <b>${wcMoney(withdrawable)}</b>
+        <small>Withdrawal eligibility depends on approved deposits, completed trade volume, profit balance and pending requests.</small>
+      </div>
+    `;
+  }
+
+  function wcCreateHistoryCards(){
+    const walletPage = document.getElementById("wallet");
+    if (!walletPage || !wcIsUser()) return;
+
+    let depositBox = document.getElementById("walletDepositCards");
+    if (!depositBox) {
+      depositBox = document.createElement("div");
+      depositBox.id = "walletDepositCards";
+      depositBox.className = "card wallet-history-card-box";
+      const depTable = Array.from(walletPage.querySelectorAll("table")).find(t => /Deposit|UTR|Transaction/i.test(t.textContent || ""));
+      const depWrap = depTable?.closest(".card") || depTable?.parentElement;
+      if (depWrap) depWrap.insertAdjacentElement("afterend", depositBox);
+      else walletPage.appendChild(depositBox);
+    }
+
+    const deposits = wcUserRows(state?.deposits || []).slice().reverse().slice(0,10);
+    depositBox.innerHTML = `
+      <div class="section-head"><div><p class="label">Deposit History</p><h2>Deposit Requests</h2></div></div>
+      <div class="wallet-history-cards">
+        ${deposits.length ? deposits.map(d => `
+          <div class="wallet-history-card">
+            <div class="wh-top"><b>${wcMoney(d.amount)}</b><span class="${wcStatusClass(d.status)}">${String(d.status || "PENDING").toUpperCase()}</span></div>
+            <p>UTR / TXN: <strong>${d.utr || d.txn || d.transaction_id || "-"}</strong></p>
+            <small>${d.createdAt || d.created_at || d.date || "-"}</small>
+          </div>
+        `).join("") : `<div class="clean-empty-card">No deposit requests yet.</div>`}
+      </div>
+    `;
+
+    let withdrawalBox = document.getElementById("walletWithdrawalCards");
+    if (!withdrawalBox) {
+      withdrawalBox = document.createElement("div");
+      withdrawalBox.id = "walletWithdrawalCards";
+      withdrawalBox.className = "card wallet-history-card-box";
+      depositBox.insertAdjacentElement("afterend", withdrawalBox);
+    }
+
+    const withdrawals = wcUserRows(state?.withdrawals || []).slice().reverse().slice(0,10);
+    withdrawalBox.innerHTML = `
+      <div class="section-head"><div><p class="label">Withdrawal History</p><h2>Withdrawal Requests</h2></div></div>
+      <div class="wallet-history-cards">
+        ${withdrawals.length ? withdrawals.map(w => `
+          <div class="wallet-history-card">
+            <div class="wh-top"><b>${wcMoney(w.amount)}</b><span class="${wcStatusClass(w.status)}">${String(w.status || "PENDING").toUpperCase()}</span></div>
+            <p>Method: <strong>${w.method || w.upi || w.bank || "-"}</strong></p>
+            <small>${w.createdAt || w.created_at || w.date || "-"}</small>
+          </div>
+        `).join("") : `<div class="clean-empty-card">No withdrawal requests yet.</div>`}
+      </div>
+    `;
+  }
+
+  function wcModalAvailable(){
+    const text = `Available for withdrawal: ${wcMoney(wcWithdrawable())}`;
+    const selectors = [
+      "#withdrawModal",
+      "#withdrawalModal",
+      ".withdraw-modal",
+      "[data-modal='withdraw']"
+    ];
+    selectors.forEach(sel => {
+      const modal = document.querySelector(sel);
+      if (!modal) return;
+      let note = modal.querySelector(".wallet-withdraw-available-note");
+      if (!note) {
+        note = document.createElement("div");
+        note.className = "wallet-withdraw-available-note";
+        const input = modal.querySelector("input[type='number'], input[name*='amount'], #withdrawAmount");
+        if (input) input.insertAdjacentElement("beforebegin", note);
+        else modal.prepend(note);
+      }
+      note.textContent = text;
+    });
+
+    document.querySelectorAll("input[type='file']").forEach(input => {
+      if (input.dataset.walletNoteAdded === "1") return;
+      const parent = input.closest("label,div,.field") || input.parentElement;
+      if (!parent) return;
+      const note = document.createElement("small");
+      note.className = "wallet-file-note";
+      note.textContent = "Upload screenshot for admin review. File upload storage can be connected later.";
+      parent.appendChild(note);
+      input.dataset.walletNoteAdded = "1";
+    });
+  }
+
+  function wcFixTableColspan(){
+    document.querySelectorAll("#wallet td[colspan='4'], #wallet td[colspan='5']").forEach(td => {
+      const table = td.closest("table");
+      const thCount = table?.querySelectorAll("thead th").length || table?.querySelector("tr")?.children.length || 5;
+      td.setAttribute("colspan", String(thCount || 5));
+    });
+  }
+
+  function wcRun(){
+    try {
+      wcCreateOrUpdateSummary();
+      wcCreateHistoryCards();
+      wcModalAvailable();
+      wcFixTableColspan();
+      document.body.classList.add("wallet-clean-update-ready");
+    } catch(e) {
+      console.warn("Wallet clean update skipped", e);
+    }
+  }
+
+  window.applyWalletCleanUpdate = wcRun;
+  document.addEventListener("DOMContentLoaded", () => setTimeout(wcRun, 600));
+  window.addEventListener("load", () => setTimeout(wcRun, 800));
+  setInterval(wcRun, 2500);
+})();

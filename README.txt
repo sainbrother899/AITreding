@@ -629,3 +629,16 @@ PC Same As Mobile Layout:
 - Wallet/Trade/Home/History all use same mobile-style structure on PC.
 - No SQL required.
 - JS syntax check: OK
+
+
+Wallet Clean Update:
+- Added Wallet Overview card with Real Wallet Equity = balance + open PnL.
+- Added clear withdrawable breakdown: Real Balance, Open PnL, Approved Deposit, Trade Volume, Profit Balance, Pending Withdrawal.
+- Added Available for Withdrawal box.
+- Added mobile card-style Deposit and Withdrawal history.
+- Fixed table colspan dynamically.
+- Withdrawal modal now shows available withdrawal amount when modal exists.
+- File upload field gets a clear admin-review note.
+- Mobile layout preserved.
+- No SQL required.
+- JS syntax check: OK
