@@ -2647,3 +2647,171 @@ function adminBulkOpenOnlyFix() {
 
 setInterval(adminBulkOpenOnlyFix, 1000);
 window.addEventListener("load", () => setTimeout(adminBulkOpenOnlyFix, 500));
+
+
+/* ===== BULK LEVERAGE + CLOSE ALL AI TRADES FIX ===== */
+function aiBulkPrice(coin) {
+  try { if (typeof priceOf === "function") return Number(priceOf(coin) || 0); } catch(e) {}
+  return Number(state?.prices?.[coin]?.price || 0);
+}
+function aiBulkMoney(n) {
+  try { if (typeof money === "function") return money(n); } catch(e) {}
+  return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+}
+function aiBulkOpenTrades() {
+  return (state.managedTrades || []).filter(t => {
+    const st = String(t.status || "OPEN").toUpperCase();
+    const src = String(t.source || "").toUpperCase();
+    return st === "OPEN" && (src.includes("ADMIN") || src.includes("AI") || src.includes("MASS") || src === "");
+  });
+}
+function aiBulkPnl(side, entry, close, amount, leverage) {
+  const diff = side === "SELL" ? Number(entry) - Number(close) : Number(close) - Number(entry);
+  return (diff / Number(entry || 1)) * Number(amount || 0) * Number(leverage || 1);
+}
+function aiBulkGetLeverage() {
+  const raw = Number(document.getElementById("massTradeLeverage")?.value || document.getElementById("managedLeverage")?.value || 1);
+  return Math.min(2000, Math.max(1, raw || 1));
+}
+function aiBulkGetOrderType() {
+  return document.getElementById("massTradeOrderType")?.value || document.getElementById("managedOrderType")?.value || "MARKET";
+}
+
+// Patch bulk trade fields into existing managed fields before old openMassTrade/openManagedTrade runs
+function aiBulkBridgeFields() {
+  const lev = document.getElementById("massTradeLeverage")?.value;
+  const type = document.getElementById("massTradeOrderType")?.value;
+  if (lev && document.getElementById("managedLeverage")) document.getElementById("managedLeverage").value = lev;
+  if (type && document.getElementById("managedOrderType")) document.getElementById("managedOrderType").value = type;
+}
+
+async function closeAllAiTrades() {
+  const open = aiBulkOpenTrades();
+  if (!open.length) {
+    alert("No open AI trades found.");
+    return;
+  }
+
+  const manualClose = Number(document.getElementById("allAiClosePrice")?.value || 0);
+  let closed = 0;
+
+  for (const t of open) {
+    const coin = t.coin || "BTCUSDT";
+    const close = manualClose || aiBulkPrice(coin) || Number(t.entry || t.entry_price || 0);
+    const entry = Number(t.entry || t.entry_price || 0);
+    const amount = Number(t.amount || 0);
+    const leverage = Number(t.leverage || 1);
+
+    t.close = close;
+    t.close_price = close;
+    t.pnl = aiBulkPnl(t.side, entry, close, amount, leverage);
+    t.status = "CLOSED";
+    t.closedAt = new Date().toLocaleString();
+    t.closed_at = t.closedAt;
+
+    if (typeof supabaseClient !== "undefined" && supabaseClient) {
+      try {
+        await supabaseClient.from("managed_trades").update({
+          close_price: close,
+          pnl: t.pnl,
+          status: "CLOSED",
+          closed_at: t.closedAt
+        }).eq("id", t.id);
+      } catch(e) {
+        console.warn("close all managed_trades update failed", e);
+      }
+
+      try {
+        await supabaseClient.from("wallet_ledger").insert({
+          user_id: t.userId || t.user_id,
+          type: String(t.source || "").toUpperCase().includes("MASS") ? "MASS_TRADE_PNL" : "MANAGED_TRADE_PNL",
+          amount: t.pnl,
+          note: "AI trade closed by admin"
+        });
+      } catch(e) {
+        console.warn("close all wallet ledger failed", e);
+      }
+    }
+
+    state.walletLedger = state.walletLedger || [];
+    state.walletLedger.unshift({
+      id: "led_ai_" + Date.now() + "_" + Math.random().toString(16).slice(2),
+      userId: t.userId || t.user_id,
+      type: String(t.source || "").toUpperCase().includes("MASS") ? "MASS_TRADE_PNL" : "MANAGED_TRADE_PNL",
+      amount: t.pnl,
+      note: "AI trade closed by admin"
+    });
+
+    closed++;
+  }
+
+  try { saveState?.(); } catch(e) {}
+  try { render?.(); } catch(e) {}
+  alert(`Closed ${closed} open AI trades.`);
+}
+
+async function cancelAllAiTrades() {
+  const open = aiBulkOpenTrades();
+  if (!open.length) {
+    alert("No open AI trades found.");
+    return;
+  }
+
+  let cancelled = 0;
+  for (const t of open) {
+    t.status = "CANCELLED";
+    t.pnl = 0;
+    t.closedAt = new Date().toLocaleString();
+    t.closed_at = t.closedAt;
+
+    try {
+      if (typeof decAiUsage === "function") decAiUsage({ id: t.userId || t.user_id, email: t.userEmail || t.user_email });
+    } catch(e) {}
+
+    if (typeof supabaseClient !== "undefined" && supabaseClient) {
+      try {
+        await supabaseClient.from("managed_trades").update({
+          status: "CANCELLED",
+          pnl: 0,
+          closed_at: t.closedAt
+        }).eq("id", t.id);
+      } catch(e) {
+        console.warn("cancel all managed_trades update failed", e);
+      }
+    }
+
+    cancelled++;
+  }
+
+  try { saveState?.(); } catch(e) {}
+  try { render?.(); } catch(e) {}
+  alert(`Cancelled ${cancelled} open AI trades.`);
+}
+
+function bindBulkLeverageCloseAll() {
+  const openBtn = document.getElementById("openMassTradeBtn");
+  if (openBtn && !openBtn.dataset.bulkLevBound) {
+    openBtn.dataset.bulkLevBound = "1";
+    openBtn.addEventListener("click", aiBulkBridgeFields, true);
+  }
+
+  const closeBtn = document.getElementById("closeAllAiTradesBtn");
+  if (closeBtn && !closeBtn.dataset.closeAllAiBound) {
+    closeBtn.dataset.closeAllAiBound = "1";
+    closeBtn.addEventListener("click", function(e) {
+      e.preventDefault();
+      closeAllAiTrades();
+    });
+  }
+
+  const cancelBtn = document.getElementById("cancelAllAiTradesBtn");
+  if (cancelBtn && !cancelBtn.dataset.cancelAllAiBound) {
+    cancelBtn.dataset.cancelAllAiBound = "1";
+    cancelBtn.addEventListener("click", function(e) {
+      e.preventDefault();
+      if (confirm("Cancel all open AI trades?")) cancelAllAiTrades();
+    });
+  }
+}
+setInterval(bindBulkLeverageCloseAll, 1000);
+window.addEventListener("load", () => setTimeout(bindBulkLeverageCloseAll, 700));

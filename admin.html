@@ -526,6 +526,25 @@
 
             
             <div id="adminManagedTrade" class="admin-panel">
+
+              <div class="card open-ai-close-all-card" id="openAiCloseAllCard">
+                <div class="section-head">
+                  <div>
+                    <p class="label">Open AI Trades</p>
+                    <h2>Close / Cancel All</h2>
+                    <p class="muted small">सभी open AI trades को एक साथ close या cancel करें.</p>
+                  </div>
+                </div>
+
+                <label class="input-label">Close Price</label>
+                <input id="allAiClosePrice" type="number" placeholder="Market price auto use होगा">
+
+                <div class="action-row">
+                  <button id="closeAllAiTradesBtn" type="button" class="approve-btn">Close All Open AI Trades</button>
+                  <button id="cancelAllAiTradesBtn" type="button" class="reject-btn">Cancel All Open AI Trades</button>
+                </div>
+              </div>
+
               <div class="admin-two-grid">
                 <div class="card">
                   <p class="label">Single AI Trade</p>
@@ -654,6 +673,6 @@
 
   <div id="toast"></div>
   <script src="config.js"></script>
-  <script src="app.js?v=adminbulkopenonly20260518"></script>
+  <script src="app.js?v=bulklevcloseall20260518"></script>
 </body>
 </html>

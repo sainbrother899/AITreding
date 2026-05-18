@@ -3480,3 +3480,30 @@ body[data-admin-page="true"] #adminManagedTrade .admin-two-grid{
 .bulk-ai-simple-note h3{
   margin:4px 0 6px!important;
 }
+
+
+/* ===== BULK LEVERAGE + CLOSE ALL AI TRADES UI ===== */
+.bulk-ai-extra-controls{
+  display:grid;
+  gap:10px;
+  margin:12px 0;
+}
+.open-ai-close-all-card{
+  margin-bottom:14px!important;
+  border:1px solid rgba(0,229,155,.14)!important;
+  background:rgba(0,229,155,.045)!important;
+}
+.open-ai-close-all-card .action-row{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:12px;
+}
+.open-ai-close-all-card .action-row button{
+  flex:1 1 180px;
+}
+@media(max-width:520px){
+  .open-ai-close-all-card .action-row{
+    flex-direction:column;
+  }
+}

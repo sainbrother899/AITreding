@@ -170,3 +170,13 @@ Admin Bulk/Open Only Update:
 - User side untouched.
 - No SQL required.
 - JS syntax check: OK
+
+
+Bulk Leverage + Close All AI Trades Update:
+- Bulk AI Trade panel now shows Order Type and Leverage 1x to 2000x.
+- Open AI Trades panel now has Close All Open AI Trades.
+- Open AI Trades panel now has Cancel All Open AI Trades.
+- Close All uses typed close price, or live market price if blank.
+- PnL calculation includes leverage.
+- No SQL required.
+- JS syntax check: OK
