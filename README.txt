@@ -426,3 +426,10 @@ Manual History Stability Fix:
 - Patched renderHistory: True
 - No SQL required.
 - JS syntax check: OK
+
+
+Safe Old Code Cleanup:
+- Removed obsolete UI-only patch blocks and old duplicate AI-control code.
+- Kept active stable user UI, live rates, home-only AI control, floating bar, manual positions, global P/L color, and manual history stability.
+- Core logic, Supabase, trade, wallet, deposit, admin users, and bulk trade functions are untouched.
+- Cleanup summary: {"app_js_removed_chars": 10194, "css_removed_chars": 3303, "removed_js_blocks": ["ADMIN USERS HARD INSERT LOGIC"], "removed_css_blocks": ["ADMIN USERS FORCE VISIBLE PANEL UI", "ADMIN USERS HARD INSERT UI"], "removed_old_ai_html": 0, "removed_orphan_functions": 0, "required_active_blocks": {"USER UI STRUCTURE CLEAN REBUILD": true, "HOME RATE LIVE + STATIC SHELL FIX": true, "CLEAN HOME AI CONTROL ONLY": true, "TRADE PAGE OPEN POSITIONS + BIG CHART ONLY": true, "FLOATING LIVE POSITION BAR": true, "GLOBAL PROFIT LOSS COLOR FIX": true, "MANUAL TRADE HISTORY PERMANENT BACKUP": true}, "syntax": "OK"}
