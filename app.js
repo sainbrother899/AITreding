@@ -4805,3 +4805,207 @@ function restoreManualHistoryBackup(mode = state.mode) {
   window.addEventListener("load", () => setTimeout(wmApply, 700));
   setInterval(wmApply, 2500);
 })();
+
+
+/* ===== WALLET HISTORY BIG CARDS ===== */
+(function(){
+  function whMoney(n){
+    try { if (typeof money === "function") return money(n); } catch(e){}
+    return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  }
+
+  function whIsUser(){
+    return state?.user && state.user.role !== "admin";
+  }
+
+  function whUid(){
+    return String(state?.user?.id || state?.user?.email || "");
+  }
+
+  function whStatusClass(s){
+    s = String(s || "PENDING").toUpperCase();
+    if (["APPROVED","SUCCESS","COMPLETED","PAID"].includes(s)) return "approved";
+    if (["REJECTED","FAILED","CANCELLED","DECLINED"].includes(s)) return "rejected";
+    return "pending";
+  }
+
+  function whFilterUser(list){
+    const uid = whUid();
+    return (list || []).filter(x => {
+      const xu = String(x.userId || x.user_id || x.uid || "");
+      return !xu || xu === uid;
+    });
+  }
+
+  function whDate(x){
+    return x.createdAt || x.created_at || x.date || x.updatedAt || x.closedAt || "-";
+  }
+
+  function whDepositRows(){
+    const rows = [
+      ...(state?.depositRequests || []),
+      ...(state?.deposits || [])
+    ];
+    const seen = new Set();
+    return whFilterUser(rows).filter(x => {
+      const id = String(x.id || x.utr || x.txn || x.transaction_id || JSON.stringify(x));
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    }).slice().reverse().slice(0, 20);
+  }
+
+  function whWithdrawalRows(){
+    const rows = [
+      ...(state?.withdrawalRequests || []),
+      ...(state?.withdrawals || [])
+    ];
+    const seen = new Set();
+    return whFilterUser(rows).filter(x => {
+      const id = String(x.id || x.account || x.upi || x.createdAt || JSON.stringify(x));
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    }).slice().reverse().slice(0, 20);
+  }
+
+  function whHideOldTinyWalletHistory(){
+    const wallet = document.getElementById("wallet");
+    if (!wallet) return;
+
+    // Hide old table sections and tiny auto cards only on mobile / phone-width desktop.
+    const mobileLike = window.innerWidth < 900 || document.body.classList.contains("pc-same-mobile");
+    if (!mobileLike) return;
+
+    ["userDepositLog","userWithdrawalLog"].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const table = el.closest("table");
+      const wrap = table?.closest(".table-wrap") || table?.parentElement;
+      if (wrap) wrap.classList.add("wallet-old-history-hidden");
+      if (table) table.classList.add("wallet-old-history-hidden");
+    });
+
+    // Hide old tiny wallet cards created by generic mobile table converter, but not our new cards.
+    wallet.querySelectorAll(".mobile-table-card,.clean-record-card,.premium-history-card").forEach(card => {
+      if (card.closest(".wallet-big-history-cards")) return;
+      const txt = card.textContent || "";
+      if (/deposit|withdraw|utr|txn|method|approved|pending|rejected/i.test(txt)) {
+        card.classList.add("wallet-old-history-hidden");
+      }
+    });
+  }
+
+  function whSection(id, title, label){
+    const wallet = document.getElementById("wallet");
+    if (!wallet) return null;
+
+    let sec = document.getElementById(id);
+    if (!sec) {
+      sec = document.createElement("div");
+      sec.id = id;
+      sec.className = "card wallet-big-history-section";
+      sec.innerHTML = `
+        <div class="section-head wallet-big-history-head">
+          <div>
+            <p class="label">${label}</p>
+            <h2>${title}</h2>
+          </div>
+        </div>
+        <div class="wallet-big-history-cards"></div>
+      `;
+      wallet.appendChild(sec);
+    }
+    return sec;
+  }
+
+  function whRenderDeposits(){
+    const sec = whSection("walletBigDepositHistory", "Deposit History", "Wallet Records");
+    if (!sec) return;
+
+    const list = whDepositRows();
+    const box = sec.querySelector(".wallet-big-history-cards");
+    box.innerHTML = list.length ? list.map(d => {
+      const status = String(d.status || "PENDING").toUpperCase();
+      const cls = whStatusClass(status);
+      const utr = d.utr || d.txn || d.transaction_id || d.payment_id || "-";
+      const note = d.note || d.remark || d.admin_note || "";
+      return `
+        <div class="wallet-big-history-card deposit">
+          <div class="wbh-top">
+            <div>
+              <span>Deposit Amount</span>
+              <b>${whMoney(d.amount)}</b>
+            </div>
+            <em class="${cls}">${status}</em>
+          </div>
+          <div class="wbh-details">
+            <p><span>UTR / TXN</span><strong>${utr}</strong></p>
+            <p><span>Date</span><strong>${whDate(d)}</strong></p>
+            ${note ? `<p><span>Note</span><strong>${note}</strong></p>` : ""}
+          </div>
+        </div>
+      `;
+    }).join("") : `<div class="wallet-big-empty">No deposit requests yet.</div>`;
+  }
+
+  function whRenderWithdrawals(){
+    const sec = whSection("walletBigWithdrawalHistory", "Withdrawal History", "Wallet Records");
+    if (!sec) return;
+
+    const list = whWithdrawalRows();
+    const box = sec.querySelector(".wallet-big-history-cards");
+    box.innerHTML = list.length ? list.map(w => {
+      const status = String(w.status || "PENDING").toUpperCase();
+      const cls = whStatusClass(status);
+      const method = w.method || (w.upi ? "UPI" : (w.bank ? "Bank" : "-"));
+      const account = w.account || w.upi || w.bank_account || w.bank || "-";
+      const note = w.note || w.remark || w.admin_note || "";
+      return `
+        <div class="wallet-big-history-card withdrawal">
+          <div class="wbh-top">
+            <div>
+              <span>Withdrawal Amount</span>
+              <b>${whMoney(w.amount)}</b>
+            </div>
+            <em class="${cls}">${status}</em>
+          </div>
+          <div class="wbh-details">
+            <p><span>Method</span><strong>${method}</strong></p>
+            <p><span>Account / UPI</span><strong>${account}</strong></p>
+            <p><span>Date</span><strong>${whDate(w)}</strong></p>
+            ${note ? `<p><span>Note</span><strong>${note}</strong></p>` : ""}
+          </div>
+        </div>
+      `;
+    }).join("") : `<div class="wallet-big-empty">No withdrawal requests yet.</div>`;
+  }
+
+  function whPlaceSections(){
+    const dep = document.getElementById("walletBigDepositHistory");
+    const wit = document.getElementById("walletBigWithdrawalHistory");
+    const wallet = document.getElementById("wallet");
+    if (!wallet || !dep || !wit) return;
+
+    // Keep them near bottom of wallet, deposit first then withdrawal.
+    if (dep.nextElementSibling !== wit) dep.insertAdjacentElement("afterend", wit);
+  }
+
+  function whRun(){
+    try {
+      if (!whIsUser()) return;
+      whHideOldTinyWalletHistory();
+      whRenderDeposits();
+      whRenderWithdrawals();
+      whPlaceSections();
+      document.body.classList.add("wallet-history-big-cards-ready");
+    } catch(e) {
+      console.warn("Wallet big history cards skipped", e);
+    }
+  }
+
+  window.applyWalletHistoryBigCards = whRun;
+  document.addEventListener("DOMContentLoaded", () => setTimeout(whRun, 600));
+  window.addEventListener("load", () => setTimeout(whRun, 800));
+  setInterval(whRun, 2500);
+})();

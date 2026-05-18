@@ -645,3 +645,13 @@ Wallet Safe Minimal Fix:
 - Patched balance line: True
 - Patched withdrawal log: True
 - JS syntax check: OK
+
+
+Wallet History Big Cards:
+- Deposit and Withdrawal history now render as full-width big mobile cards.
+- Uses correct app sources: state.depositRequests / state.withdrawalRequests, with fallback to state.deposits / state.withdrawals.
+- Old tiny table/mobile cards are hidden on mobile and PC-same-mobile shell.
+- Card layout matches Trade history style: large amount, status badge, details rows.
+- Existing wallet balance/withdrawable minimal fix remains untouched.
+- No SQL required.
+- JS syntax check: OK

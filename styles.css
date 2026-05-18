@@ -5269,3 +5269,148 @@ body[data-active-page="more"] #more{
   font-size:12px!important;
 }
 /* Do not hide existing wallet tables; keep original history working. */
+
+
+/* ===== WALLET HISTORY BIG CARDS ===== */
+.wallet-big-history-section{
+  margin:14px auto!important;
+  padding:16px!important;
+  width:100%!important;
+  max-width:100%!important;
+  box-sizing:border-box!important;
+}
+.wallet-big-history-head{
+  margin-bottom:12px!important;
+}
+.wallet-big-history-head h2{
+  font-size:22px!important;
+  line-height:1.1!important;
+  margin:2px 0 0!important;
+}
+.wallet-big-history-cards{
+  display:grid!important;
+  gap:12px!important;
+}
+.wallet-big-history-card{
+  width:100%!important;
+  min-height:132px!important;
+  border-radius:18px!important;
+  padding:14px!important;
+  box-sizing:border-box!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.065), rgba(255,255,255,.025)),
+    rgba(7,13,25,.72)!important;
+  box-shadow:0 12px 28px rgba(0,0,0,.22)!important;
+}
+.wallet-big-history-card.deposit{
+  border-color:rgba(0,231,168,.18)!important;
+}
+.wallet-big-history-card.withdrawal{
+  border-color:rgba(88,166,255,.18)!important;
+}
+.wbh-top{
+  display:flex!important;
+  align-items:flex-start!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+  margin-bottom:12px!important;
+}
+.wbh-top span{
+  display:block!important;
+  color:#9fb2d0!important;
+  font-size:12px!important;
+  margin-bottom:5px!important;
+}
+.wbh-top b{
+  display:block!important;
+  color:#f4f7ff!important;
+  font-size:22px!important;
+  line-height:1!important;
+  letter-spacing:-.03em!important;
+}
+.wbh-top em{
+  flex:0 0 auto!important;
+  font-style:normal!important;
+  font-size:11px!important;
+  font-weight:950!important;
+  border-radius:999px!important;
+  padding:7px 10px!important;
+  letter-spacing:.02em!important;
+}
+.wbh-top em.pending{
+  color:#f8bd7a!important;
+  background:rgba(248,189,122,.13)!important;
+  border:1px solid rgba(248,189,122,.20)!important;
+}
+.wbh-top em.approved{
+  color:#00e7a8!important;
+  background:rgba(0,231,168,.13)!important;
+  border:1px solid rgba(0,231,168,.20)!important;
+}
+.wbh-top em.rejected{
+  color:#ff456b!important;
+  background:rgba(255,69,107,.13)!important;
+  border:1px solid rgba(255,69,107,.20)!important;
+}
+.wbh-details{
+  display:grid!important;
+  gap:8px!important;
+}
+.wbh-details p{
+  display:flex!important;
+  align-items:flex-start!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+  margin:0!important;
+  padding:8px 0 0!important;
+  border-top:1px solid rgba(255,255,255,.06)!important;
+}
+.wbh-details p span{
+  color:#8ea2c4!important;
+  font-size:12px!important;
+  flex:0 0 auto!important;
+}
+.wbh-details p strong{
+  color:#f4f7ff!important;
+  font-size:12px!important;
+  font-weight:850!important;
+  text-align:right!important;
+  word-break:break-word!important;
+}
+.wallet-big-empty{
+  border:1px dashed rgba(255,255,255,.14)!important;
+  color:#9fb2d0!important;
+  border-radius:16px!important;
+  padding:18px!important;
+  text-align:center!important;
+  background:rgba(255,255,255,.025)!important;
+}
+.wallet-old-history-hidden{
+  display:none!important;
+}
+
+/* Mobile and PC-same-mobile: use big cards like Trade history */
+@media(max-width:899px){
+  #wallet table,
+  #wallet .table-wrap{
+    display:none!important;
+  }
+  .wallet-big-history-section{
+    display:block!important;
+  }
+}
+
+/* Since PC is same-as-mobile in this base, use same wallet big cards on PC shell too */
+body.pc-same-mobile #wallet table,
+body.pc-same-mobile #wallet .table-wrap{
+  display:none!important;
+}
+body.pc-same-mobile .wallet-big-history-section{
+  max-width:430px!important;
+}
+@media(min-width:1400px){
+  body.pc-same-mobile .wallet-big-history-section{
+    max-width:460px!important;
+  }
+}
