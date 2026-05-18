@@ -733,7 +733,7 @@ async function closeManagedTrade() {
   if (!id || !close) return toast("Trade और close price select करो.");
   const t = state.managedTrades.find(x => x.id === id);
   if (!t || t.status !== "OPEN") return;
-  t.close = close; t.pnl = pnlForManaged(t.side, t.entry, close, t.amount); t.status = "CLOSED"; t.closedAt = new Date().toLocaleString();
+  t.close = close; t.pnl = pnlForManaged(t.side, t.entry, close, t.amount, t.leverage || 1); t.status = "CLOSED"; t.closedAt = new Date().toLocaleString();
   await dbUpdate("managed_trades", { close_price: close, pnl: t.pnl, status: "CLOSED", closed_at: t.closedAt }, "id", id);
   state.walletLedger.unshift({ id: "led_" + Date.now(), userId: t.userId, type: t.source === "ADMIN_MASS" ? "MASS_TRADE_PNL" : "MANAGED_TRADE_PNL", amount: t.pnl, note: "Admin trade PnL" });
   await dbInsert("wallet_ledger", { user_id: t.userId, type: t.source === "ADMIN_MASS" ? "MASS_TRADE_PNL" : "MANAGED_TRADE_PNL", amount: t.pnl, note: "Admin trade PnL" });
@@ -765,7 +765,7 @@ async function closeAllMassTrades() {
   if (!close) return toast("Close price required.");
   const open = state.managedTrades.filter(t => t.source === "ADMIN_MASS" && t.status === "OPEN");
   for (const t of open) {
-    t.close = close; t.pnl = pnlForManaged(t.side, t.entry, close, t.amount); t.status = "CLOSED"; t.closedAt = new Date().toLocaleString();
+    t.close = close; t.pnl = pnlForManaged(t.side, t.entry, close, t.amount, t.leverage || 1); t.status = "CLOSED"; t.closedAt = new Date().toLocaleString();
     await dbUpdate("managed_trades", { close_price: close, pnl: t.pnl, status: "CLOSED", closed_at: t.closedAt }, "id", t.id);
     state.walletLedger.unshift({ id: "led_" + Date.now(), userId: t.userId, type: "MASS_TRADE_PNL", amount: t.pnl, note: "Mass trade PnL" });
     await dbInsert("wallet_ledger", { user_id: t.userId, type: "MASS_TRADE_PNL", amount: t.pnl, note: "Mass trade PnL" });
@@ -1510,3 +1510,243 @@ setInterval(checkAutoLiquidation, 1000);
 window.addEventListener("load", function(){
   setTimeout(checkAutoLiquidation, 1200);
 });
+
+
+/* ===== ADMIN TRADE ADVANCED OPTIONS FIX ===== */
+function adminTradePriceSafe(coin) {
+  try {
+    if (typeof priceOf === "function") return Number(priceOf(coin) || 0);
+  } catch(e) {}
+  return Number(state?.prices?.[coin]?.price || 0);
+}
+
+function adminTradeMoneySafe(n) {
+  try {
+    if (typeof money === "function") return money(n);
+  } catch(e) {}
+  return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+}
+
+function adminTradeUserWallet(userIdOrEmail) {
+  const u = (state.users || []).find(x =>
+    String(x.id || "") === String(userIdOrEmail || "") ||
+    String(x.email || "") === String(userIdOrEmail || "")
+  );
+  if (!u) return 0;
+
+  const uid = String(u.id || u.email || "");
+  try {
+    if (typeof realWallet === "function") return Number(realWallet(uid) || 0);
+  } catch(e) {}
+
+  const deposits = (state.depositRequests || [])
+    .filter(d => String(d.userId || d.user_id || "") === uid && String(d.status || "").toUpperCase() === "APPROVED")
+    .reduce((a, d) => a + Number(d.amount || 0), 0);
+
+  const ledger = (state.walletLedger || [])
+    .filter(l => String(l.userId || l.user_id || "") === uid)
+    .reduce((a, l) => a + Number(l.amount || 0), 0);
+
+  return Math.max(deposits, 0) + ledger;
+}
+
+function adminTradeSelectedUsers() {
+  const target = document.getElementById("managedUserSelect")?.value || "ALL";
+  const users = (state.users || []).filter(u => u.role !== "admin");
+
+  if (target === "ALL") {
+    return users.filter(u => {
+      try { return typeof canReceiveAi === "function" ? canReceiveAi(u) : true; }
+      catch(e) { return true; }
+    });
+  }
+
+  return users.filter(u => String(u.id || u.email) === String(target));
+}
+
+function adminTradeUpdateWalletPreview() {
+  const target = document.getElementById("managedUserSelect")?.value || "ALL";
+  const walletText = document.getElementById("managedUserWalletText");
+  const availableText = document.getElementById("managedUserAvailableText");
+  const amountInput = document.getElementById("managedAmount");
+  const amount = Number(amountInput?.value || 0);
+
+  if (!walletText && !availableText) return;
+
+  if (target === "ALL") {
+    const users = adminTradeSelectedUsers();
+    const total = users.reduce((a, u) => a + adminTradeUserWallet(u.id || u.email), 0);
+    const min = users.length ? Math.min(...users.map(u => adminTradeUserWallet(u.id || u.email))) : 0;
+    if (walletText) walletText.textContent = `${users.length} users | Total ${adminTradeMoneySafe(total)}`;
+    if (availableText) availableText.textContent = `Lowest user wallet: ${adminTradeMoneySafe(min)} | Trade amount: ${adminTradeMoneySafe(amount)}`;
+    return;
+  }
+
+  const wallet = adminTradeUserWallet(target);
+  if (walletText) walletText.textContent = adminTradeMoneySafe(wallet);
+  if (availableText) availableText.textContent = `Available for trade: ${adminTradeMoneySafe(wallet)} | Trade amount: ${adminTradeMoneySafe(amount)}`;
+}
+
+function adminTradeGetEntryPrice() {
+  const coin = document.getElementById("managedCoin")?.value || "BTCUSDT";
+  const orderType = document.getElementById("managedOrderType")?.value || "MARKET";
+  const live = adminTradePriceSafe(coin);
+
+  if (orderType === "MARKET") {
+    const entryInput = document.getElementById("managedEntryPrice");
+    if (entryInput) entryInput.value = live ? live.toFixed(4) : "";
+    return live;
+  }
+
+  return Number(document.getElementById("managedEntryPrice")?.value || live || 0);
+}
+
+function adminTradeGetLeverage() {
+  const lev = Number(document.getElementById("managedLeverage")?.value || 1);
+  return Math.min(2000, Math.max(1, lev || 1));
+}
+
+function adminTradeValidateAmountForTargets(targets, amount) {
+  if (!amount || amount <= 0) {
+    alert("Trade amount required.");
+    return false;
+  }
+
+  const low = targets.find(u => adminTradeUserWallet(u.id || u.email) < amount);
+  if (low) {
+    alert(`User wallet amount kam hai: ${low.email || low.name}. Wallet: ${adminTradeMoneySafe(adminTradeUserWallet(low.id || low.email))}`);
+    return false;
+  }
+
+  return true;
+}
+
+// Override existing openManagedTrade with advanced options.
+async function openManagedTradeAdvanced() {
+  if (state.user?.role !== "admin") return;
+
+  const targets = adminTradeSelectedUsers();
+  if (!targets.length) {
+    alert("No eligible user found.");
+    return;
+  }
+
+  const coin = document.getElementById("managedCoin")?.value || "BTCUSDT";
+  const side = document.getElementById("managedSide")?.value || "BUY";
+  const risk = document.getElementById("managedRisk")?.value || "MEDIUM";
+  const amount = Number(document.getElementById("managedAmount")?.value || 0);
+  const orderType = document.getElementById("managedOrderType")?.value || "MARKET";
+  const leverage = adminTradeGetLeverage();
+  const entry = adminTradeGetEntryPrice();
+
+  if (!adminTradeValidateAmountForTargets(targets, amount)) return;
+
+  for (const u of targets) {
+    const t = {
+      id: "mg_" + Date.now() + "_" + Math.random().toString(16).slice(2),
+      userId: u.id || u.email,
+      userEmail: u.email || "",
+      coin,
+      side,
+      risk,
+      amount,
+      entry,
+      close: null,
+      pnl: 0,
+      leverage,
+      orderType,
+      status: "OPEN",
+      source: "ADMIN_MANAGED",
+      openedAt: new Date().toLocaleString()
+    };
+
+    state.managedTrades = state.managedTrades || [];
+    state.managedTrades.unshift(t);
+
+    try { if (typeof incAiUsage === "function") incAiUsage(u); } catch(e) {}
+
+    if (typeof supabaseClient !== "undefined" && supabaseClient) {
+      try {
+        await supabaseClient.from("managed_trades").insert({
+          id: t.id,
+          user_id: t.userId,
+          user_email: t.userEmail,
+          coin: t.coin,
+          side: t.side,
+          risk: t.risk,
+          amount: t.amount,
+          entry_price: t.entry,
+          pnl: 0,
+          status: "OPEN",
+          source: t.source,
+          opened_at: t.openedAt
+        });
+      } catch(e) {
+        console.warn("Managed trade DB insert failed", e);
+      }
+    }
+  }
+
+  try { saveState?.(); } catch(e) {}
+  try { render?.(); } catch(e) {}
+  try { toast?.(`Admin trade opened for ${targets.length} user(s).`); } catch(e) {}
+}
+
+try { openManagedTrade = openManagedTradeAdvanced; } catch(e) {}
+window.openManagedTrade = openManagedTradeAdvanced;
+
+function patchAdminAdvancedEvents() {
+  const ids = ["managedUserSelect", "managedAmount", "managedCoin", "managedOrderType"];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.dataset.advancedBound) {
+      el.dataset.advancedBound = "1";
+      el.addEventListener("change", () => {
+        if (id === "managedCoin" || id === "managedOrderType") adminTradeGetEntryPrice();
+        adminTradeUpdateWalletPreview();
+      });
+      el.addEventListener("input", adminTradeUpdateWalletPreview);
+    }
+  });
+
+  const btn = document.getElementById("openManagedTradeBtn");
+  if (btn && !btn.dataset.advancedOpenBound) {
+    btn.dataset.advancedOpenBound = "1";
+    btn.addEventListener("click", function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      openManagedTradeAdvanced();
+      return false;
+    }, true);
+  }
+
+  adminTradeGetEntryPrice();
+  adminTradeUpdateWalletPreview();
+}
+
+setInterval(patchAdminAdvancedEvents, 1000);
+window.addEventListener("load", () => setTimeout(patchAdminAdvancedEvents, 800));
+
+
+/* Admin managed PnL leverage override */
+function pnlForManaged(side, entry, close, amount, leverage = 1) {
+  const diff = side === "SELL" ? Number(entry) - Number(close) : Number(close) - Number(entry);
+  return (diff / Number(entry || 1)) * Number(amount || 0) * Number(leverage || 1);
+}
+
+
+/* Admin mass trade advanced field bridge */
+function patchMassAdvancedBridge() {
+  const btn = document.getElementById("openMassTradeBtn");
+  if (btn && !btn.dataset.massAdvancedBound) {
+    btn.dataset.massAdvancedBound = "1";
+    btn.addEventListener("click", function(){
+      const mt = document.getElementById("massTradeOrderType")?.value;
+      const ml = document.getElementById("massTradeLeverage")?.value;
+      if (document.getElementById("managedOrderType") && mt) document.getElementById("managedOrderType").value = mt;
+      if (document.getElementById("managedLeverage") && ml) document.getElementById("managedLeverage").value = ml;
+    }, true);
+  }
+}
+setInterval(patchMassAdvancedBridge, 1000);

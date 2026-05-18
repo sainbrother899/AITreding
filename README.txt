@@ -93,3 +93,15 @@ Auto Liquidation Update:
 - DEMO liquidation also moves trade to history.
 - No SQL required.
 - JS syntax check: OK
+
+
+Admin Trade Advanced Options Update:
+- Admin managed trade now has Order Type: Market / Limit.
+- Market order auto-fills live market price.
+- Limit order allows custom entry price.
+- Admin managed trade now has leverage 1x to 2000x.
+- Selected user's wallet/available amount is shown before trade.
+- Trade amount cannot exceed selected user's wallet.
+- Admin managed PnL calculation now supports leverage.
+- No SQL required.
+- JS syntax check: OK
