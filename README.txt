@@ -617,3 +617,15 @@ Chart Important Override Fix:
 - Order Ticket / Order Book / Trade Feed untouched.
 - No SQL required.
 - Diagnostics: {"syntax": "OK", "styles_crypto_mentions": 23, "app_has_important_fix": true, "css_has_important_fix": true}
+
+
+PC Desktop Layout Fix Only:
+- Mobile CSS/layout is untouched.
+- Added desktop-only media query starting at 900px.
+- PC pages get max-width 1180px and centered layout.
+- Home grids become proper desktop grids.
+- Trade page cards, Order Book, Trade Feed align cleanly on desktop.
+- Wallet/History/PnL cards/tables get desktop width control.
+- Bottom nav and floating position bar centered on desktop.
+- No SQL required.
+- JS syntax check: OK

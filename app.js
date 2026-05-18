@@ -4708,3 +4708,17 @@ function restoreManualHistoryBackup(mode = state.mode) {
 
   setInterval(applyChartImportantOverride, 1500);
 })();
+
+
+/* ===== PC DESKTOP LAYOUT FIX ONLY ===== */
+(function(){
+  function markDesktopLayout(){
+    try {
+      if (window.innerWidth >= 900) document.body.classList.add("pc-layout-fix-ready");
+      else document.body.classList.remove("pc-layout-fix-ready");
+    } catch(e) {}
+  }
+  document.addEventListener("DOMContentLoaded", markDesktopLayout);
+  window.addEventListener("load", markDesktopLayout);
+  window.addEventListener("resize", markDesktopLayout);
+})();
