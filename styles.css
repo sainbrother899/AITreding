@@ -4902,18 +4902,22 @@ body[data-active-page="more"] #more{
 
 
 
-/* ===== TRADINGVIEW FULL FIT FINAL ===== */
-/* Final chart hierarchy:
-   card = auto height
-   host = responsive height
-   iframe = 100% of host
-   No parent clips the bottom axis/controls.
-*/
-.tv-full-fit-card,
-.exact-chart-card.tv-full-fit-card,
-.mt-chart-card.tv-full-fit-card,
-.trade-chart-bigger-card.tv-full-fit-card,
-.clean-expanded-chart-card.tv-full-fit-card{
+
+
+
+/* ===== CHART CSS CONFLICT CLEANUP FINAL ===== */
+/* Final single source of truth for TradingView chart sizing.
+   It neutralizes all old 330/360/520/620/700px conflicts. */
+
+body[data-active-page="trade"] .chart-clean-card,
+body[data-active-page="trade"] .chart-card.chart-clean-card,
+body[data-active-page="trade"] .exact-chart-card.chart-clean-card,
+body[data-active-page="trade"] .tv-full-fit-card,
+body[data-active-page="trade"] .tv-responsive-card,
+body[data-active-page="trade"] .tv-big-box-card,
+body[data-active-page="trade"] .trade-chart-bigger-card,
+body[data-active-page="trade"] .clean-expanded-chart-card,
+body[data-active-page="trade"] .mt-chart-card{
   width:100%!important;
   max-width:none!important;
   height:auto!important;
@@ -4924,91 +4928,105 @@ body[data-active-page="more"] #more{
   border-radius:18px!important;
 }
 
-.tv-full-fit-host,
-.exact-chart-host.tv-full-fit-host,
-#crypto_live_chart.tv-full-fit-host,
-#tradingViewChart.tv-full-fit-host,
-#chartContainer.tv-full-fit-host{
+/* Host gets the responsive height. No max-height clipping. */
+body[data-active-page="trade"] .chart-clean-host,
+body[data-active-page="trade"] #crypto_live_chart.chart-clean-host,
+body[data-active-page="trade"] #tradingViewChart.chart-clean-host,
+body[data-active-page="trade"] #chartContainer.chart-clean-host,
+body[data-active-page="trade"] .exact-chart-host,
+body[data-active-page="trade"] .tv-full-fit-host,
+body[data-active-page="trade"] .tv-responsive-host,
+body[data-active-page="trade"] .tv-big-box-host,
+body[data-active-page="trade"] .trade-chart-bigger,
+body[data-active-page="trade"] .clean-expanded-chart,
+body[data-active-page="trade"] .mt-chart-frame{
   width:100%!important;
-  height:var(--tv-fit-height, clamp(460px, 64dvh, 620px))!important;
-  min-height:var(--tv-fit-height, clamp(460px, 64dvh, 620px))!important;
-  max-height:var(--tv-fit-height, clamp(460px, 64dvh, 620px))!important;
-  overflow:hidden!important;
+  height:var(--chart-clean-height, clamp(460px, 66dvh, 610px))!important;
+  min-height:var(--chart-clean-height, clamp(460px, 66dvh, 610px))!important;
+  max-height:none!important;
+  overflow:visible!important;
   border-radius:16px!important;
   display:block!important;
-  position:relative!important;
   background:#070b13!important;
 }
 
-.tv-full-fit-frame,
-.tv-full-fit-host iframe,
-.exact-chart-host iframe,
-.clean-tv-only-frame,
-.real-tv-chart-frame,
-.trade-chart-bigger-frame,
-.mt-chart-frame{
+/* iframe gets exact same height as host. This prevents bottom crop. */
+body[data-active-page="trade"] .chart-clean-frame,
+body[data-active-page="trade"] .chart-clean-host iframe,
+body[data-active-page="trade"] #crypto_live_chart iframe,
+body[data-active-page="trade"] #tradingViewChart iframe,
+body[data-active-page="trade"] #chartContainer iframe,
+body[data-active-page="trade"] .exact-chart-host iframe,
+body[data-active-page="trade"] .clean-tv-only-frame,
+body[data-active-page="trade"] .real-tv-chart-frame,
+body[data-active-page="trade"] .tv-full-fit-frame,
+body[data-active-page="trade"] .tv-responsive-frame,
+body[data-active-page="trade"] .tv-big-box-frame,
+body[data-active-page="trade"] .trade-chart-bigger-frame{
   width:100%!important;
-  height:100%!important;
-  min-height:100%!important;
-  max-height:100%!important;
+  height:var(--chart-clean-height, clamp(460px, 66dvh, 610px))!important;
+  min-height:var(--chart-clean-height, clamp(460px, 66dvh, 610px))!important;
+  max-height:none!important;
   display:block!important;
   border:0!important;
   border-radius:16px!important;
 }
 
-/* Hard override all older fixed-height chart classes */
-.exact-chart-host,
-.exact-chart-host iframe,
-.exact-chart-frame,
-.clean-tv-only-frame,
-.real-tv-chart-frame,
-.mt-chart-frame,
-.mt-chart-card iframe,
-.trade-chart-bigger,
-.trade-chart-bigger iframe,
-.trade-chart-bigger-frame,
-.clean-expanded-chart,
-.clean-expanded-chart iframe,
-#crypto_live_chart,
-#tradingViewChart,
-#chartContainer{
-  height:var(--tv-fit-height, clamp(460px, 64dvh, 620px))!important;
-  min-height:var(--tv-fit-height, clamp(460px, 64dvh, 620px))!important;
-  max-height:var(--tv-fit-height, clamp(460px, 64dvh, 620px))!important;
+/* Strong neutralizer for old hard-coded chart IDs/classes */
+body[data-active-page="trade"] #crypto_live_chart,
+body[data-active-page="trade"] #tradingViewChart,
+body[data-active-page="trade"] #chartContainer,
+body[data-active-page="trade"] .exact-chart-frame,
+body[data-active-page="trade"] .real-tv-chart-frame,
+body[data-active-page="trade"] .clean-tv-only-frame{
+  height:var(--chart-clean-height, clamp(460px, 66dvh, 610px))!important;
+  min-height:var(--chart-clean-height, clamp(460px, 66dvh, 610px))!important;
+  max-height:none!important;
+  overflow:visible!important;
 }
 
-/* Hide duplicate outer controls; TradingView's internal controls remain. */
-.pro-pair-line,
-.pro-time-tabs,
-.real-tv-chart-head,
-.chart-hint{
+/* Hide only duplicate outer controls. TradingView internal controls stay visible. */
+body[data-active-page="trade"] .pro-pair-line,
+body[data-active-page="trade"] .pro-time-tabs,
+body[data-active-page="trade"] .real-tv-chart-head,
+body[data-active-page="trade"] .chart-hint{
   display:none!important;
 }
 
-/* Trade page chart card should not create a giant empty box */
-body[data-active-page="trade"] .tv-full-fit-card{
-  margin-top:10px!important;
-  margin-bottom:12px!important;
-}
-
-/* Mobile fine tuning */
+/* Mobile tuning */
 @media(max-width:480px){
-  .tv-full-fit-card,
-  .exact-chart-card.tv-full-fit-card{
+  body[data-active-page="trade"] .chart-clean-card,
+  body[data-active-page="trade"] .chart-card.chart-clean-card,
+  body[data-active-page="trade"] .exact-chart-card.chart-clean-card{
     padding:5px!important;
     border-radius:17px!important;
   }
 
-  .tv-full-fit-host,
-  .tv-full-fit-frame,
-  .tv-full-fit-host iframe,
-  .exact-chart-host,
-  .exact-chart-host iframe,
-  .clean-tv-only-frame,
-  .real-tv-chart-frame,
-  #crypto_live_chart,
-  #tradingViewChart,
-  #chartContainer{
+  body[data-active-page="trade"] .chart-clean-host,
+  body[data-active-page="trade"] .chart-clean-frame,
+  body[data-active-page="trade"] .chart-clean-host iframe,
+  body[data-active-page="trade"] #crypto_live_chart,
+  body[data-active-page="trade"] #crypto_live_chart iframe,
+  body[data-active-page="trade"] .exact-chart-host,
+  body[data-active-page="trade"] .exact-chart-host iframe,
+  body[data-active-page="trade"] .real-tv-chart-frame,
+  body[data-active-page="trade"] .clean-tv-only-frame{
     border-radius:14px!important;
+  }
+}
+
+/* Very small phones: prevent too tall empty box but keep bottom visible */
+@media(max-width:380px){
+  body[data-active-page="trade"] .chart-clean-host,
+  body[data-active-page="trade"] .chart-clean-frame,
+  body[data-active-page="trade"] .chart-clean-host iframe,
+  body[data-active-page="trade"] #crypto_live_chart,
+  body[data-active-page="trade"] #crypto_live_chart iframe,
+  body[data-active-page="trade"] .exact-chart-host,
+  body[data-active-page="trade"] .exact-chart-host iframe,
+  body[data-active-page="trade"] .real-tv-chart-frame,
+  body[data-active-page="trade"] .clean-tv-only-frame{
+    height:var(--chart-clean-height, clamp(430px, 62dvh, 560px))!important;
+    min-height:var(--chart-clean-height, clamp(430px, 62dvh, 560px))!important;
   }
 }

@@ -592,3 +592,16 @@ TradingView Full Fit Final:
 - Order Ticket, Order Book, Trade Feed untouched.
 - No SQL required.
 - JS syntax check: OK
+
+
+Chart CSS Conflict Cleanup Final:
+- Removed old conflicting chart sizing blocks: ['TRADINGVIEW FULL FIT FINAL']
+- Added one final chart sizing system that controls card/host/iframe together.
+- Neutralizes old 330/360/520/fixed-height chart rules with final selectors.
+- Chart card: auto height + overflow visible.
+- Chart host: responsive height + no max-height clipping.
+- iframe: exact same height as host.
+- Duplicate outer chart controls hidden; TradingView internal controls remain visible.
+- Order Ticket / Order Book / Trade Feed untouched.
+- No SQL required.
+- Diagnostics: {"removed_blocks": ["TRADINGVIEW FULL FIT FINAL"], "remaining_crypto_live_chart_mentions": 21, "remaining_520px_mentions": 21, "remaining_330px_mentions": 10, "remaining_360px_mentions": 7, "syntax": "OK"}

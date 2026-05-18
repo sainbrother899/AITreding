@@ -4616,79 +4616,87 @@ function restoreManualHistoryBackup(mode = state.mode) {
 
 
 
-/* ===== TRADINGVIEW FULL FIT FINAL ===== */
+
+
+
+/* ===== CHART CSS CONFLICT CLEANUP FINAL ===== */
 (function(){
-  function getChartHeight(){
+  function chartCleanHeight(){
     const vv = window.visualViewport;
     const vh = vv?.height || window.innerHeight || document.documentElement.clientHeight || 720;
     const vw = window.innerWidth || document.documentElement.clientWidth || 390;
 
-    // Chart must be tall enough to show TradingView bottom axis/controls,
-    // but not so tall that order ticket becomes unreachable.
-    if (vw <= 380) return Math.round(Math.max(440, Math.min(vh * 0.60, 560)));
-    if (vw <= 480) return Math.round(Math.max(460, Math.min(vh * 0.64, 600)));
-    if (vw <= 768) return Math.round(Math.max(500, Math.min(vh * 0.66, 650)));
-    return Math.round(Math.max(540, Math.min(vh * 0.68, 700)));
+    // Balanced responsive height. No fixed px-only layout.
+    if (vw <= 380) return Math.round(Math.max(430, Math.min(vh * 0.62, 560)));
+    if (vw <= 480) return Math.round(Math.max(460, Math.min(vh * 0.66, 610)));
+    if (vw <= 768) return Math.round(Math.max(500, Math.min(vh * 0.68, 660)));
+    return Math.round(Math.max(540, Math.min(vh * 0.70, 720)));
   }
 
-  function applyChartFullFit(){
+  function applyChartCssConflictCleanup(){
     try {
       const tradePage = document.getElementById("tradepage") || document.getElementById("trade");
       if (!tradePage) return;
 
-      const h = getChartHeight();
-      const hosts = [
+      const h = chartCleanHeight();
+      const charts = [
         document.getElementById("crypto_live_chart"),
         document.getElementById("tradingViewChart"),
         document.getElementById("chartContainer")
       ].filter(Boolean);
 
       tradePage.querySelectorAll("iframe[src*='tradingview'], iframe[src*='widgetembed']").forEach(frame => {
-        if (!hosts.includes(frame)) hosts.push(frame);
+        if (!charts.includes(frame)) charts.push(frame);
       });
 
-      hosts.forEach(el => {
+      charts.forEach(el => {
         const host = el.tagName === "IFRAME" ? (el.parentElement || el) : el;
         const iframe = el.tagName === "IFRAME" ? el : el.querySelector("iframe");
-        const card = host.closest(".card") || host.closest(".exact-chart-card") || host.parentElement;
+        const card = host.closest(".card") || host.closest(".chart-card") || host.closest(".exact-chart-card") || host.parentElement;
 
         if (card) {
-          card.classList.add("tv-full-fit-card");
-          card.style.setProperty("--tv-fit-height", h + "px");
+          card.classList.add("chart-clean-card");
+          card.style.setProperty("--chart-clean-height", h + "px");
+          card.style.height = "auto";
+          card.style.minHeight = "auto";
+          card.style.maxHeight = "none";
+          card.style.overflow = "visible";
         }
 
-        host.classList.add("tv-full-fit-host");
-        host.style.setProperty("--tv-fit-height", h + "px");
+        host.classList.add("chart-clean-host");
+        host.style.setProperty("--chart-clean-height", h + "px");
         host.style.height = h + "px";
         host.style.minHeight = h + "px";
-        host.style.maxHeight = h + "px";
+        host.style.maxHeight = "none";
+        host.style.overflow = "visible";
 
         if (iframe) {
-          iframe.classList.add("tv-full-fit-frame");
-          iframe.style.height = "100%";
-          iframe.style.minHeight = "100%";
-          iframe.style.maxHeight = "100%";
+          iframe.classList.add("chart-clean-frame");
           iframe.style.width = "100%";
+          iframe.style.height = h + "px";
+          iframe.style.minHeight = h + "px";
+          iframe.style.maxHeight = "none";
           iframe.style.display = "block";
+          iframe.style.border = "0";
         }
       });
 
-      // Remove duplicate outer chart controls/price rows if they still exist.
+      // Remove duplicate chart controls outside iframe/chart.
       tradePage.querySelectorAll(".pro-pair-line,.pro-time-tabs,.real-tv-chart-head,.chart-hint").forEach(el => {
         el.style.display = "none";
       });
 
-      document.body.classList.add("tv-full-fit-ready");
+      document.body.classList.add("chart-css-conflict-cleaned");
     } catch(e) {
-      console.warn("TradingView full fit final skipped", e);
+      console.warn("Chart CSS conflict cleanup skipped", e);
     }
   }
 
-  window.applyChartFullFitFinal = applyChartFullFit;
+  window.applyChartCssConflictCleanup = applyChartCssConflictCleanup;
 
-  document.addEventListener("DOMContentLoaded", () => setTimeout(applyChartFullFit, 600));
-  window.addEventListener("load", () => setTimeout(applyChartFullFit, 800));
-  window.addEventListener("resize", () => setTimeout(applyChartFullFit, 150));
-  window.visualViewport?.addEventListener("resize", () => setTimeout(applyChartFullFit, 150));
-  setInterval(applyChartFullFit, 3000);
+  document.addEventListener("DOMContentLoaded", () => setTimeout(applyChartCssConflictCleanup, 600));
+  window.addEventListener("load", () => setTimeout(applyChartCssConflictCleanup, 800));
+  window.addEventListener("resize", () => setTimeout(applyChartCssConflictCleanup, 150));
+  window.visualViewport?.addEventListener("resize", () => setTimeout(applyChartCssConflictCleanup, 150));
+  setInterval(applyChartCssConflictCleanup, 3000);
 })();
