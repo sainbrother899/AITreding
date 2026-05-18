@@ -472,3 +472,18 @@ Login Restore + Safe More Fix:
 - Removed hard CSS/JS page-switch rules that could break auth screen.
 - JS syntax check: OK
 
+
+
+Final History Icon Fix:
+- Bottom History icon now directly opens aiHistory page.
+- History page rebuilt with AI/Admin closed history + manual history.
+- Cancelled AI/Admin trades hidden.
+- History auto-refreshes every 1.5 seconds.
+- No SQL required.
+
+
+Mobile History Fix:
+- History page now shows table rows as mobile-friendly cards on small screens.
+- PC/tablet view stays as table.
+- AI/Admin and Manual history both improved on mobile.
+- No SQL required.

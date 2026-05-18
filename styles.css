@@ -2862,3 +2862,143 @@ body[data-admin-page="true"] .table-card:hover{
   .profile-page-card{width:100%!important;max-width:100%!important;}
   .profile-info-grid{grid-template-columns:1fr;}
 }
+
+
+/* FINAL HISTORY ICON FIX CSS */
+.history-page-shell{
+  display:grid;
+  gap:16px;
+  width:430px;
+  max-width:430px;
+  margin:0 auto;
+}
+#aiHistory .table-card{
+  width:430px!important;
+  max-width:430px!important;
+  margin:0 auto!important;
+}
+#userManagedTradesLog .pnl-plus,
+#userManualTradesLog .pnl-plus{color:var(--green);font-weight:900}
+#userManagedTradesLog .pnl-minus,
+#userManualTradesLog .pnl-minus{color:var(--red);font-weight:900}
+@media(max-width:520px){
+  .history-page-shell,
+  #aiHistory .table-card{
+    width:100%!important;
+    max-width:100%!important;
+  }
+}
+
+
+/* =========================================================
+   MOBILE HISTORY PAGE FIX
+   Mobile पर history table को card/list जैसा readable बनाया
+   ========================================================= */
+@media(max-width:650px){
+  #aiHistory{
+    width:100%!important;
+    max-width:100%!important;
+    padding-bottom:90px!important;
+  }
+
+  .history-page-shell{
+    width:100%!important;
+    max-width:100%!important;
+    gap:14px!important;
+  }
+
+  #aiHistory .table-card{
+    width:100%!important;
+    max-width:100%!important;
+    padding:14px!important;
+    border-radius:18px!important;
+  }
+
+  #aiHistory .section-head{
+    align-items:flex-start!important;
+    gap:8px!important;
+  }
+
+  #aiHistory .section-head h2{
+    font-size:18px!important;
+    line-height:1.2!important;
+  }
+
+  #aiHistory .section-head .small{
+    font-size:12px!important;
+    line-height:1.45!important;
+  }
+
+  #aiHistory .table-wrap{
+    overflow:visible!important;
+    max-width:100%!important;
+  }
+
+  #aiHistory table,
+  #aiHistory thead,
+  #aiHistory tbody,
+  #aiHistory tr,
+  #aiHistory th,
+  #aiHistory td{
+    display:block!important;
+    width:100%!important;
+    min-width:0!important;
+  }
+
+  #aiHistory thead{
+    display:none!important;
+  }
+
+  #aiHistory tr{
+    margin:0 0 12px!important;
+    padding:12px!important;
+    border:1px solid rgba(255,255,255,.08)!important;
+    border-radius:16px!important;
+    background:rgba(255,255,255,.035)!important;
+  }
+
+  #aiHistory td{
+    border:0!important;
+    border-radius:0!important;
+    background:transparent!important;
+    padding:7px 0!important;
+    display:flex!important;
+    justify-content:space-between!important;
+    gap:12px!important;
+    white-space:normal!important;
+    font-size:13px!important;
+  }
+
+  #aiHistory td::before{
+    content:"";
+    color:#8fa4c5;
+    font-weight:800;
+    flex:0 0 92px;
+  }
+
+  #userManagedTradesLog td:nth-child(1)::before,
+  #userManualTradesLog td:nth-child(1)::before{content:"Coin";}
+  #userManagedTradesLog td:nth-child(2)::before,
+  #userManualTradesLog td:nth-child(2)::before{content:"Side";}
+  #userManagedTradesLog td:nth-child(3)::before,
+  #userManualTradesLog td:nth-child(3)::before{content:"Amount";}
+  #userManagedTradesLog td:nth-child(4)::before,
+  #userManualTradesLog td:nth-child(4)::before{content:"Entry";}
+  #userManagedTradesLog td:nth-child(5)::before{content:"Close";}
+  #userManualTradesLog td:nth-child(5)::before{content:"Current";}
+  #userManagedTradesLog td:nth-child(6)::before,
+  #userManualTradesLog td:nth-child(6)::before{content:"PnL";}
+  #userManagedTradesLog td:nth-child(7)::before,
+  #userManualTradesLog td:nth-child(7)::before{content:"Status";}
+
+  #aiHistory td.empty{
+    display:block!important;
+    text-align:center!important;
+    color:#91a7c4!important;
+  }
+
+  #aiHistory td.empty::before{
+    content:""!important;
+    display:none!important;
+  }
+}

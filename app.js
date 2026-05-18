@@ -3856,3 +3856,92 @@ document.addEventListener("click", function(e){
     if(dd && !e.target.closest(".top-more-wrap")) dd.classList.remove("show");
   });
 })();
+
+
+/* FINAL HISTORY ICON + HISTORY RENDER FIX */
+function historyBelongsToCurrentUserFinal(t) {
+  const uid = String(state.user?.id || "local");
+  const email = String(state.user?.email || "").toLowerCase();
+  const tid = String(t.userId || t.user_id || "");
+  const temail = String(t.userEmail || t.user_email || "").toLowerCase();
+  return tid === uid || (!!email && temail === email) || (!tid && !temail);
+}
+
+function renderManagedHistoryFinal() {
+  const el = document.getElementById("userManagedTradesLog");
+  if (!el) return;
+
+  const rows = (state.managedTrades || [])
+    .filter(t => historyBelongsToCurrentUserFinal(t))
+    .filter(t => String(t.status || "").toUpperCase() === "CLOSED");
+
+  el.innerHTML = rows.map(t => {
+    const pnl = Number(t.pnl || 0);
+    const cls = pnl >= 0 ? "pnl-plus" : "pnl-minus";
+    return `<tr>
+      <td>${String(t.coin || "").replace("USDT","/USDT")}</td>
+      <td>${t.side || "-"}</td>
+      <td>${money(Number(t.amount || 0))}</td>
+      <td>${money(Number(t.entry || t.entry_price || 0))}</td>
+      <td>${money(Number(t.close || t.close_price || 0))}</td>
+      <td class="${cls}">${money(pnl)}</td>
+      <td>CLOSED</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="7" class="empty">No closed AI/Admin trades yet.</td></tr>`;
+}
+
+function renderManualHistoryFinal() {
+  const el = document.getElementById("userManualTradesLog");
+  if (!el) return;
+
+  normalizeAccounts?.();
+  const acc = typeof currentAccount === "function" ? currentAccount() : state.accounts?.[state.mode || "DEMO"] || {};
+  const openRows = (acc.trades || []).filter(t => !t.source || t.source === "USER" || t.source === "MANUAL");
+  const closedRows = (acc.closedTrades || []).filter(t => !t.source || t.source === "USER" || t.source === "MANUAL");
+  const rows = [...openRows.map(t => ({...t, status:t.status || "OPEN"})), ...closedRows.map(t => ({...t, status:t.status || "CLOSED"}))];
+
+  el.innerHTML = rows.map(t => {
+    if (String(t.status).toUpperCase() === "OPEN" && typeof updateTradePnl === "function") updateTradePnl(t);
+    const pnl = Number(t.pnl || 0);
+    const cls = pnl >= 0 ? "pnl-plus" : "pnl-minus";
+    const current = Number(t.current || t.close || t.entry || 0);
+    return `<tr>
+      <td>${String(t.coin || "").replace("USDT","/USDT")}</td>
+      <td>${t.side || "-"}</td>
+      <td>${money(Number(t.amount || 0))}</td>
+      <td>${money(Number(t.entry || 0))}</td>
+      <td>${money(current)}</td>
+      <td class="${cls}">${money(pnl)}</td>
+      <td>${t.status || "OPEN"}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="7" class="empty">No manual trades yet.</td></tr>`;
+}
+
+function renderHistoryFinal() {
+  try {
+    renderManagedHistoryFinal();
+    renderManualHistoryFinal();
+  } catch(e) {
+    console.warn("History render failed", e);
+  }
+}
+
+function openHistoryPageFinal() {
+  const target = document.getElementById("aiHistory");
+  if (!target) return false;
+
+  document.querySelectorAll("#appPage .page").forEach(p => p.classList.remove("active-page"));
+  target.classList.add("active-page");
+
+  document.querySelectorAll(".nav-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.page === "aiHistory");
+  });
+
+  renderHistoryFinal();
+  window.scrollTo({top:0, behavior:"smooth"});
+  return false;
+}
+
+window.openHistoryPageFinal = openHistoryPageFinal;
+setInterval(renderHistoryFinal, 1500);
+window.addEventListener("load", () => setTimeout(renderHistoryFinal, 1000));

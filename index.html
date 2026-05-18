@@ -116,7 +116,7 @@
     <span class="nav-ico">↗</span><small>PnL</small>
   </button>
 
-  <button class="nav-btn" data-page="aiHistory">
+  <button type="button" class="nav-btn" data-page="aiHistory" onclick="return openHistoryPageFinal()">
     <span class="nav-ico">≡</span><small>History</small>
   </button>
 </nav>
@@ -379,8 +379,8 @@
             <div class="section-head">
               <div>
                 <p class="label">AI/Admin Trades</p>
-                <h2>Managed Trade History</h2>
-                <p class="muted small">Admin side से close की गई trades और profit/loss यहाँ दिखेगा.</p>
+                <h2>Closed AI Trade History</h2>
+                <p class="muted small">Only closed AI/Admin trades are shown here. Cancelled trades are hidden.</p>
               </div>
             </div>
             <div class="table-wrap">
@@ -389,7 +389,7 @@
                   <tr><th>Coin</th><th>Side</th><th>Amount</th><th>Entry</th><th>Close</th><th>PnL</th><th>Status</th></tr>
                 </thead>
                 <tbody id="userManagedTradesLog">
-                  <tr><td colspan="7" class="empty">No AI/Admin trades yet.</td></tr>
+                  <tr><td colspan="7" class="empty">No closed AI/Admin trades yet.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -400,7 +400,7 @@
               <div>
                 <p class="label">Manual Trades</p>
                 <h2>Your Manual Trade History</h2>
-                <p class="muted small">User side से manually लगाई गई open/closed trades यहाँ दिखेंगी.</p>
+                <p class="muted small">Your own manual open and closed trades are shown here.</p>
               </div>
             </div>
             <div class="table-wrap">
@@ -416,6 +416,7 @@
           </div>
         </div>
       </section>
+
 
 
       <section id="wallet" class="page real-only-page mock-mobile-page">
