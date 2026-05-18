@@ -4716,58 +4716,44 @@ function restoreManualHistoryBackup(mode = state.mode) {
 })();
 
 
-/* ===== TRADINGVIEW CHART HEIGHT RESPONSIVE FIX ===== */
+
+
+
+/* ===== TRADINGVIEW CHART BIGGER BOX FIX ===== */
 (function(){
-  function tvAvailableHeight(){
-    const vv = window.visualViewport;
-    const vh = vv?.height || window.innerHeight || document.documentElement.clientHeight || 720;
-
-    // Keep enough room for header + chart title + small gaps.
-    // Mobile browser bars are handled by visualViewport when available.
-    let h = Math.floor(vh - 145);
-
-    // Safe responsive bounds. Avoid tiny chart and avoid overlong desktop chart.
-    h = Math.max(500, h);
-    h = Math.min(680, h);
-
-    // Smaller phones still need full chart including bottom toolbar.
-    if (window.innerWidth <= 430) {
-      h = Math.max(500, Math.min(620, Math.floor(vh - 130)));
-    }
-
-    return h;
+  function chartBigBoxHeight(){
+    const w = window.innerWidth || 390;
+    if (w <= 430) return 620;   // mobile
+    if (w <= 768) return 660;   // tablet
+    return 700;                 // desktop
   }
 
-  function applyTradingViewHeightFix(){
+  function applyChartBiggerBox(){
     try {
-      const page = document.getElementById("tradepage") || document.getElementById("trade");
-      if (!page) return;
-
-      const chartHosts = [
+      const h = chartBigBoxHeight();
+      const hosts = [
         document.getElementById("crypto_live_chart"),
         document.getElementById("tradingViewChart"),
         document.getElementById("chartContainer")
       ].filter(Boolean);
 
-      page.querySelectorAll("iframe[src*='tradingview'], iframe[src*='widgetembed']").forEach(frame => {
-        if (!chartHosts.includes(frame)) chartHosts.push(frame);
+      document.querySelectorAll("iframe[src*='tradingview'], iframe[src*='widgetembed']").forEach(frame => {
+        if (!hosts.includes(frame)) hosts.push(frame);
       });
 
-      const h = tvAvailableHeight();
-
-      chartHosts.forEach(el => {
+      hosts.forEach(el => {
         const host = el.tagName === "IFRAME" ? (el.parentElement || el) : el;
         const iframe = el.tagName === "IFRAME" ? el : el.querySelector("iframe");
 
-        host.classList.add("tv-height-fixed-host");
-        host.style.setProperty("--tv-chart-height", h + "px");
+        host.classList.add("tv-big-box-host");
+        host.style.setProperty("--tv-big-box-height", h + "px");
         host.style.height = h + "px";
         host.style.minHeight = h + "px";
         host.style.maxHeight = "none";
-        host.style.overflow = "visible";
+        host.style.overflow = "hidden";
 
         if (iframe) {
-          iframe.classList.add("tv-height-fixed-frame");
+          iframe.classList.add("tv-big-box-frame");
           iframe.style.height = h + "px";
           iframe.style.minHeight = h + "px";
           iframe.style.maxHeight = "none";
@@ -4777,26 +4763,24 @@ function restoreManualHistoryBackup(mode = state.mode) {
 
         const card = host.closest(".card") || host.closest(".exact-chart-card") || host.parentElement;
         if (card) {
-          card.classList.add("tv-height-fixed-card");
+          card.classList.add("tv-big-box-card");
           card.style.height = "auto";
-          card.style.minHeight = "auto";
+          card.style.minHeight = (h + 18) + "px";
           card.style.maxHeight = "none";
           card.style.overflow = "visible";
         }
       });
 
-      document.body.classList.add("tv-chart-height-fixed-ready");
+      document.body.classList.add("tv-big-box-ready");
     } catch(e) {
-      console.warn("TradingView height fix skipped", e);
+      console.warn("Chart bigger box fix skipped", e);
     }
   }
 
-  window.applyTradingViewHeightFix = applyTradingViewHeightFix;
+  window.applyChartBiggerBox = applyChartBiggerBox;
 
-  document.addEventListener("DOMContentLoaded", () => setTimeout(applyTradingViewHeightFix, 700));
-  window.addEventListener("load", () => setTimeout(applyTradingViewHeightFix, 900));
-  window.addEventListener("resize", () => setTimeout(applyTradingViewHeightFix, 150));
-  window.visualViewport?.addEventListener("resize", () => setTimeout(applyTradingViewHeightFix, 150));
-
-  setInterval(applyTradingViewHeightFix, 2500);
+  document.addEventListener("DOMContentLoaded", () => setTimeout(applyChartBiggerBox, 600));
+  window.addEventListener("load", () => setTimeout(applyChartBiggerBox, 800));
+  window.addEventListener("resize", () => setTimeout(applyChartBiggerBox, 200));
+  setInterval(applyChartBiggerBox, 2500);
 })();

@@ -5028,48 +5028,58 @@ body[data-active-page="more"] #more{
 }
 
 
-/* ===== TRADINGVIEW CHART HEIGHT RESPONSIVE FIX ===== */
-/* Main fix: parent and iframe use the same responsive height, so bottom is not cropped */
-.tv-height-fixed-card,
-.exact-chart-card.tv-height-fixed-card,
-.trade-chart-bigger-card.tv-height-fixed-card,
-.clean-expanded-chart-card.tv-height-fixed-card{
+
+
+
+/* ===== TRADINGVIEW CHART BIGGER BOX FIX ===== */
+/* This fix keeps chart BIG and prevents bottom crop by making parent + iframe same height */
+.tv-big-box-card,
+.exact-chart-card.tv-big-box-card,
+.trade-chart-bigger-card.tv-big-box-card,
+.clean-expanded-chart-card.tv-big-box-card,
+.mt-chart-card.tv-big-box-card{
+  width:100%!important;
+  max-width:none!important;
+  min-height:calc(var(--tv-big-box-height, 620px) + 18px)!important;
   height:auto!important;
-  min-height:auto!important;
   max-height:none!important;
   overflow:visible!important;
-  padding:6px!important;
+  padding:8px!important;
+  border-radius:18px!important;
 }
 
-.tv-height-fixed-host,
-.exact-chart-host.tv-height-fixed-host,
-#crypto_live_chart.tv-height-fixed-host,
-#tradingViewChart.tv-height-fixed-host,
-#chartContainer.tv-height-fixed-host{
+.tv-big-box-host,
+.exact-chart-host.tv-big-box-host,
+#crypto_live_chart.tv-big-box-host,
+#tradingViewChart.tv-big-box-host,
+#chartContainer.tv-big-box-host{
   width:100%!important;
-  height:var(--tv-chart-height, 560px)!important;
-  min-height:var(--tv-chart-height, 560px)!important;
+  height:var(--tv-big-box-height, 620px)!important;
+  min-height:var(--tv-big-box-height, 620px)!important;
   max-height:none!important;
-  overflow:visible!important;
+  overflow:hidden!important;
   border-radius:16px!important;
   display:block!important;
+  background:#070b13!important;
 }
 
-.tv-height-fixed-frame,
-.tv-height-fixed-host iframe,
+.tv-big-box-frame,
+.tv-big-box-host iframe,
 .exact-chart-host iframe,
 .clean-tv-only-frame,
-.real-tv-chart-frame{
+.real-tv-chart-frame,
+.trade-chart-bigger-frame,
+.mt-chart-frame{
   width:100%!important;
-  height:var(--tv-chart-height, 560px)!important;
-  min-height:var(--tv-chart-height, 560px)!important;
+  height:var(--tv-big-box-height, 620px)!important;
+  min-height:var(--tv-big-box-height, 620px)!important;
   max-height:none!important;
   display:block!important;
   border:0!important;
   border-radius:16px!important;
 }
 
-/* Override earlier fixed chart heights that were causing bottom crop */
+/* Override older smaller chart heights */
 .exact-chart-host,
 .exact-chart-host iframe,
 .exact-chart-frame,
@@ -5082,32 +5092,65 @@ body[data-active-page="more"] #more{
 .trade-chart-bigger-frame,
 .clean-expanded-chart,
 .clean-expanded-chart iframe{
-  height:var(--tv-chart-height, 560px)!important;
-  min-height:var(--tv-chart-height, 560px)!important;
+  height:var(--tv-big-box-height, 620px)!important;
+  min-height:var(--tv-big-box-height, 620px)!important;
   max-height:none!important;
 }
 
-/* Keep the chart card inside the viewport without clipping the iframe */
-body[data-active-page="trade"] .exact-chart-card,
-body[data-active-page="trade"] .mt-chart-card,
-body[data-active-page="trade"] .trade-chart-bigger-card{
-  overflow:visible!important;
-}
-
+/* Mobile specific: big box but still usable */
 @media(max-width:430px){
-  .tv-height-fixed-card,
-  .exact-chart-card.tv-height-fixed-card{
-    padding:5px!important;
+  .tv-big-box-card,
+  .exact-chart-card.tv-big-box-card{
+    min-height:638px!important;
+    padding:6px!important;
     border-radius:17px!important;
   }
 
-  .tv-height-fixed-host,
-  .tv-height-fixed-frame,
-  .tv-height-fixed-host iframe,
+  .tv-big-box-host,
+  .tv-big-box-frame,
+  .tv-big-box-host iframe,
   .exact-chart-host,
   .exact-chart-host iframe,
   .clean-tv-only-frame,
   .real-tv-chart-frame{
+    height:620px!important;
+    min-height:620px!important;
     border-radius:14px!important;
+  }
+}
+
+@media(min-width:431px) and (max-width:768px){
+  .tv-big-box-card,
+  .exact-chart-card.tv-big-box-card{
+    min-height:678px!important;
+  }
+
+  .tv-big-box-host,
+  .tv-big-box-frame,
+  .tv-big-box-host iframe,
+  .exact-chart-host,
+  .exact-chart-host iframe,
+  .clean-tv-only-frame,
+  .real-tv-chart-frame{
+    height:660px!important;
+    min-height:660px!important;
+  }
+}
+
+@media(min-width:769px){
+  .tv-big-box-card,
+  .exact-chart-card.tv-big-box-card{
+    min-height:718px!important;
+  }
+
+  .tv-big-box-host,
+  .tv-big-box-frame,
+  .tv-big-box-host iframe,
+  .exact-chart-host,
+  .exact-chart-host iframe,
+  .clean-tv-only-frame,
+  .real-tv-chart-frame{
+    height:700px!important;
+    min-height:700px!important;
   }
 }

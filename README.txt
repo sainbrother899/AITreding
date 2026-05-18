@@ -561,3 +561,12 @@ TradingView Chart Height Responsive Fix:
 - Order Ticket, Order Book, Trade Feed untouched.
 - No SQL required.
 - JS syntax check: OK
+
+
+TradingView Chart Bigger Box Fix:
+- Reverted the previous viewport-shrink height logic that made the chart box smaller.
+- Chart box is now bigger: mobile 620px, tablet 660px, desktop 700px.
+- Parent card, chart host, and iframe all use the same height to prevent bottom cut-off.
+- Order Ticket, Order Book, Trade Feed untouched.
+- No SQL required.
+- JS syntax check: OK
