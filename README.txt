@@ -709,3 +709,18 @@ Menu Pages Stay + Header Flash Fix:
 - Clean header becomes visible after JS applies the clean header.
 - No SQL required.
 - JS syntax check: OK
+
+
+Payment KYC Admin Approval Final:
+- Payment method add now requires KYC Approved.
+- Account holder name is auto-filled from KYC/name and locked.
+- User-added payout method saves as PENDING.
+- Withdrawal UI is blocked unless user has an APPROVED payout method.
+- Withdrawal form shows only approved payout methods where possible.
+- Admin section added: Payout Method Requests.
+- Admin can Approve/Reject payout methods.
+- Admin request card shows Holder Name, KYC Name, and Name Match warning.
+- Admin section added: Payment Settings for deposit UPI/Bank details.
+- User wallet shows admin deposit payment settings where possible.
+- Data is local-state/localStorage for now; no SQL required in this UI version.
+- JS syntax check: OK

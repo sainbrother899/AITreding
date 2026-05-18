@@ -5777,3 +5777,384 @@ function restoreManualHistoryBackup(mode = state.mode) {
   setInterval(bindMenuStay, 1200);
   setInterval(keepMenuPageAlive, 700);
 })();
+
+
+/* ===== PAYMENT KYC ADMIN APPROVAL FINAL ===== */
+(function(){
+  function psUser(){ return state?.user || {}; }
+  function psUid(){ return String(psUser().id || psUser().email || "local"); }
+  function psName(){
+    const u = psUser();
+    return u.kycName || u.kyc_name || u.name || u.full_name || u.email?.split("@")[0] || "User";
+  }
+  function psKycApproved(){
+    const u = psUser();
+    return String(u.kycStatus || u.kyc_status || "").toUpperCase() === "APPROVED";
+  }
+  function psMoney(n){
+    try { if (typeof money === "function") return money(n); } catch(e){}
+    return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  }
+  function psSave(){
+    try { saveState?.(); } catch(e){}
+    try { saveSession?.(); } catch(e){}
+    try { localStorage.setItem("ai_payment_security_v1", JSON.stringify({
+      payoutMethods: state.userPayoutMethods || state.payoutMethods || [],
+      paymentSettings: state.paymentSettings || {}
+    })); } catch(e){}
+  }
+  function psLoad(){
+    try {
+      const raw = localStorage.getItem("ai_payment_security_v1");
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data.payoutMethods && !(state.userPayoutMethods||[]).length) {
+        state.userPayoutMethods = data.payoutMethods;
+        state.payoutMethods = data.payoutMethods;
+      }
+      if (data.paymentSettings && !state.paymentSettings) {
+        state.paymentSettings = data.paymentSettings;
+      }
+    } catch(e){}
+  }
+  function psEnsure(){
+    state.userPayoutMethods ||= state.payoutMethods || [];
+    state.payoutMethods = state.userPayoutMethods;
+    state.paymentSettings ||= {
+      upi: { active:true, upiId:"admin@upi", name:"AI Trading", qrUrl:"" },
+      bank: { active:true, accountName:"AI Trading", bankName:"Demo Bank", accountNumber:"0000000000", ifsc:"DEMO0000001", branch:"Main" }
+    };
+  }
+  function psMethods(uid = psUid()){
+    psEnsure();
+    return (state.userPayoutMethods || []).filter(m => String(m.userId || m.user_id || "") === String(uid));
+  }
+  function psApprovedMethods(){
+    return psMethods().filter(m => String(m.status || "").toUpperCase() === "APPROVED");
+  }
+  function psMethodMask(m){
+    const type = String(m.type || m.method || "").toUpperCase();
+    if (type === "UPI") return m.upi || "-";
+    const acc = String(m.accountNumber || m.account_number || "");
+    return `${m.bankName || m.bank_name || "Bank"} ${acc ? "****" + acc.slice(-4) : ""}`.trim();
+  }
+  function psStatus(s){
+    s = String(s || "PENDING").toUpperCase();
+    const cls = s === "APPROVED" ? "approved" : (s === "REJECTED" ? "rejected" : "pending");
+    return `<em class="pay-sec-status ${cls}">${s}</em>`;
+  }
+  function psNameMatch(m){
+    const holder = String(m.holderName || m.holder_name || "").trim().toLowerCase();
+    const kyc = String(m.kycName || psName()).trim().toLowerCase();
+    return holder && kyc && holder === kyc;
+  }
+
+  function psPatchPaymentPage(){
+    psLoad(); psEnsure();
+    const page = document.getElementById("paymentMethodsPage");
+    const content = document.getElementById("paymentMethodsPageContent");
+    if (!page || !content || !page.classList.contains("active-page")) return;
+
+    const approved = psKycApproved();
+    const kycName = psName();
+    const list = psMethods();
+
+    content.innerHTML = `
+      <div class="card pay-sec-note ${approved ? "ok" : "warn"}">
+        <b>${approved ? "KYC Approved" : "KYC Required"}</b>
+        <span>${approved ? "Payment method holder name will be locked with your KYC name." : "Complete admin-approved KYC before adding withdrawal method."}</span>
+      </div>
+
+      <form id="securePaymentMethodForm" class="card menu-real-form pay-sec-form ${approved ? "" : "disabled"}">
+        <label>Method Type
+          <select name="type" id="securePayType" ${approved ? "" : "disabled"}>
+            <option value="UPI">UPI</option>
+            <option value="BANK">Bank Account</option>
+          </select>
+        </label>
+        <label class="secure-pay-upi">UPI ID
+          <input name="upi" placeholder="example@upi" ${approved ? "" : "disabled"}>
+        </label>
+        <label>Account Holder Name / KYC Name
+          <input name="holderName" value="${kycName}" readonly>
+        </label>
+        <div class="secure-pay-bank-fields">
+          <label>Bank Name
+            <input name="bankName" placeholder="Bank name" ${approved ? "" : "disabled"}>
+          </label>
+          <label>Account Number
+            <input name="accountNumber" placeholder="Account number" ${approved ? "" : "disabled"}>
+          </label>
+          <label>IFSC Code
+            <input name="ifsc" placeholder="IFSC code" ${approved ? "" : "disabled"}>
+          </label>
+        </div>
+        <button type="submit" ${approved ? "" : "disabled"}>${approved ? "Add Method for Admin Approval" : "KYC Approval Required"}</button>
+      </form>
+
+      <div class="menu-real-section-title">Saved Methods</div>
+      <div class="menu-real-methods">
+        ${list.length ? list.map(m => `
+          <div class="card menu-real-method-card pay-sec-method">
+            <div>
+              <span>${String(m.type || m.method || "METHOD").toUpperCase()}</span>
+              <b>${psMethodMask(m)}</b>
+              <small>Holder: ${m.holderName || "-"}</small>
+              <small>KYC Name: ${m.kycName || kycName}</small>
+            </div>
+            ${psStatus(m.status || "PENDING")}
+          </div>
+        `).join("") : `<div class="card menu-real-empty">No payment method added yet.</div>`}
+      </div>
+    `;
+
+    page.classList.remove("pay-bank-mode");
+  }
+
+  function psPatchWithdrawalUI(){
+    psLoad(); psEnsure();
+    const approved = psApprovedMethods();
+
+    const modal = document.getElementById("withdrawModal") || document.getElementById("withdrawalModal");
+    const wallet = document.getElementById("wallet");
+
+    const targets = [modal, wallet].filter(Boolean);
+    targets.forEach(root => {
+      let box = root.querySelector(".approved-payout-select-box");
+      if (!box) {
+        box = document.createElement("div");
+        box.className = "approved-payout-select-box";
+        const amt = root.querySelector("#withdrawAmount, input[name*='withdraw'], input[type='number']");
+        if (amt) amt.insertAdjacentElement("beforebegin", box);
+        else root.prepend(box);
+      }
+
+      if (approved.length) {
+        box.innerHTML = `
+          <label>Select Approved Payout Method
+            <select id="approvedPayoutMethodSelect">
+              ${approved.map(m => `<option value="${m.id}">${String(m.type).toUpperCase()} — ${psMethodMask(m)}</option>`).join("")}
+            </select>
+          </label>
+        `;
+      } else {
+        box.innerHTML = `
+          <div class="pay-sec-note warn">
+            <b>No approved payout method</b>
+            <span>Please add payment method from Menu → My Payment Methods and wait for admin approval.</span>
+          </div>
+        `;
+      }
+
+      root.querySelectorAll("button, input[type='submit']").forEach(btn => {
+        const txt = (btn.textContent || btn.value || "").toLowerCase();
+        if (/withdraw|request/.test(txt)) {
+          btn.disabled = !approved.length;
+          btn.classList.toggle("pay-sec-disabled", !approved.length);
+        }
+      });
+    });
+  }
+
+  function psPatchDepositDetails(){
+    psLoad(); psEnsure();
+    const wallet = document.getElementById("wallet");
+    if (!wallet) return;
+    let box = document.getElementById("adminDepositDetailsBox");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "adminDepositDetailsBox";
+      box.className = "card admin-deposit-details-box";
+      const depBtn = Array.from(wallet.querySelectorAll("button")).find(b => /deposit/i.test(b.textContent || ""));
+      const parent = depBtn?.closest(".card") || wallet.querySelector(".card");
+      if (parent) parent.insertAdjacentElement("afterend", box);
+      else wallet.prepend(box);
+    }
+
+    const upi = state.paymentSettings?.upi || {};
+    const bank = state.paymentSettings?.bank || {};
+    box.innerHTML = `
+      <div class="section-head"><div><p class="label">Deposit Methods</p><h2>Admin Payment Details</h2></div></div>
+      <div class="deposit-method-tabs">
+        ${upi.active ? `<div><span>UPI</span><b>${upi.upiId || "-"}</b><small>${upi.name || ""}</small></div>` : ""}
+        ${bank.active ? `<div><span>Bank</span><b>${bank.bankName || "-"}</b><small>${bank.accountName || ""} • ${bank.accountNumber || ""} • ${bank.ifsc || ""}</small></div>` : ""}
+      </div>
+    `;
+  }
+
+  function psAddPayoutAdminPage(){
+    const adminRoot = document.getElementById("adminPage") || document.getElementById("adminApp") || document.body;
+    if (!adminRoot || document.getElementById("adminPayoutRequestsPanel")) return;
+
+    const panel = document.createElement("section");
+    panel.id = "adminPayoutRequestsPanel";
+    panel.className = "admin-pay-sec-panel card";
+    panel.innerHTML = `
+      <div class="section-head"><div><p class="label">User Security</p><h2>💳 Payout Method Requests</h2></div></div>
+      <div id="adminPayoutRequestsList" class="admin-pay-sec-list"></div>
+    `;
+    adminRoot.appendChild(panel);
+  }
+
+  function psAddPaymentSettingsAdmin(){
+    const adminRoot = document.getElementById("adminPage") || document.getElementById("adminApp") || document.body;
+    if (!adminRoot || document.getElementById("adminPaymentSettingsPanel")) return;
+
+    const panel = document.createElement("section");
+    panel.id = "adminPaymentSettingsPanel";
+    panel.className = "admin-pay-sec-panel card";
+    panel.innerHTML = `
+      <div class="section-head"><div><p class="label">Deposit Account</p><h2>🏦 Payment Settings</h2></div></div>
+      <form id="adminPaymentSettingsForm" class="admin-pay-settings-form">
+        <label>UPI Active <select name="upiActive"><option value="true">Active</option><option value="false">Inactive</option></select></label>
+        <label>UPI ID <input name="upiId" placeholder="admin@upi"></label>
+        <label>UPI Name <input name="upiName" placeholder="Account name"></label>
+        <label>Bank Active <select name="bankActive"><option value="true">Active</option><option value="false">Inactive</option></select></label>
+        <label>Account Name <input name="accountName" placeholder="Account holder"></label>
+        <label>Bank Name <input name="bankName" placeholder="Bank name"></label>
+        <label>Account Number <input name="accountNumber" placeholder="Account number"></label>
+        <label>IFSC <input name="ifsc" placeholder="IFSC code"></label>
+        <button type="submit">Save Payment Settings</button>
+      </form>
+    `;
+    adminRoot.appendChild(panel);
+  }
+
+  function psRenderAdmin(){
+    psLoad(); psEnsure();
+
+    const isAdmin = state?.user?.role === "admin" || location.pathname.includes("admin") || document.body.classList.contains("admin");
+    if (!isAdmin) return;
+
+    psAddPayoutAdminPage();
+    psAddPaymentSettingsAdmin();
+
+    const list = document.getElementById("adminPayoutRequestsList");
+    if (list) {
+      const rows = (state.userPayoutMethods || []).slice().reverse();
+      list.innerHTML = rows.length ? rows.map(m => `
+        <div class="admin-pay-request-card">
+          <div class="apr-top">
+            <div><span>User</span><b>${m.userId || "-"}</b></div>
+            ${psStatus(m.status || "PENDING")}
+          </div>
+          <div class="apr-grid">
+            <p><span>Type</span><b>${m.type || "-"}</b></p>
+            <p><span>Method</span><b>${psMethodMask(m)}</b></p>
+            <p><span>Holder Name</span><b>${m.holderName || "-"}</b></p>
+            <p><span>KYC Name</span><b>${m.kycName || "-"}</b></p>
+            <p><span>Name Match</span><b class="${psNameMatch(m) ? "plc-profit" : "plc-loss"}">${psNameMatch(m) ? "YES" : "NO ⚠️"}</b></p>
+          </div>
+          <div class="apr-actions">
+            <button type="button" data-approve-payout="${m.id}">Approve</button>
+            <button type="button" data-reject-payout="${m.id}">Reject</button>
+          </div>
+        </div>
+      `).join("") : `<div class="menu-real-empty">No payout method requests.</div>`;
+    }
+
+    const form = document.getElementById("adminPaymentSettingsForm");
+    if (form && form.dataset.bound !== "1") {
+      form.dataset.bound = "1";
+      const upi = state.paymentSettings.upi || {};
+      const bank = state.paymentSettings.bank || {};
+      form.upiActive.value = String(upi.active !== false);
+      form.upiId.value = upi.upiId || "";
+      form.upiName.value = upi.name || "";
+      form.bankActive.value = String(bank.active !== false);
+      form.accountName.value = bank.accountName || "";
+      form.bankName.value = bank.bankName || "";
+      form.accountNumber.value = bank.accountNumber || "";
+      form.ifsc.value = bank.ifsc || "";
+      form.addEventListener("submit", function(e){
+        e.preventDefault();
+        state.paymentSettings = {
+          upi: { active: form.upiActive.value === "true", upiId: form.upiId.value, name: form.upiName.value, qrUrl:"" },
+          bank: { active: form.bankActive.value === "true", accountName: form.accountName.value, bankName: form.bankName.value, accountNumber: form.accountNumber.value, ifsc: form.ifsc.value, branch:"" }
+        };
+        psSave();
+        psRenderAdmin();
+        alert("Payment settings saved.");
+      });
+    }
+  }
+
+  function psBind(){
+    psLoad(); psEnsure();
+
+    document.addEventListener("submit", function(e){
+      if (e.target?.id === "securePaymentMethodForm" || e.target?.id === "realPaymentMethodForm") {
+        e.preventDefault();
+        if (!psKycApproved()) {
+          alert("Please complete approved KYC before adding payment method.");
+          return;
+        }
+        const fd = new FormData(e.target);
+        const type = String(fd.get("type") || "UPI").toUpperCase();
+        const kycName = psName();
+        state.userPayoutMethods ||= state.payoutMethods || [];
+        state.userPayoutMethods.unshift({
+          id: "pm_" + Date.now(),
+          userId: psUid(),
+          type,
+          upi: fd.get("upi") || "",
+          holderName: kycName,
+          kycName,
+          bankName: fd.get("bankName") || "",
+          accountNumber: fd.get("accountNumber") || "",
+          ifsc: fd.get("ifsc") || "",
+          status: "PENDING",
+          createdAt: new Date().toLocaleString()
+        });
+        state.payoutMethods = state.userPayoutMethods;
+        psSave();
+        try { openRealMenuPage?.("paymentMethods"); } catch(err) { psPatchPaymentPage(); }
+      }
+    }, true);
+
+    document.addEventListener("change", function(e){
+      if (e.target?.id === "securePayType") {
+        const page = document.getElementById("paymentMethodsPage");
+        page?.classList.toggle("pay-bank-mode", e.target.value === "BANK");
+      }
+    });
+
+    document.addEventListener("click", function(e){
+      const approve = e.target?.dataset?.approvePayout;
+      const reject = e.target?.dataset?.rejectPayout;
+      if (approve || reject) {
+        const id = approve || reject;
+        const m = (state.userPayoutMethods || []).find(x => String(x.id) === String(id));
+        if (m) {
+          m.status = approve ? "APPROVED" : "REJECTED";
+          m.reviewedAt = new Date().toLocaleString();
+          psSave();
+          psRenderAdmin();
+        }
+      }
+    });
+  }
+
+  function psRun(){
+    try {
+      psLoad(); psEnsure();
+      psPatchPaymentPage();
+      psPatchWithdrawalUI();
+      psPatchDepositDetails();
+      psRenderAdmin();
+      document.body.classList.add("payment-kyc-admin-approval-ready");
+    } catch(e) {
+      console.warn("Payment security update skipped", e);
+    }
+  }
+
+  if (!window.__paymentKycAdminApprovalBound) {
+    window.__paymentKycAdminApprovalBound = true;
+    psBind();
+  }
+
+  window.applyPaymentKycAdminApproval = psRun;
+  document.addEventListener("DOMContentLoaded", () => setTimeout(psRun, 800));
+  window.addEventListener("load", () => setTimeout(psRun, 1000));
+  setInterval(psRun, 2500);
+})();

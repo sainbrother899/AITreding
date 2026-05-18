@@ -5842,3 +5842,205 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
   opacity:1!important;
   visibility:visible!important;
 }
+
+
+/* ===== PAYMENT KYC ADMIN APPROVAL FINAL ===== */
+.pay-sec-note,
+.admin-deposit-details-box{
+  border:1px solid rgba(255,255,255,.10)!important;
+  background:rgba(255,255,255,.045)!important;
+  border-radius:18px!important;
+  padding:14px!important;
+}
+.pay-sec-note b{
+  display:block!important;
+  color:#f4f7ff!important;
+  margin-bottom:5px!important;
+}
+.pay-sec-note span{
+  color:#9fb2d0!important;
+  font-size:13px!important;
+  line-height:1.35!important;
+}
+.pay-sec-note.ok{
+  border-color:rgba(0,231,168,.22)!important;
+  background:rgba(0,231,168,.065)!important;
+}
+.pay-sec-note.warn{
+  border-color:rgba(248,189,122,.24)!important;
+  background:rgba(248,189,122,.075)!important;
+}
+.pay-sec-form.disabled{
+  opacity:.75!important;
+}
+.pay-sec-disabled,
+.pay-sec-form button:disabled{
+  opacity:.55!important;
+  filter:grayscale(.4)!important;
+  cursor:not-allowed!important;
+}
+.pay-sec-status{
+  font-style:normal!important;
+  font-size:11px!important;
+  font-weight:950!important;
+  border-radius:999px!important;
+  padding:6px 10px!important;
+  white-space:nowrap!important;
+}
+.pay-sec-status.pending{
+  color:#f8bd7a!important;
+  background:rgba(248,189,122,.13)!important;
+}
+.pay-sec-status.approved{
+  color:#00e7a8!important;
+  background:rgba(0,231,168,.13)!important;
+}
+.pay-sec-status.rejected{
+  color:#ff456b!important;
+  background:rgba(255,69,107,.13)!important;
+}
+.secure-pay-bank-fields{
+  display:none!important;
+  gap:11px!important;
+}
+#paymentMethodsPage.pay-bank-mode .secure-pay-bank-fields{
+  display:grid!important;
+}
+#paymentMethodsPage.pay-bank-mode .secure-pay-upi{
+  display:none!important;
+}
+.approved-payout-select-box{
+  margin:12px 0!important;
+}
+.approved-payout-select-box label{
+  display:grid!important;
+  gap:6px!important;
+  color:#9fb2d0!important;
+  font-size:12px!important;
+}
+.approved-payout-select-box select{
+  min-height:48px!important;
+  border-radius:13px!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  background:rgba(0,0,0,.20)!important;
+  color:#f4f7ff!important;
+  padding:0 12px!important;
+}
+.deposit-method-tabs{
+  display:grid!important;
+  gap:10px!important;
+}
+.deposit-method-tabs div{
+  border:1px solid rgba(255,255,255,.08)!important;
+  background:rgba(255,255,255,.035)!important;
+  border-radius:14px!important;
+  padding:12px!important;
+}
+.deposit-method-tabs span{
+  color:#9fb2d0!important;
+  font-size:12px!important;
+}
+.deposit-method-tabs b{
+  display:block!important;
+  color:#f4f7ff!important;
+  margin:4px 0!important;
+}
+.deposit-method-tabs small{
+  color:#9fb2d0!important;
+}
+.admin-pay-sec-panel{
+  margin:16px auto!important;
+  padding:16px!important;
+}
+.admin-pay-sec-list{
+  display:grid!important;
+  gap:12px!important;
+}
+.admin-pay-request-card{
+  border:1px solid rgba(255,255,255,.10)!important;
+  background:rgba(255,255,255,.04)!important;
+  border-radius:18px!important;
+  padding:14px!important;
+}
+.apr-top{
+  display:flex!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+  margin-bottom:12px!important;
+}
+.apr-top span,
+.apr-grid span{
+  color:#9fb2d0!important;
+  font-size:12px!important;
+}
+.apr-top b,
+.apr-grid b{
+  color:#f4f7ff!important;
+  word-break:break-word!important;
+}
+.apr-grid{
+  display:grid!important;
+  gap:8px!important;
+}
+.apr-grid p{
+  margin:0!important;
+  display:flex!important;
+  justify-content:space-between!important;
+  gap:10px!important;
+  border-top:1px solid rgba(255,255,255,.06)!important;
+  padding-top:8px!important;
+}
+.apr-actions{
+  display:grid!important;
+  grid-template-columns:1fr 1fr!important;
+  gap:10px!important;
+  margin-top:12px!important;
+}
+.apr-actions button{
+  min-height:42px!important;
+  border:0!important;
+  border-radius:12px!important;
+  font-weight:950!important;
+}
+.apr-actions button:first-child{
+  background:#00e7a8!important;
+  color:#06101e!important;
+}
+.apr-actions button:last-child{
+  background:#ff456b!important;
+  color:#fff!important;
+}
+.admin-pay-settings-form{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:10px!important;
+}
+.admin-pay-settings-form label{
+  display:grid!important;
+  gap:6px!important;
+  color:#9fb2d0!important;
+  font-size:12px!important;
+}
+.admin-pay-settings-form input,
+.admin-pay-settings-form select{
+  min-height:42px!important;
+  border-radius:12px!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  background:rgba(0,0,0,.20)!important;
+  color:#f4f7ff!important;
+  padding:0 10px!important;
+}
+.admin-pay-settings-form button{
+  grid-column:1 / -1!important;
+  min-height:44px!important;
+  border:0!important;
+  border-radius:12px!important;
+  background:linear-gradient(135deg,#00e7a8,#35a7ff)!important;
+  color:#06101e!important;
+  font-weight:950!important;
+}
+@media(max-width:700px){
+  .admin-pay-settings-form{
+    grid-template-columns:1fr!important;
+  }
+}
