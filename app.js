@@ -3064,3 +3064,49 @@ function ahStart() {
 setInterval(ahStart, 1200);
 window.addEventListener("load", () => setTimeout(ahStart, 700));
 document.addEventListener("DOMContentLoaded", () => setTimeout(ahStart, 700));
+
+
+/* ===== ADMIN USERS MENU EXACT FIX ===== */
+function adminUsersAliasBridge() {
+  // If old Users panel IDs exist, mirror them to hard IDs so one renderer can fill both.
+  const pairs = [
+    ["adminUserSearch", "adminHardUserSearch"],
+    ["adminUserStatusFilter", "adminHardUserStatusFilter"],
+    ["adminUsersLog", "adminHardUsersLog"],
+    ["adminSelectedUserTitle", "adminHardSelectedUserTitle"],
+    ["adminSelectedUserSub", "adminHardSelectedUserSub"],
+    ["adminDetailWallet", "adminHardDetailWallet"],
+    ["adminDetailDeposit", "adminHardDetailDeposit"],
+    ["adminDetailPnl", "adminHardDetailPnl"],
+    ["adminDetailAiLimit", "adminHardDetailAiLimit"],
+    ["adminUserPlanSelect", "adminHardUserPlanSelect"],
+    ["adminUserAiPercentSelect", "adminHardUserAiPercentSelect"],
+    ["adminUserAiToggle", "adminHardUserAiToggle"],
+    ["adminUserActiveToggle", "adminHardUserActiveToggle"],
+    ["adminWalletAdjustAmount", "adminHardWalletAdjustAmount"],
+    ["adminWalletAdjustType", "adminHardWalletAdjustType"],
+    ["adminWalletAdjustNote", "adminHardWalletAdjustNote"],
+    ["adminWalletAdjustBtn", "adminHardWalletAdjustBtn"],
+    ["adminSaveUserControlBtn", "adminHardSaveUserControlBtn"],
+    ["adminViewUserHistoryBtn", "adminHardRefreshUserBtn"]
+  ];
+  pairs.forEach(([oldId, newId]) => {
+    const oldEl = document.getElementById(oldId);
+    const newEl = document.getElementById(newId);
+    if (oldEl && !newEl) oldEl.id = newId;
+  });
+
+  // Make sure Users button is inside admin-menu if app was cached/modified.
+  const menu = document.querySelector(".admin-menu");
+  if (menu && !menu.querySelector('[data-admin-tab="adminUsers"]')) {
+    const btn = document.createElement("button");
+    btn.className = "admin-tab";
+    btn.dataset.adminTab = "adminUsers";
+    btn.textContent = "👥 Users";
+    const overview = menu.querySelector('[data-admin-tab="adminOverview"]');
+    if (overview) menu.insertBefore(btn, overview);
+    else menu.appendChild(btn);
+  }
+}
+setInterval(adminUsersAliasBridge, 700);
+window.addEventListener("load", () => setTimeout(adminUsersAliasBridge, 300));

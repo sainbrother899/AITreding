@@ -225,3 +225,13 @@ Admin Users Hard Insert:
 - Cache bust added.
 - SQL optional patch included.
 - JS syntax check: OK
+
+
+Admin Users Menu Exact Fix:
+- Fixed previous mistake: Users tab was inserted above login page, not inside real admin controls.
+- Users tab is now inserted inside .admin-menu before Overview.
+- Wrong top-level Users tab removed.
+- Users panel exists inside admin-content.
+- Alias bridge supports old/new Users panel element IDs.
+- Verification: has_in_menu=True, has_top_wrong=False, has_panel=True
+- JS syntax check: OK

@@ -3779,3 +3779,15 @@ body[data-admin-page="true"] .users-tab-hard{
     grid-template-columns:1fr;
   }
 }
+
+
+/* ===== ADMIN USERS MENU EXACT FIX UI ===== */
+body[data-admin-page="true"] .admin-menu [data-admin-tab="adminUsers"]{
+  display:block!important;
+}
+body[data-admin-page="true"] #adminUsers.active-admin-panel{
+  display:block!important;
+}
+body[data-admin-page="true"] #adminUsers:not(.active-admin-panel){
+  display:none!important;
+}
