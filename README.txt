@@ -21,3 +21,11 @@ Core tested logic:
 
 SQL:
 Run supabase-schema.sql once in Supabase SQL Editor.
+
+
+DB Compatibility Fix:
+- Fixed bigint id error by not sending string IDs to deposit_requests/withdrawal_requests when inserting.
+- Added fallback for other tables: if bigint id error happens, insert is retried without id.
+- Added SQL compatibility patch for missing metadata columns.
+- Keep UI/design same.
+- JS syntax check: OK

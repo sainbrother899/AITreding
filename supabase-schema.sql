@@ -150,3 +150,23 @@ create policy "public all referrals" on public.referrals for all using (true) wi
 create policy "public all kyc_requests" on public.kyc_requests for all using (true) with check (true);
 create policy "public all subscription_plans" on public.subscription_plans for all using (true) with check (true);
 create policy "public all payment_requests" on public.payment_requests for all using (true) with check (true);
+
+
+
+-- Compatibility patch for existing tables with bigint id.
+-- App no longer inserts string IDs into bigint id columns.
+alter table public.deposit_requests add column if not exists user_name text;
+alter table public.deposit_requests add column if not exists txn text;
+alter table public.deposit_requests add column if not exists created_at_text text;
+alter table public.withdrawal_requests add column if not exists created_at_text text;
+alter table public.withdrawal_requests add column if not exists account text;
+alter table public.withdrawal_requests add column if not exists method text;
+alter table public.withdrawal_requests add column if not exists name text;
+alter table public.withdrawal_requests add column if not exists ifsc text;
+alter table public.kyc_requests add column if not exists doc_type text;
+alter table public.kyc_requests add column if not exists doc_number text;
+
+drop index if exists public.idx_deposit_requests_unique_txn;
+create unique index if not exists idx_deposit_requests_unique_txn
+on public.deposit_requests(txn)
+where txn is not null and txn ~ '^[0-9]{12}$';

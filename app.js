@@ -183,7 +183,13 @@ function userByIdOrEmail(id, email) {
 /* ---------- Supabase helpers ---------- */
 async function dbInsert(table, row) {
   if (!supabaseClient) return { data: null, error: null };
-  return await supabaseClient.from(table).insert(row);
+  let res = await supabaseClient.from(table).insert(row);
+  if (res?.error && String(res.error.message || "").includes("invalid input syntax for type bigint") && row && row.id) {
+    const safe = { ...row };
+    delete safe.id;
+    res = await supabaseClient.from(table).insert(safe);
+  }
+  return res;
 }
 async function dbUpdate(table, patch, col, val) {
   if (!supabaseClient) return { data: null, error: null };
@@ -226,20 +232,20 @@ async function loadRemoteData() {
   };
 
   await loadTable("deposit_requests", r => ({
-    id: r.id, userId: r.user_id, userEmail: r.user_email, userName: r.user_name,
+    id: String(r.id), userId: r.user_id, userEmail: r.user_email, userName: r.user_name,
     amount: Number(r.amount || 0), txn: r.txn || "", status: r.status || "PENDING",
     createdAt: r.created_at_text || r.created_at || ""
   }), "depositRequests");
 
   await loadTable("withdrawal_requests", r => ({
-    id: r.id, userId: r.user_id, userEmail: r.user_email,
+    id: String(r.id), userId: r.user_id, userEmail: r.user_email,
     amount: Number(r.amount || 0), method: r.method || r.withdraw_method || "",
     account: r.account || r.account_detail || "", name: r.name || "", ifsc: r.ifsc || "",
     status: r.status || "PENDING", createdAt: r.created_at_text || r.created_at || ""
   }), "withdrawalRequests");
 
   await loadTable("managed_trades", r => ({
-    id: r.id, userId: r.user_id, userEmail: r.user_email, coin: r.coin, side: r.side,
+    id: String(r.id), userId: r.user_id, userEmail: r.user_email, coin: r.coin, side: r.side,
     risk: r.risk || "MEDIUM", amount: Number(r.amount || 0),
     entry: Number(r.entry_price || 0), close: r.close_price == null ? null : Number(r.close_price),
     pnl: Number(r.pnl || 0), status: r.status || "OPEN", source: r.source || "ADMIN_MANAGED",
@@ -247,14 +253,14 @@ async function loadRemoteData() {
   }), "managedTrades");
 
   await loadTable("referrals", r => ({
-    id: r.id, referrerId: r.referrer_id, referrerEmail: r.referrer_email,
+    id: String(r.id), referrerId: r.referrer_id, referrerEmail: r.referrer_email,
     userId: r.user_id, userEmail: r.user_email, depositId: r.deposit_id,
     depositAmount: Number(r.deposit_amount || 0), bonusAmount: Number(r.bonus_amount || 0),
     percent: Number(r.percent || 0), status: r.status || "PAID"
   }), "referrals");
 
   await loadTable("wallet_ledger", r => ({
-    id: r.id, userId: r.user_id, type: r.type, amount: Number(r.amount || 0), note: r.note || ""
+    id: String(r.id), userId: r.user_id, type: r.type, amount: Number(r.amount || 0), note: r.note || ""
   }), "walletLedger");
 
   try {
@@ -541,13 +547,20 @@ async function submitWithdrawal() {
   if (!amount || amount < 1000) return toast("Minimum withdrawal ₹1000.");
   if (amount > withdrawable()) return toast("Withdrawable amount se jyada nahi.");
   const req = {
-    id: "wd_" + Date.now(), userId: state.user.id, userEmail: state.user.email, amount,
+    id: "local_wd_" + Date.now(), userId: state.user.id, userEmail: state.user.email, amount,
     method: $("withdrawMethod")?.value || "UPI", account: $("withdrawAccount")?.value || "",
     name: $("withdrawName")?.value || "", ifsc: $("withdrawIfsc")?.value || "", status: "PENDING",
     createdAt: new Date().toLocaleString()
   };
   state.withdrawalRequests.unshift(req);
-  await dbInsert("withdrawal_requests", { id: req.id, user_id: req.userId, user_email: req.userEmail, amount, method: req.method, account: req.account, name: req.name, ifsc: req.ifsc, status: "PENDING", created_at_text: req.createdAt });
+  if (supabaseClient) {
+    const { data, error } = await supabaseClient.from("withdrawal_requests").insert({
+      user_id: req.userId, user_email: req.userEmail, amount,
+      method: req.method, account: req.account, name: req.name, ifsc: req.ifsc,
+      status: "PENDING", created_at_text: req.createdAt
+    }).select("id").single();
+    if (!error && data?.id !== undefined && data?.id !== null) req.id = String(data.id);
+  }
   closeModal("withdrawModal");
   saveState(); render();
   toast("Withdrawal request submitted.");
@@ -716,7 +729,13 @@ async function closeAllMassTrades() {
 async function submitKyc() {
   const req = { id: "kyc_" + Date.now(), userId: state.user.id, userEmail: state.user.email, name: $("kycName")?.value, mobile: $("kycMobile")?.value, docType: $("kycDocType")?.value, docNumber: $("kycDocNumber")?.value, status: "PENDING" };
   state.kycRequests.unshift(req);
-  await dbInsert("kyc_requests", { id: req.id, user_id: req.userId, user_email: req.userEmail, name: req.name, mobile: req.mobile, doc_type: req.docType, doc_number: req.docNumber, status: req.status });
+  if (supabaseClient) {
+    const { data } = await supabaseClient.from("kyc_requests").insert({
+      user_id: req.userId, user_email: req.userEmail, name: req.name, mobile: req.mobile,
+      doc_type: req.docType, doc_number: req.docNumber, status: req.status
+    }).select("id").single();
+    if (data?.id !== undefined && data?.id !== null) req.id = String(data.id);
+  }
   saveState(); render(); toast("KYC submitted.");
 }
 async function approveKyc(id) {
