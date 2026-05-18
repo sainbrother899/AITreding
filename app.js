@@ -1222,14 +1222,15 @@ function renderAnalytics() {
 }
 
 function renderReferral() {
-  if (!$("refCount")) return;
+  if (!state.user || state.user.role === "admin") return;
+  const code = state.user.referralCode || state.user.referral_code || state.user.id || "";
+  const link = `${location.origin}${location.pathname}?ref=${encodeURIComponent(code)}`;
 
-  const code = state.user?.referralCode;
-  const refs = state.referrals.filter(r => r.code === code);
-  const bonus = refs.reduce((a, r) => a + Number(r.bonus || 0), 0);
+  if ($("referralCodeText")) $("referralCodeText").textContent = code;
+  if ($("referralLink")) $("referralLink").value = link;
+  if ($("referralLinkText")) $("referralLinkText").textContent = link;
 
-  $("refCount").textContent = refs.length;
-  $("refBonus").textContent = rupee(bonus);
+  renderUserReferralFinal();
 }
 
 function openPaymentModal(plan) {
@@ -4174,3 +4175,81 @@ document.addEventListener("click", function(e){
     }, 1200);
   }
 });
+
+
+/* ===== USER REFERRAL 10 PERCENT HARD FIX ===== */
+function refUserRowsFinal() {
+  const uid = String(state.user?.id || "");
+  const email = String(state.user?.email || "").toLowerCase();
+
+  return (state.referrals || []).filter(r => {
+    const refId = String(r.referrerId || r.referrer_id || "");
+    const refEmail = String(r.referrerEmail || r.referrer_email || "").toLowerCase();
+    return refId === uid || (!!email && refEmail === email);
+  });
+}
+
+function refUserBonusTotalFinal() {
+  // Only real paid referral records count.
+  return refUserRowsFinal()
+    .filter(r => String(r.status || "").toUpperCase() === "PAID")
+    .reduce((a, r) => a + Number(r.bonusAmount || r.bonus_amount || 0), 0);
+}
+
+function renderUserReferralFinal() {
+  try {
+    if (!state.user || state.user.role === "admin") return;
+
+    const total = refUserBonusTotalFinal();
+    const rows = refUserRowsFinal();
+
+    const possibleTotalIds = [
+      "referralBonusText",
+      "refBonusText",
+      "referralEarningsText",
+      "referralTotalBonus",
+      "referralBonusAmount",
+      "refEarningAmount",
+      "referralRewardText"
+    ];
+
+    possibleTotalIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = money(total);
+    });
+
+    const possibleCountIds = ["referralCountText", "totalReferralsText", "referralTotalCount"];
+    possibleCountIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = rows.length;
+    });
+
+    const log = document.getElementById("userReferralLog") || document.getElementById("referralHistoryLog") || document.getElementById("referralList");
+    if (log) {
+      log.innerHTML = rows.map(r => {
+        const deposit = Number(r.depositAmount || r.deposit_amount || 0);
+        const bonus = Number(r.bonusAmount || r.bonus_amount || 0);
+        return `<tr>
+          <td>${r.userEmail || r.user_email || r.userId || r.user_id || "-"}</td>
+          <td>${deposit ? money(deposit) : "-"}</td>
+          <td>${money(bonus)}</td>
+          <td>${r.status || "PAID"}</td>
+        </tr>`;
+      }).join("") || `<tr><td colspan="4" class="empty">No referral bonus yet.</td></tr>`;
+    }
+
+    // Update any visible text that still says 50 in referral area.
+    document.querySelectorAll("#referral, .referral-card, .referral-page").forEach(box => {
+      box.querySelectorAll("*").forEach(el => {
+        if (el.childNodes.length === 1 && el.textContent && /₹50|Rs\.50|INR 50/.test(el.textContent)) {
+          el.textContent = el.textContent.replace(/₹50|Rs\.50|INR 50/g, "10% of first deposit");
+        }
+      });
+    });
+  } catch(e) {
+    console.warn("renderUserReferralFinal failed", e);
+  }
+}
+
+setInterval(renderUserReferralFinal, 1200);
+window.addEventListener("load", () => setTimeout(renderUserReferralFinal, 1200));

@@ -564,3 +564,11 @@ Referral Admin Auto 10% Fix:
 - Rule: First approved deposit ka 10% automatic wallet_ledger me add hota hai.
 - No SQL required if latest referral SQL already run.
 - JS syntax check: OK
+
+
+User Referral 10% Hard Fix:
+- Removed remaining hardcoded ₹50 referral display/defaults.
+- User referral total now reads bonus_amount from paid referral records.
+- Referral page/list shows joined user, deposit amount, actual 10% bonus, status.
+- If old ₹50 test rows exist in Supabase, delete old referral/REFERRAL_BONUS rows before fresh test.
+- JS syntax check: OK

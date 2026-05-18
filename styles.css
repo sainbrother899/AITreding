@@ -3140,3 +3140,16 @@ body.real-mode-active .pro-bottom-nav .nav-btn[data-page="wallet"]{
 #adminReferralsLog button{
   display:none!important;
 }
+
+
+/* User referral 10% hard fix */
+#referral .ref-bonus,
+#referralBonusText,
+#refBonusText,
+#referralEarningsText,
+#referralTotalBonus,
+#referralBonusAmount,
+#refEarningAmount{
+  color:var(--green)!important;
+  font-weight:900!important;
+}
