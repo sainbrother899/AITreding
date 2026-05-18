@@ -472,3 +472,18 @@ Final More Page Button Fix:
 - Added/ensured Profile page exists.
 - Removed older conflicting More navigation handlers.
 - No SQL required.
+
+
+Hard More Page Fix:
+- Added hardOpenUserPage() independent navigation.
+- More page buttons use direct inline hardOpenUserPage().
+- CSS force-hides inactive pages and force-shows active page.
+- This bypasses old nav-handler conflicts.
+- No SQL required.
+
+
+More Dropdown Fix:
+- Replaced More page dependency with top 3-dot dropdown menu.
+- Dropdown buttons open KYC, Plans, Referral and Profile directly.
+- This avoids old navigation conflicts.
+- No SQL required.

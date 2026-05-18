@@ -1,3 +1,68 @@
+
+/* MORE DROPDOWN FINAL FIX */
+(function(){
+  function showDirectPage(pageId){
+    var target = document.getElementById(pageId);
+    if(!target) {
+      console.warn("Page missing:", pageId);
+      return;
+    }
+
+    document.querySelectorAll("#appPage .page").forEach(function(p){
+      p.classList.remove("active-page");
+      p.style.display = "none";
+    });
+
+    target.classList.add("active-page");
+    target.style.display = "block";
+
+    document.querySelectorAll(".nav-btn").forEach(function(btn){
+      btn.classList.toggle("active", btn.getAttribute("data-page") === pageId);
+    });
+
+    if(pageId === "profilepage"){
+      var s = window.state || {};
+      var u = s.user || {};
+      function set(id, val){ var el = document.getElementById(id); if(el) el.textContent = val; }
+      set("profileNameText", u.name || "User");
+      set("profileEmailText", u.email || "-");
+      set("profilePlanText", u.plan || "Free");
+      set("profileModeText", s.mode || "DEMO");
+    }
+
+    var dd = document.getElementById("topMoreDropdown");
+    if(dd) dd.classList.remove("show");
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+
+  window.showDirectPage = showDirectPage;
+
+  document.addEventListener("click", function(e){
+    var moreBtn = e.target.closest("#topMoreMenuBtn");
+    if(moreBtn){
+      e.preventDefault();
+      e.stopPropagation();
+      var dd = document.getElementById("topMoreDropdown");
+      if(dd) dd.classList.toggle("show");
+      return;
+    }
+
+    var pageBtn = e.target.closest("[data-direct-page]");
+    if(pageBtn){
+      e.preventDefault();
+      e.stopPropagation();
+      showDirectPage(pageBtn.getAttribute("data-direct-page"));
+      return;
+    }
+
+    var dd = document.getElementById("topMoreDropdown");
+    if(dd && !e.target.closest(".top-more-wrap")) dd.classList.remove("show");
+  }, true);
+})();
+
+
+});
+
 const CONFIG = window.APP_CONFIG || {};
 const IS_ADMIN_PAGE = document.body?.dataset?.adminPage === "true";
 const MIN_DEPOSIT_AMOUNT = 1000;
@@ -3740,51 +3805,3 @@ window.closeAllMassTrades = closeAllMassTrades;
 
 
 
-/* Final More Page Button Fix */
-function openMoreTargetPage(pageId) {
-  if (!pageId) return false;
-
-  const target = document.getElementById(pageId);
-  if (!target) {
-    console.warn("More target page not found:", pageId);
-    return false;
-  }
-
-  document.querySelectorAll(".page").forEach(p => {
-    p.classList.remove("active-page");
-    p.classList.remove("active");
-  });
-
-  target.classList.add("active-page");
-
-  document.querySelectorAll(".nav-btn").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.page === pageId);
-  });
-
-  try {
-    if (pageId === "profilepage") {
-      if ($("profileNameText")) $("profileNameText").textContent = state.user?.name || "User";
-      if ($("profileEmailText")) $("profileEmailText").textContent = state.user?.email || "-";
-      if ($("profilePlanText")) $("profilePlanText").textContent = state.user?.plan || getPlan?.() || "Free";
-      if ($("profileModeText")) $("profileModeText").textContent = state.mode || "DEMO";
-    }
-    if (typeof render === "function") setTimeout(render, 30);
-  } catch(e) {}
-
-  return false;
-}
-
-window.openMoreTargetPage = openMoreTargetPage;
-
-document.addEventListener("click", function(e) {
-  const btn = e.target.closest(".more-open-btn, #topMoreMenuBtn");
-  if (!btn) return;
-
-  const inlineMatch = btn.getAttribute("onclick");
-  if (inlineMatch) return; // inline onclick handles it
-
-  const pageId = btn.dataset.page || "morepage";
-  e.preventDefault();
-  e.stopPropagation();
-  openMoreTargetPage(pageId);
-}, true);
