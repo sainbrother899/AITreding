@@ -911,3 +911,14 @@ Payment Method Combined Strong Fix:
   YOUR PAYMENT METHOD NAME SHOULD MATCH KYC NAME. DON'T USE OTHER ACCOUNT. IF YOU USE OTHER ACCOUNT, YOUR ACCOUNT MAY BE SUSPENDED.
 - Design/layout/sidebar/header untouched.
 - JS syntax check: OK
+
+
+Payment Method No Blink + One Warning Fix:
+- Removed previous payment method scripts that caused blinking/repeated DOM rewrites.
+- No MutationObserver and no fast interval.
+- Warning appears only once above the form.
+- Old duplicate warning/note texts are removed/hidden.
+- Bank/UPI selection remains stable.
+- Max 2 UPI IDs and max 2 Bank Accounts limit remains.
+- Design/layout/sidebar/header untouched.
+- JS syntax check: OK

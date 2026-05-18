@@ -6621,55 +6621,52 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
 
 
 
-/* ===== PAYMENT METHOD COMBINED STRONG FIX ===== */
-#paymentMethodsPage.payment-bank-selected .secure-pay-bank-fields,
-#paymentMethodsPage.payment-bank-selected .real-pay-bank-fields,
-#paymentMethodsPage.payment-bank-selected .pay-bank-fields{
+
+
+
+/* ===== PAYMENT METHOD NO BLINK ONE WARNING FIX ===== */
+#paymentMethodsPage.payment-bank-selected-final .secure-pay-bank-fields,
+#paymentMethodsPage.payment-bank-selected-final .real-pay-bank-fields,
+#paymentMethodsPage.payment-bank-selected-final .pay-bank-fields{
   display:grid!important;
 }
-#paymentMethodsPage.payment-bank-selected .secure-pay-upi,
-#paymentMethodsPage.payment-bank-selected .real-pay-upi,
-#paymentMethodsPage.payment-bank-selected .pay-upi-field{
+#paymentMethodsPage.payment-bank-selected-final .secure-pay-upi,
+#paymentMethodsPage.payment-bank-selected-final .real-pay-upi,
+#paymentMethodsPage.payment-bank-selected-final .pay-upi-field{
   display:none!important;
 }
-#paymentMethodsPage:not(.payment-bank-selected) .secure-pay-bank-fields,
-#paymentMethodsPage:not(.payment-bank-selected) .real-pay-bank-fields,
-#paymentMethodsPage:not(.payment-bank-selected) .pay-bank-fields{
+#paymentMethodsPage:not(.payment-bank-selected-final) .secure-pay-bank-fields,
+#paymentMethodsPage:not(.payment-bank-selected-final) .real-pay-bank-fields,
+#paymentMethodsPage:not(.payment-bank-selected-final) .pay-bank-fields{
   display:none!important;
 }
-.pm-strong-warning{
-  color:#f8bd7a!important;
-  border-color:rgba(248,189,122,.22)!important;
+.pm-one-warning-note{
+  border:1px solid rgba(248,189,122,.22)!important;
   background:rgba(248,189,122,.075)!important;
+  color:#f8bd7a!important;
+  border-radius:14px!important;
+  padding:11px 12px!important;
   font-size:12px!important;
   line-height:1.4!important;
   text-transform:uppercase!important;
   font-weight:850!important;
 }
-.pm-combined-limit-note{
-  border:1px solid rgba(248,189,122,.22)!important;
-  background:rgba(248,189,122,.075)!important;
-  border-radius:14px!important;
-  padding:10px 12px!important;
-  display:grid!important;
-  gap:5px!important;
+.pm-one-limit-note{
+  border:1px solid rgba(255,255,255,.08)!important;
+  background:rgba(255,255,255,.035)!important;
+  border-radius:13px!important;
+  padding:9px 11px!important;
 }
-.pm-combined-limit-note span{
-  color:#f8bd7a!important;
+.pm-one-limit-note span{
+  color:#9fb2d0!important;
   font-size:12px!important;
-  font-weight:900!important;
+  font-weight:850!important;
 }
-.pm-combined-limit-note small{
-  color:#d8e4f7!important;
-  font-size:11px!important;
-  line-height:1.35!important;
-  text-transform:uppercase!important;
-}
-.pm-combined-limit-note b{
+.pm-one-limit-note b{
   color:#ff456b!important;
   font-size:12px!important;
 }
-.pm-combined-disabled{
+.pm-one-disabled{
   opacity:.55!important;
   cursor:not-allowed!important;
   filter:grayscale(.35)!important;
