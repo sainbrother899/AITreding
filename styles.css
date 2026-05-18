@@ -3050,3 +3050,85 @@ body.demo-mode-active .pro-bottom-nav .real-only-nav{
     display:none!important;
   }
 }
+
+
+/* =========================================================
+   FINAL WALLET NAV RESTORE
+   Bottom nav = Home | Trade | Wallet | PnL | History
+   Wallet visible on PC + mobile
+   ========================================================= */
+.bottom-nav .nav-btn[data-page="wallet"],
+.pro-bottom-nav .nav-btn[data-page="wallet"]{
+  display:flex!important;
+}
+
+body.demo-mode-active .bottom-nav .nav-btn[data-page="wallet"],
+body.demo-mode-active .pro-bottom-nav .nav-btn[data-page="wallet"],
+body.real-mode-active .bottom-nav .nav-btn[data-page="wallet"],
+body.real-mode-active .pro-bottom-nav .nav-btn[data-page="wallet"]{
+  display:flex!important;
+}
+
+.bottom-nav,
+.pro-bottom-nav{
+  grid-template-columns:repeat(5,1fr)!important;
+  justify-content:space-between!important;
+}
+
+.bottom-nav .nav-btn,
+.pro-bottom-nav .nav-btn{
+  min-width:0!important;
+  flex:1 1 0!important;
+  padding-left:8px!important;
+  padding-right:8px!important;
+}
+
+.bottom-nav .nav-btn small,
+.pro-bottom-nav .nav-btn small{
+  font-size:12px!important;
+}
+
+@media(min-width:901px){
+  body:not([data-admin-page="true"]) .bottom-nav,
+  body:not([data-admin-page="true"]) .pro-bottom-nav{
+    display:flex!important;
+    width:430px!important;
+    max-width:430px!important;
+    left:50%!important;
+    right:auto!important;
+    transform:translateX(-50%)!important;
+    overflow:visible!important;
+  }
+
+  body:not([data-admin-page="true"]) .bottom-nav .nav-btn,
+  body:not([data-admin-page="true"]) .pro-bottom-nav .nav-btn{
+    display:flex!important;
+    min-width:0!important;
+    flex:1 1 0!important;
+  }
+}
+
+@media(max-width:520px){
+  .bottom-nav,
+  .pro-bottom-nav{
+    width:calc(100% - 20px)!important;
+    left:10px!important;
+    right:10px!important;
+    transform:none!important;
+  }
+
+  .bottom-nav .nav-btn,
+  .pro-bottom-nav .nav-btn{
+    padding:8px 4px!important;
+  }
+
+  .bottom-nav .nav-ico,
+  .pro-bottom-nav .nav-ico{
+    font-size:18px!important;
+  }
+
+  .bottom-nav .nav-btn small,
+  .pro-bottom-nav .nav-btn small{
+    font-size:11px!important;
+  }
+}

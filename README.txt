@@ -494,3 +494,10 @@ PC Wallet Nav Fix:
 - Demo account still hides Wallet.
 - Mobile behavior remains unchanged.
 - No SQL required.
+
+
+Wallet Nav Restore:
+- Bottom nav restored to 5 buttons: Home, Trade, Wallet, PnL, History.
+- Wallet button is visible on PC and mobile.
+- Wallet is no longer hidden by demo/real mode CSS.
+- No SQL required.

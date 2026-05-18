@@ -99,27 +99,29 @@
 
     <section id="appPage" class="hidden">
       
+
 <nav class="bottom-nav pro-bottom-nav clean-nav">
-  <button class="nav-btn active" data-page="dashboard">
+  <button type="button" class="nav-btn active" data-page="dashboard">
     <span class="nav-ico">⌂</span><small>Home</small>
   </button>
 
-  <button class="nav-btn" data-page="tradepage">
+  <button type="button" class="nav-btn" data-page="tradepage">
     <span class="nav-ico">⇅</span><small>Trade</small>
   </button>
 
-  <button type="button" class="nav-btn real-only-nav" data-page="wallet">
+  <button type="button" class="nav-btn" data-page="wallet">
     <span class="nav-ico">▣</span><small>Wallet</small>
   </button>
 
-  <button class="nav-btn" data-page="analytics">
+  <button type="button" class="nav-btn" data-page="analytics">
     <span class="nav-ico">↗</span><small>PnL</small>
   </button>
 
-  <button type="button" class="nav-btn" data-page="aiHistory" onclick="return openHistoryPageFinal()">
+  <button type="button" class="nav-btn" data-page="aiHistory" onclick="return openHistoryPageFinal ? openHistoryPageFinal() : false">
     <span class="nav-ico">≡</span><small>History</small>
   </button>
 </nav>
+
 
 
       <section id="dashboard" class="page active-page">
