@@ -6450,7 +6450,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
     const pageBtn = e.target.closest("[data-page]");
     const menuBtn = e.target.closest("[data-menu-page],[data-direct-page]");
     const target = pageBtn?.dataset?.page || menuBtn?.dataset?.menuPage || menuBtn?.dataset?.directPage || "";
-    if (target === "kyc" || target === "kycPage" || text.includes("kyc")) setTimeout(renderKyc, 80);
+    if (target === "kyc" || target === "kycPage" || text.includes("kyc")) setTimeout(window.kprRenderKyc || function(){}, 80);
     if (target === "paymentMethods" || target === "paymentMethodsPage" || text.includes("payment method")) setTimeout(renderPayment, 80);
     if (target === "referral" || text.includes("referral")) setTimeout(renderReferral, 80);
   }, true);
@@ -6473,7 +6473,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
   function runForCurrent(){
     patchNavigation();
     const route = pageId();
-    if (route === "kyc") renderKyc();
+    if (route === "kyc") (window.kprRenderKyc || function(){})();
     if (route === "payment") renderPayment();
     if (route === "referral") renderReferral();
   }
@@ -6530,13 +6530,17 @@ function restoreManualHistoryBackup(mode = state.mode) {
 
 
 
-/* ===== PAYMENT METHOD SINGLE OWNER FINAL ===== */
+
+
+
+/* ===== PAYMENT METHOD SINGLE OWNER DB SAVE V2 ===== */
 (function(){
   const TABLE = "user_payout_methods";
-  const STORE = "ai_trading_user_payout_methods_single_owner_v1";
+  const STORE = "ai_trading_user_payout_methods_single_owner_v2";
   const MAX_UPI = 2;
   const MAX_BANK = 2;
   const WARNING = "YOUR PAYMENT METHOD NAME SHOULD MATCH KYC NAME. DON'T USE OTHER ACCOUNT. IF YOU USE OTHER ACCOUNT, YOUR ACCOUNT MAY BE SUSPENDED.";
+
   let type = (localStorage.getItem("pm_single_type") || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI";
   let busy = false;
   let rendering = false;
@@ -6551,6 +6555,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
   function user(){ return state?.user || {}; }
   function uid(){ const u = user(); return String(u.id || u.email || "local"); }
   function email(){ return String(user().email || ""); }
+  function isAdmin(){ return String(user().role || "").toLowerCase() === "admin" || location.pathname.toLowerCase().includes("admin"); }
   function holderName(){ return user().kycName || user().kyc_name || user().name || user().email?.split("@")[0] || "User"; }
   function norm(v){ return String(v || "").trim().toLowerCase().replace(/\s+/g, ""); }
   function toastMsg(msg){ try { toast?.(msg); } catch(e){ alert(msg); } }
@@ -6578,7 +6583,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
     return {
       id: String(m.id || ("pm_" + Date.now() + "_" + Math.random().toString(16).slice(2))),
       userId: String(m.userId || m.user_id || uid()),
-      userEmail: String(m.userEmail || m.user_email || email()),
+      userEmail: String(m.userEmail || m.user_email || ""),
       type: t,
       upi: String(m.upi || m.upi_id || ""),
       holderName: String(m.holderName || m.holder_name || holderName()),
@@ -6631,6 +6636,9 @@ function restoreManualHistoryBackup(mode = state.mode) {
   function myMethods(){
     return sync().filter(m => String(m.userId) === uid());
   }
+  function visibleMethods(){
+    return isAdmin() ? sync() : myMethods();
+  }
   function count(t){
     return myMethods().filter(m => m.type === t).length;
   }
@@ -6653,11 +6661,29 @@ function restoreManualHistoryBackup(mode = state.mode) {
       return (st === "PENDING" || st === "APPROVED") && keyOf(m) === k;
     });
   }
-  function dbRow(m){
+
+  function dbRowFull(m){
     return {
       id: m.id,
       user_id: m.userId,
-      user_email: m.userEmail,
+      user_email: m.userEmail || email(),
+      method_type: m.type,
+      holder_name: m.holderName,
+      kyc_name_snapshot: m.kycName,
+      upi_id: m.upi,
+      bank_name: m.bankName,
+      account_number: m.accountNumber,
+      ifsc: m.ifsc,
+      status: m.status,
+      name_match: true,
+      created_at_text: m.createdAt
+    };
+  }
+  function dbRowMinimal(m){
+    // Matches the SQL file schema even if user_email column was not added yet.
+    return {
+      id: m.id,
+      user_id: m.userId,
       method_type: m.type,
       holder_name: m.holderName,
       kyc_name_snapshot: m.kycName,
@@ -6674,7 +6700,14 @@ function restoreManualHistoryBackup(mode = state.mode) {
     const c = client();
     if (!c) return { ok:false, reason:"no_supabase_client" };
     try {
-      const res = await c.from(TABLE).upsert(dbRow(method), { onConflict:"id" });
+      let res = await c.from(TABLE).upsert(dbRowFull(method), { onConflict:"id" });
+      if (res.error) {
+        const msg = String(res.error.message || "");
+        // If table has no user_email column, retry with exact existing schema.
+        if (msg.includes("user_email") || msg.includes("Could not find") || msg.includes("schema cache")) {
+          res = await c.from(TABLE).upsert(dbRowMinimal(method), { onConflict:"id" });
+        }
+      }
       if (res.error) return { ok:false, reason:res.error.message };
       return { ok:true };
     } catch(e){
@@ -6685,7 +6718,9 @@ function restoreManualHistoryBackup(mode = state.mode) {
     const c = client();
     if (!c || !state?.user) return [];
     try {
-      const res = await c.from(TABLE).select("*").eq("user_id", uid());
+      let query = c.from(TABLE).select("*");
+      if (!isAdmin()) query = query.eq("user_id", uid());
+      const res = await query;
       if (res.error) {
         console.warn("Payment method DB load failed:", res.error.message);
         return [];
@@ -6700,7 +6735,13 @@ function restoreManualHistoryBackup(mode = state.mode) {
     const c = client();
     if (!c) return { ok:false };
     try {
-      const res = await c.from(TABLE).update({ status, reviewed_at:new Date().toISOString() }).eq("id", id);
+      let res = await c.from(TABLE).update({ status, reviewed_at:new Date().toISOString() }).eq("id", id);
+      if (res.error) {
+        const msg = String(res.error.message || "");
+        if (msg.includes("reviewed_at") || msg.includes("Could not find") || msg.includes("schema cache")) {
+          res = await c.from(TABLE).update({ status }).eq("id", id);
+        }
+      }
       if (res.error) {
         console.warn("Payment method DB update failed:", res.error.message);
         return { ok:false, reason:res.error.message };
@@ -6720,7 +6761,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
   }
   function statusPill(st){
     st = String(st || "PENDING").toUpperCase();
-    return `<em class="pm-single-status ${st.toLowerCase()}">${st}</em>`;
+    return `<em class="pm-v2-status ${st.toLowerCase()}">${st}</em>`;
   }
   function methodHtml(m){
     return `<div class="card menu-real-method-card">
@@ -6739,18 +6780,18 @@ function restoreManualHistoryBackup(mode = state.mode) {
     const list = myMethods();
 
     return `
-      <div class="pm-single-warning">${WARNING}</div>
-      ${approved ? "" : `<div class="card pm-single-note"><b>KYC Approval Required</b><span>Please complete approved KYC before adding a payment method.</span></div>`}
+      <div class="pm-v2-warning">${WARNING}</div>
+      ${approved ? "" : `<div class="card pm-v2-note"><b>KYC Approval Required</b><span>Please complete approved KYC before adding a payment method.</span></div>`}
 
-      <form id="pmSingleForm" class="card menu-real-form ${approved ? "" : "disabled"}">
+      <form id="pmV2Form" class="card menu-real-form ${approved ? "" : "disabled"}">
         <label>Method Type
-          <select id="pmSingleType" name="type" ${approved ? "" : "disabled"}>
+          <select id="pmV2Type" name="type" ${approved ? "" : "disabled"}>
             <option value="UPI" ${type === "UPI" ? "selected" : ""}>UPI</option>
             <option value="BANK" ${type === "BANK" ? "selected" : ""}>Bank Account</option>
           </select>
         </label>
 
-        <label class="pm-single-upi">UPI ID
+        <label class="pm-v2-upi">UPI ID
           <input name="upi" placeholder="example@upi" ${approved ? "" : "disabled"}>
         </label>
 
@@ -6758,7 +6799,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
           <input name="holderName" value="${holderName()}" readonly>
         </label>
 
-        <div class="pm-single-bank">
+        <div class="pm-v2-bank">
           <label>Bank Name
             <input name="bankName" placeholder="Bank name" ${approved ? "" : "disabled"}>
           </label>
@@ -6770,7 +6811,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
           </label>
         </div>
 
-        <div class="pm-single-limit">${ok ? `<span>Limit: UPI ${count("UPI")}/${MAX_UPI} • Bank ${count("BANK")}/${MAX_BANK}</span>` : `<b>${approved ? limitText : "KYC approval required"}</b>`}</div>
+        <div class="pm-v2-limit">${ok ? `<span>Limit: UPI ${count("UPI")}/${MAX_UPI} • Bank ${count("BANK")}/${MAX_BANK}</span>` : `<b>${approved ? limitText : "KYC approval required"}</b>`}</div>
         <button type="submit" ${ok ? "" : "disabled"}>${ok ? "Add Method for Admin Approval" : "Not Available"}</button>
       </form>
 
@@ -6779,15 +6820,15 @@ function restoreManualHistoryBackup(mode = state.mode) {
   }
   function applyTypeView(){
     const p = page();
-    const sel = document.getElementById("pmSingleType");
+    const sel = document.getElementById("pmV2Type");
     if (sel && sel.value !== type) sel.value = type;
-    p?.classList.toggle("pm-single-bank-selected", type === "BANK");
-    p?.querySelectorAll(".pm-single-bank").forEach(el => el.style.display = type === "BANK" ? "grid" : "none");
-    p?.querySelectorAll(".pm-single-upi").forEach(el => el.style.display = type === "BANK" ? "none" : "grid");
+    p?.classList.toggle("pm-v2-bank-selected", type === "BANK");
+    p?.querySelectorAll(".pm-v2-bank").forEach(el => el.style.display = type === "BANK" ? "grid" : "none");
+    p?.querySelectorAll(".pm-v2-upi").forEach(el => el.style.display = type === "BANK" ? "none" : "grid");
   }
   function bind(){
-    const sel = document.getElementById("pmSingleType");
-    const form = document.getElementById("pmSingleForm");
+    const sel = document.getElementById("pmV2Type");
+    const form = document.getElementById("pmV2Form");
     sel?.addEventListener("change", () => {
       type = String(sel.value || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI";
       localStorage.setItem("pm_single_type", type);
@@ -6835,16 +6876,16 @@ function restoreManualHistoryBackup(mode = state.mode) {
     if (mode === "loading") {
       btn.dataset.oldText = btn.dataset.oldText || btn.textContent;
       btn.disabled = true;
-      btn.classList.add("pm-single-saving");
+      btn.classList.add("pm-v2-saving");
       btn.textContent = "Sending request...";
     } else if (mode === "done") {
       btn.disabled = true;
-      btn.classList.remove("pm-single-saving");
-      btn.classList.add("pm-single-saved");
+      btn.classList.remove("pm-v2-saving");
+      btn.classList.add("pm-v2-saved");
       btn.textContent = "Request Sent ✓";
     } else {
       btn.disabled = false;
-      btn.classList.remove("pm-single-saving","pm-single-saved");
+      btn.classList.remove("pm-v2-saving","pm-v2-saved");
       btn.textContent = btn.dataset.oldText || "Add Method for Admin Approval";
     }
   }
@@ -6876,18 +6917,18 @@ function restoreManualHistoryBackup(mode = state.mode) {
         return;
       }
 
-      // Persist before DB/render so it never disappears.
       sync([method]);
       renderAdmin();
       buttonState(btn, "done");
 
       const db = await dbSave(method);
       if (!db.ok) {
-        toastMsg("Saved locally. DB save failed: check user_payout_methods RLS/columns.");
+        toastMsg("Browser में save हो गया, लेकिन DB save fail है: " + db.reason);
         console.warn("Payment method DB save failed:", db.reason);
       } else {
-        toastMsg("Payment method request sent to admin.");
+        toastMsg("Payment method request DB में save हो गई.");
       }
+      await hydrate();
       setTimeout(renderPayment, 900);
       setTimeout(renderAdmin, 900);
     } finally {
@@ -6899,7 +6940,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
       document.getElementById("payoutRequestsLog") ||
       document.getElementById("adminPayoutRequestsList");
     if (!body) return;
-    const rows = sync();
+    const rows = visibleMethods();
     const html = rows.length ? rows.map(m => {
       const st = String(m.status || "PENDING").toUpperCase();
       return `<tr>
@@ -6908,7 +6949,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
         <td>${mask(m)}</td>
         <td>${m.holderName || "-"}</td>
         <td>${statusPill(st)}</td>
-        <td>${st === "PENDING" ? `<button class="approve-btn" onclick="approvePayoutMethod('${m.id}')">Approve</button><button class="reject-btn" onclick="rejectPayoutMethod('${m.id}')">Reject</button>` : `<span class="pm-single-locked">Locked</span>`}</td>
+        <td>${st === "PENDING" ? `<button class="approve-btn" onclick="approvePayoutMethod('${m.id}')">Approve</button><button class="reject-btn" onclick="rejectPayoutMethod('${m.id}')">Reject</button>` : `<span class="pm-v2-locked">Locked</span>`}</td>
       </tr>`;
     }).join("") : `<tr><td colspan="6" class="empty">No payout method requests.</td></tr>`;
     if (body.tagName === "TBODY") body.innerHTML = html;
@@ -6920,6 +6961,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
     if (row) row.status = status;
     sync(rows);
     await dbUpdate(id, status);
+    await hydrate();
     renderAdmin();
     renderPayment();
   }
@@ -6931,8 +6973,8 @@ function restoreManualHistoryBackup(mode = state.mode) {
     window.rejectPayoutMethod = (id) => setStatus(id, "REJECTED");
 
     const oldShowPage = window.showPage;
-    if (typeof oldShowPage === "function" && !window.__pmSingleShowPatched) {
-      window.__pmSingleShowPatched = true;
+    if (typeof oldShowPage === "function" && !window.__pmV2ShowPatched) {
+      window.__pmV2ShowPatched = true;
       window.showPage = function(pageId){
         const res = oldShowPage.apply(this, arguments);
         if (pageId === "paymentMethodsPage" || pageId === "paymentMethods") {
@@ -6944,8 +6986,8 @@ function restoreManualHistoryBackup(mode = state.mode) {
       try { showPage = window.showPage; } catch(e){}
     }
     const oldOpen = window.openRealMenuPage;
-    if (typeof oldOpen === "function" && !window.__pmSingleMenuPatched) {
-      window.__pmSingleMenuPatched = true;
+    if (typeof oldOpen === "function" && !window.__pmV2MenuPatched) {
+      window.__pmV2MenuPatched = true;
       window.openRealMenuPage = function(route){
         const res = oldOpen.apply(this, arguments);
         if (route === "paymentMethods") {
@@ -6960,7 +7002,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
   document.addEventListener("submit", function(e){
     const form = e.target?.closest?.("form") || e.target;
     if (!form) return;
-    if (form.id === "pmSingleForm" || form.closest("#paymentMethodsPage")) {
+    if (form.id === "pmV2Form" || form.closest("#paymentMethodsPage")) {
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
@@ -6977,7 +7019,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
     }
     const tab = e.target.closest("[data-admin-tab]")?.dataset?.adminTab || "";
     if (text.includes("payout") || text.includes("payment request") || tab.toLowerCase().includes("payment")) {
-      setTimeout(renderAdmin, 150);
+      setTimeout(hydrate, 150);
       setTimeout(renderAdmin, 700);
     }
   }, true);
@@ -6994,4 +7036,113 @@ function restoreManualHistoryBackup(mode = state.mode) {
     setTimeout(boot, 1000);
     setTimeout(boot, 2500);
   });
+})();
+
+
+/* ===== RESTORE ORIGINAL KYC DESIGN KEEP PAYMENT FIX ===== */
+(function(){
+  function getUser(){
+    try { return state?.user || {}; } catch(e){ return {}; }
+  }
+  function uid(){
+    const u = getUser();
+    return String(u.id || u.email || "local");
+  }
+  function email(){
+    return String(getUser().email || "").toLowerCase();
+  }
+  function latestKyc(){
+    try {
+      const id = uid(), em = email();
+      const rows = (state?.kycRequests || []).filter(k =>
+        String(k.userId || k.user_id || "") === id ||
+        String(k.userEmail || k.user_email || "").toLowerCase() === em
+      );
+      if (!rows.length) return null;
+      const rank = s => String(s || "PENDING").toUpperCase() === "APPROVED" ? 3 : (String(s || "").toUpperCase() === "PENDING" ? 2 : 1);
+      return rows.slice().sort((a,b) => rank(b.status) - rank(a.status))[0];
+    } catch(e){ return null; }
+  }
+  function updateOriginalKycOnly(){
+    const page = document.getElementById("kycPage");
+    if (!page || !page.classList.contains("active-page")) return;
+
+    const row = latestKyc();
+    const status = String(row?.status || getUser().kycStatus || getUser().kyc_status || "").toUpperCase();
+
+    const title = document.getElementById("kycStatusTitle");
+    if (title) title.textContent = status || "Not Submitted";
+
+    const box = document.getElementById("kycStatusBox");
+    if (box) {
+      box.classList.remove("approved","pending","rejected");
+      if (status) box.classList.add(status.toLowerCase());
+    }
+
+    // Do not replace kycPageContent. Keep original HTML/design.
+    // Only if approved, hide existing form inputs lightly and show approved note at top.
+    const root = document.getElementById("kycPageContent") || page;
+    let note = document.getElementById("kycOriginalStatusNote");
+    if (!note) {
+      note = document.createElement("div");
+      note.id = "kycOriginalStatusNote";
+      note.className = "card kyc-original-status-note";
+      root.prepend(note);
+    }
+
+    if (status === "APPROVED") {
+      note.innerHTML = "<b>Your KYC Approved</b><span>Your identity verification is approved. You do not need to submit KYC again.</span>";
+      note.style.display = "";
+      page.querySelectorAll("input,select,textarea,#submitKycBtn").forEach(el => {
+        if (!note.contains(el)) el.style.display = "none";
+      });
+    } else if (status === "PENDING") {
+      note.innerHTML = "<b>KYC Under Review</b><span>Your KYC documents have been submitted. Please wait for admin approval.</span>";
+      note.style.display = "";
+      page.querySelectorAll("input,select,textarea,#submitKycBtn").forEach(el => {
+        if (!note.contains(el)) el.style.display = "none";
+      });
+    } else {
+      if (status === "REJECTED") {
+        note.innerHTML = "<b>KYC Rejected</b><span>Your previous KYC was rejected. Please submit again with correct details.</span>";
+        note.style.display = "";
+      } else {
+        note.style.display = "none";
+      }
+      page.querySelectorAll("input,select,textarea,#submitKycBtn").forEach(el => {
+        if (!note.contains(el)) el.style.display = "";
+      });
+    }
+  }
+
+  // Override only KYC renderer from KPR. Payment renderer remains from Payment V2.
+  window.renderKycPage = updateOriginalKycOnly;
+  window.kprRenderKyc = updateOriginalKycOnly;
+
+  const oldShowPage = window.showPage;
+  if (typeof oldShowPage === "function" && !window.__restoreKycDesignShowPatched) {
+    window.__restoreKycDesignShowPatched = true;
+    window.showPage = function(pageId){
+      const res = oldShowPage.apply(this, arguments);
+      if (pageId === "kycPage" || pageId === "kyc") {
+        setTimeout(updateOriginalKycOnly, 80);
+        setTimeout(updateOriginalKycOnly, 600);
+      }
+      return res;
+    };
+    try { showPage = window.showPage; } catch(e){}
+  }
+
+  document.addEventListener("click", function(e){
+    const text = (e.target?.textContent || "").toLowerCase();
+    const pageId = e.target.closest("[data-page]")?.dataset?.page || "";
+    const menuId = e.target.closest("[data-menu-page]")?.dataset?.menuPage || "";
+    if (pageId === "kycPage" || pageId === "kyc" || menuId === "kyc" || text.includes("kyc")) {
+      setTimeout(updateOriginalKycOnly, 100);
+      setTimeout(updateOriginalKycOnly, 700);
+    }
+  }, true);
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(updateOriginalKycOnly, 1200));
+  window.addEventListener("load", () => setTimeout(updateOriginalKycOnly, 1300));
 })();

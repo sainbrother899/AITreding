@@ -1120,3 +1120,20 @@ Payment Method Single Owner Final:
 - Admin request list rendered by the single owner module.
 - KYC/referral/design/trade/chart/wallet untouched.
 - JS syntax check: OK
+
+
+Payment DB Save + Admin Load Fix:
+- Root cause found: app was sending user_email but SQL schema did not create user_email in user_payout_methods.
+- New payment owner V2 retries DB save with minimal schema if user_email column is missing.
+- Admin now loads all rows from user_payout_methods; users load only their own rows.
+- Added SQL file: user-payout-methods-db-save-fix.sql
+- Run that SQL in Supabase to add missing columns and RLS policies.
+- JS syntax check: OK
+
+
+Restore Original KYC Design Keep Payment Fix:
+- Problem: KYC PAYMENT REFERRAL CLEAN MODULE was replacing kycPageContent with kprKycForm/kpr-kyc-card.
+- Added override so KYC keeps original index.html design and only updates status note/visibility.
+- Payment DB Save/Admin Load V2 remains active.
+- Trade/chart/wallet untouched.
+- JS syntax check: OK
