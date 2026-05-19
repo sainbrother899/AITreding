@@ -6365,3 +6365,53 @@ body.app-mode .menu-owned-page.active-page {
   display: block;
   visibility: visible;
 }
+
+
+/* ===== KYC WIZARD BUTTON VISIBILITY FIX ===== */
+.kyc-step-actions{
+  grid-template-columns:1fr 1fr!important;
+  gap:12px!important;
+  margin-top:4px!important;
+}
+
+.kyc-step-actions button{
+  min-height:52px!important;
+  border-radius:16px!important;
+  font-size:15px!important;
+  font-weight:950!important;
+  letter-spacing:.2px!important;
+  border:1px solid rgba(255,255,255,.12)!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+}
+
+#kycStepBack{
+  background:rgba(255,255,255,.08)!important;
+  color:#f4f7ff!important;
+}
+
+#kycStepNext{
+  background:linear-gradient(135deg,#f8bd7a,#ffd89c)!important;
+  color:#06101e!important;
+  box-shadow:0 10px 28px rgba(248,189,122,.18)!important;
+}
+
+#kycStepNext:hover{
+  filter:brightness(1.05)!important;
+}
+
+.kyc-step-actions button[disabled]{
+  opacity:.5!important;
+  color:#9fb2d0!important;
+  cursor:not-allowed!important;
+  box-shadow:none!important;
+}
+
+@media(max-width:700px){
+  .kyc-step-actions button{
+    min-height:54px!important;
+    font-size:15px!important;
+  }
+}

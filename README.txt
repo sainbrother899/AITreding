@@ -1155,3 +1155,11 @@ Menu Pages Auth Visibility Fix:
 - Logout/auth mode hides all menu-owned pages.
 - KYC step wizard and payment DB fixes untouched.
 - JS syntax check: OK
+
+
+KYC Wizard Button Visibility Fix:
+- Back / Next buttons made larger.
+- Next button color changed for high contrast.
+- Button text made bold and centered.
+- Only CSS styling changed; KYC logic/payment/admin untouched.
+- JS syntax check: OK
