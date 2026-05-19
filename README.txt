@@ -1318,3 +1318,11 @@ Wallet Balance + Trade Logic Fix:
 - Referral logic intentionally NOT included.
 - Added SQL: wallet-balance-trade-logic-db-fix.sql
 - JS syntax check: OK
+
+
+Permanent Wallet Cleanup from stop.zip:
+- Removed risky duplicate wallet/balance patch blocks permanently from app.js/styles.css.
+- Kept existing UI/design and professional wallet owner if present.
+- Kept minimum deposit/withdrawal limit patch if present.
+- Removed blocks:
+  - WALLET BALANCE TRADE LOGIC FINAL (app 1, css 0)
