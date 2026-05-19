@@ -1,37 +1,4 @@
 
-/* ===== ONLY USER PAYOUT METHODS TABLE FINAL ===== */
-const PAYMENT_METHOD_TABLE = "user_payout_methods";
-
-async function paymentDbTry(operation) {
-  const client = (typeof supabaseClient !== "undefined" && supabaseClient) ? supabaseClient : window.supabaseClient;
-  if (!client) return { data: null, error: { message: "Supabase client not found" }, table: PAYMENT_METHOD_TABLE };
-  try {
-    const res = await operation(client.from(PAYMENT_METHOD_TABLE), PAYMENT_METHOD_TABLE);
-    return { ...(res || {}), table: PAYMENT_METHOD_TABLE };
-  } catch (e) {
-    return { data: null, error: e, table: PAYMENT_METHOD_TABLE };
-  }
-}
-
-function paymentMethodDbRow(method) {
-  return {
-    id: method.id,
-    user_id: method.userId || method.user_id,
-    user_email: method.userEmail || method.user_email || "",
-    method_type: method.type || method.method_type || method.method,
-    holder_name: method.holderName || method.holder_name || "",
-    kyc_name_snapshot: method.kycName || method.kyc_name_snapshot || "",
-    upi_id: method.upi || method.upi_id || "",
-    bank_name: method.bankName || method.bank_name || "",
-    account_number: method.accountNumber || method.account_number || "",
-    ifsc: method.ifsc || "",
-    status: method.status || "PENDING",
-    name_match: true,
-    created_at_text: method.createdAt || method.created_at_text || new Date().toLocaleString()
-  };
-}
-
-
 /* ===== SAFE RENDER GUARD ===== */
 window.addEventListener("error", function(e){
   console.warn("Runtime error caught:", e.message);
@@ -6560,466 +6527,62 @@ function restoreManualHistoryBackup(mode = state.mode) {
 })();
 
 
-/* ===== PAYMENT SUBMIT FEEDBACK + ADMIN VISIBILITY FIX ===== */
-(function(){
-  let submitLock = false;
 
-  function sb(){
+
+
+/* ===== PAYMENT METHOD SINGLE OWNER FINAL ===== */
+(function(){
+  const TABLE = "user_payout_methods";
+  const STORE = "ai_trading_user_payout_methods_single_owner_v1";
+  const MAX_UPI = 2;
+  const MAX_BANK = 2;
+  const WARNING = "YOUR PAYMENT METHOD NAME SHOULD MATCH KYC NAME. DON'T USE OTHER ACCOUNT. IF YOU USE OTHER ACCOUNT, YOUR ACCOUNT MAY BE SUSPENDED.";
+  let type = (localStorage.getItem("pm_single_type") || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI";
+  let busy = false;
+  let rendering = false;
+
+  function client(){
     try {
       if (window.supabaseClient) return window.supabaseClient;
       if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
     } catch(e){}
     return null;
   }
-  function u(){ return state?.user || {}; }
-  function uid(){ return String(u().id || u().email || "local"); }
-  function email(){ return String(u().email || ""); }
-  function kycName(){ return u().kycName || u().kyc_name || u().name || u().email?.split("@")[0] || "User"; }
+  function user(){ return state?.user || {}; }
+  function uid(){ const u = user(); return String(u.id || u.email || "local"); }
+  function email(){ return String(user().email || ""); }
+  function holderName(){ return user().kycName || user().kyc_name || user().name || user().email?.split("@")[0] || "User"; }
   function norm(v){ return String(v || "").trim().toLowerCase().replace(/\s+/g, ""); }
-  function methods(){ return state?.userPayoutMethods || state?.payoutMethods || []; }
-  function myMethods(){ return methods().filter(m => String(m.userId || m.user_id || "") === uid()); }
-  function typeOf(m){ return String(m.type || m.method || m.method_type || "").toUpperCase(); }
-  function accountKey(m){
-    const type = typeOf(m);
-    if (type === "UPI") return "UPI:" + norm(m.upi || m.upi_id);
-    return "BANK:" + norm(m.accountNumber || m.account_number) + ":" + norm(m.ifsc);
+  function toastMsg(msg){ try { toast?.(msg); } catch(e){ alert(msg); } }
+
+  function page(){ return document.getElementById("paymentMethodsPage"); }
+  function root(){
+    const p = page();
+    return document.getElementById("paymentMethodsPageContent") ||
+      p?.querySelector(".menu-real-content") ||
+      p?.querySelector(".menu-full-content") ||
+      p;
   }
-  function currentType(){
-    const select = document.getElementById("kprPayType") || document.querySelector("#paymentMethodsPage select[name='type']");
-    return String(select?.value || localStorage.getItem("kpr_pm_type") || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI";
-  }
-  function currentKey(form){
-    const fd = new FormData(form);
-    const type = currentType();
-    if (type === "UPI") return "UPI:" + norm(fd.get("upi"));
-    return "BANK:" + norm(fd.get("accountNumber")) + ":" + norm(fd.get("ifsc"));
-  }
-  function hasDuplicate(form){
-    const key = currentKey(form);
-    if (key === "UPI:" || key === "BANK::") return false;
-    return myMethods().some(m => {
-      const st = String(m.status || "PENDING").toUpperCase();
-      return (st === "PENDING" || st === "APPROVED") && accountKey(m) === key;
-    });
-  }
-  function setBtn(btn, mode, text){
-    if (!btn) return;
-    if (mode === "loading") {
-      btn.dataset.oldText = btn.dataset.oldText || btn.textContent || "Add Method for Admin Approval";
-      btn.disabled = true;
-      btn.classList.add("kpr-saving");
-      btn.textContent = text || "Saving...";
-    } else if (mode === "success") {
-      btn.disabled = true;
-      btn.classList.remove("kpr-saving");
-      btn.classList.add("kpr-saved");
-      btn.textContent = text || "Request Sent ✓";
-    } else {
-      btn.disabled = false;
-      btn.classList.remove("kpr-saving","kpr-saved");
-      btn.textContent = btn.dataset.oldText || "Add Method for Admin Approval";
-      delete btn.dataset.oldText;
-    }
-  }
-  function notify(msg){
-    try { toast?.(msg); } catch(e){ alert(msg); }
+  function isPaymentOpen(){
+    const p = page();
+    return !!(p && p.classList.contains("active-page") && getComputedStyle(p).display !== "none");
   }
 
-  async function savePaymentMethodClean(form){
-    if (submitLock) return;
-    submitLock = true;
-
-    const btn = form.querySelector("button[type='submit'],button");
-    setBtn(btn, "loading", "Sending request...");
-
-    try {
-      if (hasDuplicate(form)) {
-        setBtn(btn, "normal");
-        alert("This payment method request is already added or pending approval.");
-        return;
-      }
-
-      const fd = new FormData(form);
-      const type = currentType();
-      const method = {
-        id: "pm_" + Date.now(),
-        userId: uid(),
-        userEmail: email(),
-        type,
-        upi: type === "UPI" ? String(fd.get("upi") || "").trim() : "",
-        holderName: kycName(),
-        kycName: kycName(),
-        bankName: type === "BANK" ? String(fd.get("bankName") || "").trim() : "",
-        accountNumber: type === "BANK" ? String(fd.get("accountNumber") || "").trim() : "",
-        ifsc: type === "BANK" ? String(fd.get("ifsc") || "").trim().toUpperCase() : "",
-        status: "PENDING",
-        createdAt: new Date().toLocaleString()
-      };
-
-      if (type === "UPI" && !method.upi) {
-        setBtn(btn, "normal");
-        alert("Please enter UPI ID.");
-        return;
-      }
-      if (type === "BANK" && (!method.bankName || !method.accountNumber || !method.ifsc)) {
-        setBtn(btn, "normal");
-        alert("Please enter complete bank details.");
-        return;
-      }
-
-      // Add locally first so UI/admin can show it immediately.
-      state.userPayoutMethods ||= state.payoutMethods || [];
-      state.userPayoutMethods.unshift(method);
-      state.payoutMethods = state.userPayoutMethods;
-
-      let dbOk = true;
-      const client = sb();
-      if (client) {
-        const res = await paymentDbTry((q) => q.upsert(paymentMethodDbRow(method), { onConflict:"id" }));
-        if (res.error) {
-          dbOk = false;
-          console.warn("Payout method DB save failed", res.error);
-        }
-      }
-
-      try { saveState?.(); } catch(e){}
-      try { saveSession?.(); } catch(e){}
-
-      setBtn(btn, "success", dbOk ? "Request Sent ✓" : "Saved locally ✓");
-      notify(dbOk ? "Payment method request sent to admin." : "Request saved locally. DB save failed; check Supabase policy/table.");
-
-      renderAdminPaymentRequests();
-      setTimeout(() => {
-        try { window.kprRenderPayment?.(); } catch(e){}
-        try { window.renderPaymentMethodsPage?.(); } catch(e){}
-      }, 800);
-    } finally {
-      setTimeout(() => { submitLock = false; }, 1200);
-    }
-  }
-
-  function mask(m){
-    const type = typeOf(m);
-    if (type === "UPI") return m.upi || m.upi_id || "-";
-    const acc = String(m.accountNumber || m.account_number || "");
-    return `${m.bankName || m.bank_name || "Bank"} ${acc ? "****" + acc.slice(-4) : ""}`;
-  }
-  function statusBadge(s){
-    s = String(s || "PENDING").toUpperCase();
-    return `<span class="kpr-admin-status ${s.toLowerCase()}">${s}</span>`;
-  }
-
-  function renderAdminPaymentRequests(){
-    const body = document.getElementById("paymentRequestsLog") ||
-      document.getElementById("payoutRequestsLog") ||
-      document.getElementById("adminPayoutRequestsList");
-    if (!body) return;
-
-    const rows = methods();
-    const html = rows.length ? rows.map(m => {
-      const st = String(m.status || "PENDING").toUpperCase();
-      const id = String(m.id || "");
-      return `
-        <tr>
-          <td>${m.userEmail || m.user_email || m.userId || m.user_id || "-"}</td>
-          <td>${typeOf(m)}</td>
-          <td>${mask(m)}</td>
-          <td>${m.holderName || m.holder_name || "-"}</td>
-          <td>${statusBadge(st)}</td>
-          <td>${st === "PENDING" ? `
-            <button class="approve-btn" onclick="approvePayoutMethod('${id}')">Approve</button>
-            <button class="reject-btn" onclick="rejectPayoutMethod('${id}')">Reject</button>
-          ` : `<span class="kpr-admin-locked">Locked</span>`}</td>
-        </tr>`;
-    }).join("") : `<tr><td colspan="6" class="empty">No payout method requests.</td></tr>`;
-
-    if (body.tagName === "TBODY") body.innerHTML = html;
-    else body.innerHTML = `<table><tbody>${html}</tbody></table>`;
-  }
-
-  function bindPaymentSubmit(){
-    const form = document.getElementById("kprPaymentForm") ||
-      document.getElementById("routePaymentForm") ||
-      document.querySelector("#paymentMethodsPage form");
-    if (!form || form.dataset.submitFeedbackFixed === "1") return;
-    form.dataset.submitFeedbackFixed = "1";
-
-    form.addEventListener("submit", function(e){
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      savePaymentMethodClean(form);
-    }, true);
-  }
-
-  function patchAdminApprovals(){
-    if (window.__paymentSubmitAdminApprovalsPatched) return;
-    window.__paymentSubmitAdminApprovalsPatched = true;
-
-    const oldApprove = window.approvePayoutMethod;
-    window.approvePayoutMethod = async function(id){
-      const row = methods().find(m => String(m.id) === String(id));
-      if (row) row.status = "APPROVED";
-      const client = sb();
-      if (client) {
-        const res = await paymentDbTry((q) => q.update({ status:"APPROVED", reviewed_at:new Date().toISOString() }).eq("id", id));
-        if (res.error) console.warn("Approve payout DB failed", res.error);
-      }
-      try { saveState?.(); } catch(e){}
-      renderAdminPaymentRequests();
-      try { render?.(); } catch(e){}
-    };
-
-    const oldReject = window.rejectPayoutMethod;
-    window.rejectPayoutMethod = async function(id){
-      const row = methods().find(m => String(m.id) === String(id));
-      if (row) row.status = "REJECTED";
-      const client = sb();
-      if (client) {
-        const res = await paymentDbTry((q) => q.update({ status:"REJECTED", reviewed_at:new Date().toISOString() }).eq("id", id));
-        if (res.error) console.warn("Reject payout DB failed", res.error);
-      }
-      try { saveState?.(); } catch(e){}
-      renderAdminPaymentRequests();
-      try { render?.(); } catch(e){}
-    };
-  }
-
-  function run(){
-    bindPaymentSubmit();
-    patchAdminApprovals();
-    renderAdminPaymentRequests();
-  }
-
-  document.addEventListener("click", function(e){
-    const text = (e.target?.textContent || "").toLowerCase();
-    const page = e.target.closest("[data-page]")?.dataset?.page || "";
-    const tab = e.target.closest("[data-admin-tab]")?.dataset?.adminTab || "";
-    if (text.includes("payment method") || text.includes("payout") || page.includes("payment") || tab.includes("payment")) {
-      setTimeout(run, 150);
-      setTimeout(run, 700);
-    }
-  }, true);
-
-  document.addEventListener("DOMContentLoaded", () => setTimeout(run, 1000));
-  window.addEventListener("load", () => setTimeout(run, 1200));
-  window.renderAdminPaymentRequestsFixed = renderAdminPaymentRequests;
-})();
-
-
-/* ===== PAYMENT METHOD PERSIST REFRESH FIX ===== */
-(function(){
-  const PM_STORE_KEY = "ai_trading_payment_methods_persist_v1";
-  let loadedOnce = false;
-
-  function sb(){
-    try {
-      if (window.supabaseClient) return window.supabaseClient;
-      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
-    } catch(e){}
-    return null;
-  }
-  function uid(){
-    const u = state?.user || {};
-    return String(u.id || u.email || "local");
-  }
-  function email(){
-    return String(state?.user?.email || "");
-  }
-  function norm(v){ return String(v || "").trim().toLowerCase().replace(/\s+/g, ""); }
-  function getAll(){
+  function rawList(){
     state.userPayoutMethods ||= state.payoutMethods || [];
     state.payoutMethods = state.userPayoutMethods;
     return state.userPayoutMethods;
-  }
-  function typeOf(m){ return String(m.type || m.method || m.method_type || "").toUpperCase(); }
-  function accountKey(m){
-    const type = typeOf(m);
-    const user = String(m.userId || m.user_id || "");
-    if (type === "UPI") return user + "|UPI|" + norm(m.upi || m.upi_id);
-    return user + "|BANK|" + norm(m.accountNumber || m.account_number) + "|" + norm(m.ifsc);
   }
   function normalizeMethod(m){
-    const type = typeOf(m) || "UPI";
+    const t = String(m.type || m.method_type || m.method || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI";
     return {
       id: String(m.id || ("pm_" + Date.now() + "_" + Math.random().toString(16).slice(2))),
       userId: String(m.userId || m.user_id || uid()),
       userEmail: String(m.userEmail || m.user_email || email()),
-      type,
+      type: t,
       upi: String(m.upi || m.upi_id || ""),
-      holderName: String(m.holderName || m.holder_name || ""),
-      kycName: String(m.kycName || m.kyc_name_snapshot || ""),
-      bankName: String(m.bankName || m.bank_name || ""),
-      accountNumber: String(m.accountNumber || m.account_number || ""),
-      ifsc: String(m.ifsc || ""),
-      status: String(m.status || "PENDING").toUpperCase(),
-      createdAt: String(m.createdAt || m.created_at_text || m.created_at || new Date().toLocaleString())
-    };
-  }
-  function readLocal(){
-    try {
-      const raw = JSON.parse(localStorage.getItem(PM_STORE_KEY) || "[]");
-      return Array.isArray(raw) ? raw.map(normalizeMethod) : [];
-    } catch(e){ return []; }
-  }
-  function writeLocal(){
-    try {
-      const all = getAll().map(normalizeMethod);
-      localStorage.setItem(PM_STORE_KEY, JSON.stringify(all));
-    } catch(e){}
-  }
-  function mergeMethods(list){
-    const map = new Map();
-
-    // Existing first
-    getAll().map(normalizeMethod).forEach(m => {
-      const key = accountKey(m) || m.id;
-      map.set(key, m);
-    });
-
-    // Incoming overwrites only if newer/id exists or status is more final
-    (list || []).map(normalizeMethod).forEach(m => {
-      const key = accountKey(m) || m.id;
-      const old = map.get(key);
-      if (!old) {
-        map.set(key, m);
-        return;
-      }
-      const rank = s => s === "APPROVED" ? 3 : (s === "PENDING" ? 2 : (s === "REJECTED" ? 1 : 0));
-      if (rank(m.status) >= rank(old.status)) map.set(key, { ...old, ...m });
-    });
-
-    state.userPayoutMethods = Array.from(map.values());
-    state.payoutMethods = state.userPayoutMethods;
-    writeLocal();
-    try { saveState?.(); } catch(e){}
-  }
-  async function loadFromDb(){
-    const client = sb();
-    if (!client) return [];
-    try {
-      const id = uid();
-      let res = await paymentDbTry((q) => q.select("*").eq("user_id", id));
-      if (res.error) {
-        // fallback: try all, then filter locally
-        res = await paymentDbTry((q) => q.select("*"));
-        if (res.error) throw res.error;
-        return (res.data || []).filter(r => String(r.user_id || "") === id).map(normalizeMethod);
-      }
-      return (res.data || []).map(normalizeMethod);
-    } catch(e) {
-      console.warn("Payment methods DB load failed", e);
-      return [];
-    }
-  }
-  async function hydratePaymentMethods(){
-    if (!state?.user) return;
-
-    const local = readLocal();
-    if (local.length) mergeMethods(local);
-
-    const dbRows = await loadFromDb();
-    if (dbRows.length) mergeMethods(dbRows);
-
-    loadedOnce = true;
-
-    try { window.renderAdminPaymentRequestsFixed?.(); } catch(e){}
-    try {
-      const p = document.getElementById("paymentMethodsPage");
-      if (p && p.classList.contains("active-page")) {
-        window.kprRenderPayment?.();
-        window.renderPaymentMethodsPage?.();
-      }
-    } catch(e){}
-  }
-
-  function patchSaveState(){
-    if (window.__paymentPersistSavePatched) return;
-    window.__paymentPersistSavePatched = true;
-
-    const oldSave = typeof window.saveState === "function" ? window.saveState : (typeof saveState === "function" ? saveState : null);
-    if (oldSave) {
-      window.saveState = function(){
-        writeLocal();
-        return oldSave.apply(this, arguments);
-      };
-      try { saveState = window.saveState; } catch(e){}
-    }
-  }
-
-  function patchSubmitToPersist(){
-    if (window.__paymentPersistSubmitPatched) return;
-    window.__paymentPersistSubmitPatched = true;
-
-    document.addEventListener("submit", function(e){
-      if (e.target?.id === "kprPaymentForm" || e.target?.id === "routePaymentForm" || e.target?.closest("#paymentMethodsPage")) {
-        setTimeout(() => {
-          writeLocal();
-          hydratePaymentMethods();
-        }, 600);
-      }
-    }, true);
-
-    document.addEventListener("click", function(e){
-      const txt = (e.target?.textContent || "").toLowerCase();
-      if (txt.includes("payment method") || txt.includes("payout") || txt.includes("approve") || txt.includes("reject")) {
-        setTimeout(() => {
-          writeLocal();
-          hydratePaymentMethods();
-        }, 700);
-      }
-    }, true);
-  }
-
-  window.hydratePaymentMethodsPersist = hydratePaymentMethods;
-  window.savePaymentMethodsPersistLocal = writeLocal;
-
-  document.addEventListener("DOMContentLoaded", () => {
-    patchSaveState();
-    patchSubmitToPersist();
-    setTimeout(hydratePaymentMethods, 900);
-  });
-  window.addEventListener("load", () => {
-    patchSaveState();
-    patchSubmitToPersist();
-    setTimeout(hydratePaymentMethods, 1200);
-    setTimeout(hydratePaymentMethods, 2500);
-  });
-})();
-
-
-/* ===== PAYMENT FINAL SUBMIT LOCK + ADMIN PUSH FIX ===== */
-(function(){
-  const STORE = "ai_trading_payment_methods_persist_v2";
-  let lock = false;
-
-  function sb(){
-    try {
-      if (window.supabaseClient) return window.supabaseClient;
-      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
-    } catch(e){}
-    return null;
-  }
-  function u(){ return state?.user || {}; }
-  function uid(){ return String(u().id || u().email || "local"); }
-  function email(){ return String(u().email || ""); }
-  function kycName(){ return u().kycName || u().kyc_name || u().name || u().email?.split("@")[0] || "User"; }
-  function norm(v){ return String(v || "").trim().toLowerCase().replace(/\s+/g, ""); }
-  function all(){
-    state.userPayoutMethods ||= state.payoutMethods || [];
-    state.payoutMethods = state.userPayoutMethods;
-    return state.userPayoutMethods;
-  }
-  function typeOf(m){ return String(m.type || m.method || m.method_type || "").toUpperCase(); }
-  function normalize(m){
-    return {
-      id: String(m.id || ("pm_" + Date.now() + "_" + Math.random().toString(16).slice(2))),
-      userId: String(m.userId || m.user_id || uid()),
-      userEmail: String(m.userEmail || m.user_email || email()),
-      type: typeOf(m) || "UPI",
-      upi: String(m.upi || m.upi_id || ""),
-      holderName: String(m.holderName || m.holder_name || kycName()),
-      kycName: String(m.kycName || m.kyc_name_snapshot || kycName()),
+      holderName: String(m.holderName || m.holder_name || holderName()),
+      kycName: String(m.kycName || m.kyc_name_snapshot || holderName()),
       bankName: String(m.bankName || m.bank_name || ""),
       accountNumber: String(m.accountNumber || m.account_number || ""),
       ifsc: String(m.ifsc || "").toUpperCase(),
@@ -7027,95 +6590,239 @@ function restoreManualHistoryBackup(mode = state.mode) {
       createdAt: String(m.createdAt || m.created_at_text || m.created_at || new Date().toLocaleString())
     };
   }
-  function key(m){
-    m = normalize(m);
+  function keyOf(m){
+    m = normalizeMethod(m);
     if (m.type === "UPI") return m.userId + "|UPI|" + norm(m.upi);
     return m.userId + "|BANK|" + norm(m.accountNumber) + "|" + norm(m.ifsc);
   }
-  function readStore(){
-    try {
-      const arr = JSON.parse(localStorage.getItem(STORE) || "[]");
-      return Array.isArray(arr) ? arr.map(normalize) : [];
-    } catch(e){ return []; }
-  }
-  function writeStore(){
-    const merged = mergeArrays(readStore(), all());
-    localStorage.setItem(STORE, JSON.stringify(merged));
-    localStorage.setItem("ai_trading_payment_methods_persist_v1", JSON.stringify(merged));
-  }
-  function rank(s){
+  function rankStatus(s){
     s = String(s || "").toUpperCase();
     if (s === "APPROVED") return 3;
     if (s === "PENDING") return 2;
     if (s === "REJECTED") return 1;
     return 0;
   }
-  function mergeArrays(){
+  function readLocal(){
+    try {
+      const arr = JSON.parse(localStorage.getItem(STORE) || "[]");
+      return Array.isArray(arr) ? arr.map(normalizeMethod) : [];
+    } catch(e){ return []; }
+  }
+  function mergeLists(){
     const map = new Map();
     for (const list of arguments) {
-      (list || []).map(normalize).forEach(m => {
-        const k = key(m) || m.id;
+      (list || []).map(normalizeMethod).forEach(m => {
+        const k = keyOf(m) || m.id;
         const old = map.get(k);
-        if (!old || rank(m.status) >= rank(old.status)) map.set(k, { ...(old || {}), ...m });
+        if (!old || rankStatus(m.status) >= rankStatus(old.status)) map.set(k, { ...(old || {}), ...m });
       });
     }
     return Array.from(map.values());
   }
-  function syncState(extra=[]){
-    const merged = mergeArrays(all(), readStore(), extra);
+  function sync(extra=[]){
+    const merged = mergeLists(rawList(), readLocal(), extra);
     state.userPayoutMethods = merged;
     state.payoutMethods = merged;
-    writeStore();
+    localStorage.setItem(STORE, JSON.stringify(merged));
     try { saveState?.(); } catch(e){}
     try { saveSession?.(); } catch(e){}
     return merged;
   }
   function myMethods(){
-    return syncState().filter(m => String(m.userId) === uid());
+    return sync().filter(m => String(m.userId) === uid());
   }
-  function currentType(form){
-    const sel = document.getElementById("kprPayType") || form?.querySelector("select[name='type']");
-    return String(sel?.value || localStorage.getItem("kpr_pm_type") || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI";
+  function count(t){
+    return myMethods().filter(m => m.type === t).length;
   }
-  function duplicateExists(method){
-    const k = key(method);
-    return myMethods().some(m => {
-      const st = String(m.status || "PENDING").toUpperCase();
-      return (st === "PENDING" || st === "APPROVED") && key(m) === k;
+  function kycApproved(){
+    const st = String(user().kycStatus || user().kyc_status || "").toUpperCase();
+    if (st === "APPROVED") return true;
+    const rows = state?.kycRequests || [];
+    return rows.some(k => {
+      const same = String(k.userId || k.user_id || "") === uid() || String(k.userEmail || k.user_email || "").toLowerCase() === email().toLowerCase();
+      return same && String(k.status || "").toUpperCase() === "APPROVED";
     });
   }
-  function setButton(btn, mode){
-    if (!btn) return;
-    if (mode === "loading") {
-      btn.dataset.oldText = btn.dataset.oldText || btn.textContent || "Add Method for Admin Approval";
-      btn.disabled = true;
-      btn.textContent = "Sending request...";
-      btn.classList.add("kpr-saving");
-    } else if (mode === "done") {
-      btn.disabled = true;
-      btn.textContent = "Request Sent ✓";
-      btn.classList.remove("kpr-saving");
-      btn.classList.add("kpr-saved");
-    } else {
-      btn.disabled = false;
-      btn.textContent = btn.dataset.oldText || "Add Method for Admin Approval";
-      btn.classList.remove("kpr-saving","kpr-saved");
+  function canAdd(t=type){
+    return t === "BANK" ? count("BANK") < MAX_BANK : count("UPI") < MAX_UPI;
+  }
+  function duplicate(method){
+    const k = keyOf(method);
+    return myMethods().some(m => {
+      const st = String(m.status || "").toUpperCase();
+      return (st === "PENDING" || st === "APPROVED") && keyOf(m) === k;
+    });
+  }
+  function dbRow(m){
+    return {
+      id: m.id,
+      user_id: m.userId,
+      user_email: m.userEmail,
+      method_type: m.type,
+      holder_name: m.holderName,
+      kyc_name_snapshot: m.kycName,
+      upi_id: m.upi,
+      bank_name: m.bankName,
+      account_number: m.accountNumber,
+      ifsc: m.ifsc,
+      status: m.status,
+      name_match: true,
+      created_at_text: m.createdAt
+    };
+  }
+  async function dbSave(method){
+    const c = client();
+    if (!c) return { ok:false, reason:"no_supabase_client" };
+    try {
+      const res = await c.from(TABLE).upsert(dbRow(method), { onConflict:"id" });
+      if (res.error) return { ok:false, reason:res.error.message };
+      return { ok:true };
+    } catch(e){
+      return { ok:false, reason:e.message || String(e) };
     }
   }
-  function toastMsg(msg){
-    try { toast?.(msg); } catch(e){ alert(msg); }
+  async function dbLoad(){
+    const c = client();
+    if (!c || !state?.user) return [];
+    try {
+      const res = await c.from(TABLE).select("*").eq("user_id", uid());
+      if (res.error) {
+        console.warn("Payment method DB load failed:", res.error.message);
+        return [];
+      }
+      return (res.data || []).map(normalizeMethod);
+    } catch(e){
+      console.warn("Payment method DB load failed:", e);
+      return [];
+    }
+  }
+  async function dbUpdate(id, status){
+    const c = client();
+    if (!c) return { ok:false };
+    try {
+      const res = await c.from(TABLE).update({ status, reviewed_at:new Date().toISOString() }).eq("id", id);
+      if (res.error) {
+        console.warn("Payment method DB update failed:", res.error.message);
+        return { ok:false, reason:res.error.message };
+      }
+      return { ok:true };
+    } catch(e){ return { ok:false, reason:e.message || String(e) }; }
+  }
+  async function hydrate(){
+    const rows = await dbLoad();
+    sync(rows);
+    renderAdmin();
+  }
+  function mask(m){
+    m = normalizeMethod(m);
+    if (m.type === "UPI") return m.upi || "-";
+    return `${m.bankName || "Bank"} ${m.accountNumber ? "****" + String(m.accountNumber).slice(-4) : ""}`;
+  }
+  function statusPill(st){
+    st = String(st || "PENDING").toUpperCase();
+    return `<em class="pm-single-status ${st.toLowerCase()}">${st}</em>`;
+  }
+  function methodHtml(m){
+    return `<div class="card menu-real-method-card">
+      <div>
+        <span>${m.type}</span>
+        <b>${mask(m)}</b>
+        <small>${m.holderName}</small>
+      </div>
+      ${statusPill(m.status)}
+    </div>`;
+  }
+  function paymentHtml(){
+    const approved = kycApproved();
+    const ok = approved && canAdd(type);
+    const limitText = type === "BANK" ? `You can add only ${MAX_BANK} bank accounts.` : `You can add only ${MAX_UPI} UPI IDs.`;
+    const list = myMethods();
+
+    return `
+      <div class="pm-single-warning">${WARNING}</div>
+      ${approved ? "" : `<div class="card pm-single-note"><b>KYC Approval Required</b><span>Please complete approved KYC before adding a payment method.</span></div>`}
+
+      <form id="pmSingleForm" class="card menu-real-form ${approved ? "" : "disabled"}">
+        <label>Method Type
+          <select id="pmSingleType" name="type" ${approved ? "" : "disabled"}>
+            <option value="UPI" ${type === "UPI" ? "selected" : ""}>UPI</option>
+            <option value="BANK" ${type === "BANK" ? "selected" : ""}>Bank Account</option>
+          </select>
+        </label>
+
+        <label class="pm-single-upi">UPI ID
+          <input name="upi" placeholder="example@upi" ${approved ? "" : "disabled"}>
+        </label>
+
+        <label>Account Holder Name / KYC Name
+          <input name="holderName" value="${holderName()}" readonly>
+        </label>
+
+        <div class="pm-single-bank">
+          <label>Bank Name
+            <input name="bankName" placeholder="Bank name" ${approved ? "" : "disabled"}>
+          </label>
+          <label>Account Number
+            <input name="accountNumber" placeholder="Account number" ${approved ? "" : "disabled"}>
+          </label>
+          <label>IFSC Code
+            <input name="ifsc" placeholder="IFSC code" ${approved ? "" : "disabled"}>
+          </label>
+        </div>
+
+        <div class="pm-single-limit">${ok ? `<span>Limit: UPI ${count("UPI")}/${MAX_UPI} • Bank ${count("BANK")}/${MAX_BANK}</span>` : `<b>${approved ? limitText : "KYC approval required"}</b>`}</div>
+        <button type="submit" ${ok ? "" : "disabled"}>${ok ? "Add Method for Admin Approval" : "Not Available"}</button>
+      </form>
+
+      <div class="menu-real-section-title">Saved Methods</div>
+      <div class="menu-real-methods">${list.length ? list.map(methodHtml).join("") : `<div class="card menu-real-empty">No payment method added yet.</div>`}</div>`;
+  }
+  function applyTypeView(){
+    const p = page();
+    const sel = document.getElementById("pmSingleType");
+    if (sel && sel.value !== type) sel.value = type;
+    p?.classList.toggle("pm-single-bank-selected", type === "BANK");
+    p?.querySelectorAll(".pm-single-bank").forEach(el => el.style.display = type === "BANK" ? "grid" : "none");
+    p?.querySelectorAll(".pm-single-upi").forEach(el => el.style.display = type === "BANK" ? "none" : "grid");
+  }
+  function bind(){
+    const sel = document.getElementById("pmSingleType");
+    const form = document.getElementById("pmSingleForm");
+    sel?.addEventListener("change", () => {
+      type = String(sel.value || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI";
+      localStorage.setItem("pm_single_type", type);
+      renderPayment();
+    }, true);
+    form?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      await submit(form);
+    }, true);
+  }
+  function renderPayment(){
+    if (!isPaymentOpen() || rendering) return;
+    const r = root();
+    if (!r) return;
+    rendering = true;
+    try {
+      r.innerHTML = paymentHtml();
+      bind();
+      applyTypeView();
+    } finally {
+      rendering = false;
+    }
   }
   function buildMethod(form){
     const fd = new FormData(form);
-    const type = currentType(form);
-    return normalize({
+    return normalizeMethod({
       id: "pm_" + Date.now(),
       userId: uid(),
       userEmail: email(),
       type,
       upi: type === "UPI" ? String(fd.get("upi") || "").trim() : "",
-      holderName: kycName(),
-      kycName: kycName(),
+      holderName: holderName(),
+      kycName: holderName(),
       bankName: type === "BANK" ? String(fd.get("bankName") || "").trim() : "",
       accountNumber: type === "BANK" ? String(fd.get("accountNumber") || "").trim() : "",
       ifsc: type === "BANK" ? String(fd.get("ifsc") || "").trim().toUpperCase() : "",
@@ -7123,176 +6830,168 @@ function restoreManualHistoryBackup(mode = state.mode) {
       createdAt: new Date().toLocaleString()
     });
   }
-  async function saveDb(method){
-    const client = sb();
-    if (!client) return { ok:false, reason:"no_client" };
-    try {
-      const res = await paymentDbTry((q) => q.upsert(paymentMethodDbRow(method), { onConflict:"id" }));
-      if (res.error) return { ok:false, reason:res.error.message };
-      return { ok:true };
-    } catch(e){
-      return { ok:false, reason:e.message || String(e) };
+  function buttonState(btn, mode){
+    if (!btn) return;
+    if (mode === "loading") {
+      btn.dataset.oldText = btn.dataset.oldText || btn.textContent;
+      btn.disabled = true;
+      btn.classList.add("pm-single-saving");
+      btn.textContent = "Sending request...";
+    } else if (mode === "done") {
+      btn.disabled = true;
+      btn.classList.remove("pm-single-saving");
+      btn.classList.add("pm-single-saved");
+      btn.textContent = "Request Sent ✓";
+    } else {
+      btn.disabled = false;
+      btn.classList.remove("pm-single-saving","pm-single-saved");
+      btn.textContent = btn.dataset.oldText || "Add Method for Admin Approval";
     }
   }
-  function mask(m){
-    m = normalize(m);
-    if (m.type === "UPI") return m.upi || "-";
-    return `${m.bankName || "Bank"} ${m.accountNumber ? "****" + String(m.accountNumber).slice(-4) : ""}`;
+  async function submit(form){
+    if (busy) return;
+    busy = true;
+    const btn = form.querySelector("button[type='submit'],button");
+    buttonState(btn, "loading");
+    try {
+      if (!kycApproved()) {
+        alert("Please complete approved KYC before adding payment method.");
+        buttonState(btn, "normal");
+        return;
+      }
+      const method = buildMethod(form);
+      if (method.type === "UPI" && !method.upi) {
+        alert("Please enter UPI ID.");
+        buttonState(btn, "normal");
+        return;
+      }
+      if (method.type === "BANK" && (!method.bankName || !method.accountNumber || !method.ifsc)) {
+        alert("Please enter complete bank details.");
+        buttonState(btn, "normal");
+        return;
+      }
+      if (duplicate(method)) {
+        alert("This payment method is already pending or approved.");
+        buttonState(btn, "normal");
+        return;
+      }
+
+      // Persist before DB/render so it never disappears.
+      sync([method]);
+      renderAdmin();
+      buttonState(btn, "done");
+
+      const db = await dbSave(method);
+      if (!db.ok) {
+        toastMsg("Saved locally. DB save failed: check user_payout_methods RLS/columns.");
+        console.warn("Payment method DB save failed:", db.reason);
+      } else {
+        toastMsg("Payment method request sent to admin.");
+      }
+      setTimeout(renderPayment, 900);
+      setTimeout(renderAdmin, 900);
+    } finally {
+      setTimeout(() => { busy = false; }, 1400);
+    }
   }
   function renderAdmin(){
     const body = document.getElementById("paymentRequestsLog") ||
       document.getElementById("payoutRequestsLog") ||
       document.getElementById("adminPayoutRequestsList");
     if (!body) return;
-    const rows = syncState();
+    const rows = sync();
     const html = rows.length ? rows.map(m => {
-      m = normalize(m);
-      const st = m.status;
+      const st = String(m.status || "PENDING").toUpperCase();
       return `<tr>
         <td>${m.userEmail || m.userId || "-"}</td>
         <td>${m.type}</td>
         <td>${mask(m)}</td>
         <td>${m.holderName || "-"}</td>
-        <td><span class="kpr-admin-status ${st.toLowerCase()}">${st}</span></td>
-        <td>${st === "PENDING" ? `<button class="approve-btn" onclick="approvePayoutMethod('${m.id}')">Approve</button><button class="reject-btn" onclick="rejectPayoutMethod('${m.id}')">Reject</button>` : `<span class="kpr-admin-locked">Locked</span>`}</td>
+        <td>${statusPill(st)}</td>
+        <td>${st === "PENDING" ? `<button class="approve-btn" onclick="approvePayoutMethod('${m.id}')">Approve</button><button class="reject-btn" onclick="rejectPayoutMethod('${m.id}')">Reject</button>` : `<span class="pm-single-locked">Locked</span>`}</td>
       </tr>`;
     }).join("") : `<tr><td colspan="6" class="empty">No payout method requests.</td></tr>`;
     if (body.tagName === "TBODY") body.innerHTML = html;
     else body.innerHTML = `<table><tbody>${html}</tbody></table>`;
   }
-  function renderUser(){
-    try { window.kprRenderPayment?.(); } catch(e){}
-    try { window.renderPaymentMethodsPage?.(); } catch(e){}
+  async function setStatus(id, status){
+    const rows = sync();
+    const row = rows.find(m => String(m.id) === String(id));
+    if (row) row.status = status;
+    sync(rows);
+    await dbUpdate(id, status);
+    renderAdmin();
+    renderPayment();
   }
-  async function finalSubmit(form){
-    if (lock) return;
-    lock = true;
-    const btn = form.querySelector("button[type='submit'],button");
-    setButton(btn, "loading");
-    try {
-      const method = buildMethod(form);
-      if (method.type === "UPI" && !method.upi) {
-        setButton(btn, "normal");
-        alert("Please enter UPI ID.");
-        return;
-      }
-      if (method.type === "BANK" && (!method.bankName || !method.accountNumber || !method.ifsc)) {
-        setButton(btn, "normal");
-        alert("Please enter complete bank details.");
-        return;
-      }
-      if (duplicateExists(method)) {
-        setButton(btn, "normal");
-        alert("This payment method is already pending or approved.");
-        return;
-      }
+  function patchGlobals(){
+    window.renderPaymentMethodsPage = renderPayment;
+    window.kprRenderPayment = renderPayment;
+    window.renderAdminPaymentRequestsFixed = renderAdmin;
+    window.approvePayoutMethod = (id) => setStatus(id, "APPROVED");
+    window.rejectPayoutMethod = (id) => setStatus(id, "REJECTED");
 
-      // Add and persist BEFORE any render/DB call, so it cannot disappear.
-      syncState([method]);
-      setButton(btn, "done");
-      renderAdmin();
-
-      const db = await saveDb(method);
-      if (!db.ok) {
-        console.warn("Payment DB save failed:", db.reason);
-        toastMsg("Request saved on this browser. DB save issue: check Supabase RLS/table.");
-      } else {
-        toastMsg("Payment method request sent to admin.");
-      }
-
-      setTimeout(() => {
-        renderUser();
-        renderAdmin();
-      }, 250);
-    } finally {
-      setTimeout(() => { lock = false; }, 1500);
+    const oldShowPage = window.showPage;
+    if (typeof oldShowPage === "function" && !window.__pmSingleShowPatched) {
+      window.__pmSingleShowPatched = true;
+      window.showPage = function(pageId){
+        const res = oldShowPage.apply(this, arguments);
+        if (pageId === "paymentMethodsPage" || pageId === "paymentMethods") {
+          setTimeout(renderPayment, 80);
+          setTimeout(renderPayment, 500);
+        }
+        return res;
+      };
+      try { showPage = window.showPage; } catch(e){}
+    }
+    const oldOpen = window.openRealMenuPage;
+    if (typeof oldOpen === "function" && !window.__pmSingleMenuPatched) {
+      window.__pmSingleMenuPatched = true;
+      window.openRealMenuPage = function(route){
+        const res = oldOpen.apply(this, arguments);
+        if (route === "paymentMethods") {
+          setTimeout(renderPayment, 80);
+          setTimeout(renderPayment, 500);
+        }
+        return res;
+      };
+      try { openRealMenuPage = window.openRealMenuPage; } catch(e){}
     }
   }
-  function interceptSubmit(e){
+  document.addEventListener("submit", function(e){
     const form = e.target?.closest?.("form") || e.target;
     if (!form) return;
-    const isPaymentForm =
-      form.id === "kprPaymentForm" ||
-      form.id === "routePaymentForm" ||
-      !!form.closest("#paymentMethodsPage");
-    if (!isPaymentForm) return;
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-    finalSubmit(form);
-  }
-  function interceptClick(e){
-    const btn = e.target.closest("button");
-    if (!btn) return;
-    const form = btn.closest("form");
-    if (!form) return;
-    const isPaymentForm =
-      form.id === "kprPaymentForm" ||
-      form.id === "routePaymentForm" ||
-      !!form.closest("#paymentMethodsPage");
-    if (!isPaymentForm) return;
-    if ((btn.type || "submit").toLowerCase() === "submit") {
+    if (form.id === "pmSingleForm" || form.closest("#paymentMethodsPage")) {
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
-      finalSubmit(form);
+      submit(form);
     }
-  }
-  async function hydrateDb(){
-    const client = sb();
-    let dbRows = [];
-    if (client && state?.user) {
-      try {
-        let res = await paymentDbTry((q) => q.select("*").eq("user_id", uid()));
-        if (!res.error) dbRows = (res.data || []).map(normalize);
-      } catch(e){}
+  }, true);
+  document.addEventListener("click", function(e){
+    const text = (e.target?.textContent || "").toLowerCase();
+    const pageId = e.target.closest("[data-page]")?.dataset?.page || "";
+    const menuId = e.target.closest("[data-menu-page]")?.dataset?.menuPage || "";
+    if (pageId === "paymentMethodsPage" || pageId === "paymentMethods" || menuId === "paymentMethods" || text.includes("payment method")) {
+      setTimeout(renderPayment, 100);
+      setTimeout(renderPayment, 600);
     }
-    syncState(dbRows);
-    renderAdmin();
-  }
-  function patchApprovals(){
-    if (window.__paymentFinalSubmitApprovalsPatched) return;
-    window.__paymentFinalSubmitApprovalsPatched = true;
+    const tab = e.target.closest("[data-admin-tab]")?.dataset?.adminTab || "";
+    if (text.includes("payout") || text.includes("payment request") || tab.toLowerCase().includes("payment")) {
+      setTimeout(renderAdmin, 150);
+      setTimeout(renderAdmin, 700);
+    }
+  }, true);
 
-    window.approvePayoutMethod = async function(id){
-      const rows = syncState();
-      const row = rows.find(m => String(m.id) === String(id));
-      if (row) row.status = "APPROVED";
-      syncState(rows);
-      const client = sb();
-      if (client) {
-        const res = await paymentDbTry((q) => q.update({ status:"APPROVED", reviewed_at:new Date().toISOString() }).eq("id", id));
-        if (res.error) console.warn("Approve payout DB failed", res.error);
-      }
-      renderAdmin();
-      renderUser();
-    };
-    window.rejectPayoutMethod = async function(id){
-      const rows = syncState();
-      const row = rows.find(m => String(m.id) === String(id));
-      if (row) row.status = "REJECTED";
-      syncState(rows);
-      const client = sb();
-      if (client) {
-        const res = await paymentDbTry((q) => q.update({ status:"REJECTED", reviewed_at:new Date().toISOString() }).eq("id", id));
-        if (res.error) console.warn("Reject payout DB failed", res.error);
-      }
-      renderAdmin();
-      renderUser();
-    };
-  }
   function boot(){
-    patchApprovals();
-    syncState();
-    hydrateDb();
+    patchGlobals();
+    sync();
+    hydrate();
     renderAdmin();
+    if (isPaymentOpen()) renderPayment();
   }
-  document.addEventListener("submit", interceptSubmit, true);
-  document.addEventListener("click", interceptClick, true);
   document.addEventListener("DOMContentLoaded", () => setTimeout(boot, 900));
   window.addEventListener("load", () => {
     setTimeout(boot, 1000);
     setTimeout(boot, 2500);
   });
-  window.paymentFinalSubmitHydrate = boot;
 })();

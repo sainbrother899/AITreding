@@ -6160,43 +6160,45 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
 }
 
 
-/* ===== PAYMENT SUBMIT FEEDBACK + ADMIN VISIBILITY FIX ===== */
-.kpr-saving{
-  opacity:.75!important;
-  pointer-events:none!important;
-}
-.kpr-saved{
-  background:#00e7a8!important;
-  color:#06101e!important;
-  pointer-events:none!important;
-}
-.kpr-admin-status{
-  display:inline-flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  border-radius:999px!important;
-  padding:5px 9px!important;
-  font-size:11px!important;
-  font-weight:900!important;
-}
-.kpr-admin-status.pending{color:#f8bd7a!important;background:rgba(248,189,122,.13)!important;}
-.kpr-admin-status.approved{color:#00e7a8!important;background:rgba(0,231,168,.13)!important;}
-.kpr-admin-status.rejected{color:#ff456b!important;background:rgba(255,69,107,.13)!important;}
-.kpr-admin-locked{
-  color:#9fb2d0!important;
+
+
+
+/* ===== PAYMENT METHOD SINGLE OWNER FINAL ===== */
+.pm-single-warning{
+  border:1px solid rgba(248,189,122,.22)!important;
+  background:rgba(248,189,122,.075)!important;
+  color:#f8bd7a!important;
+  border-radius:14px!important;
+  padding:11px 12px!important;
   font-size:12px!important;
-  font-weight:800!important;
+  line-height:1.4!important;
+  text-transform:uppercase!important;
+  font-weight:850!important;
 }
-
-
-/* ===== PAYMENT FINAL SUBMIT LOCK + ADMIN PUSH FIX ===== */
-.kpr-saving{opacity:.75!important;pointer-events:none!important;}
-.kpr-saved{background:#00e7a8!important;color:#06101e!important;pointer-events:none!important;}
-.kpr-admin-status{
-  display:inline-flex!important;align-items:center!important;justify-content:center!important;
-  border-radius:999px!important;padding:5px 9px!important;font-size:11px!important;font-weight:900!important;
+.pm-single-note{padding:12px!important;}
+.pm-single-note b{display:block!important;color:#f8bd7a!important;margin-bottom:4px!important;}
+.pm-single-note span{color:#9fb2d0!important;font-size:12px!important;}
+.pm-single-bank{display:none!important;gap:11px!important;}
+#paymentMethodsPage.pm-single-bank-selected .pm-single-bank{display:grid!important;}
+#paymentMethodsPage.pm-single-bank-selected .pm-single-upi{display:none!important;}
+.pm-single-limit{
+  border:1px solid rgba(255,255,255,.08)!important;
+  background:rgba(255,255,255,.035)!important;
+  border-radius:13px!important;
+  padding:9px 11px!important;
 }
-.kpr-admin-status.pending{color:#f8bd7a!important;background:rgba(248,189,122,.13)!important;}
-.kpr-admin-status.approved{color:#00e7a8!important;background:rgba(0,231,168,.13)!important;}
-.kpr-admin-status.rejected{color:#ff456b!important;background:rgba(255,69,107,.13)!important;}
-.kpr-admin-locked{color:#9fb2d0!important;font-size:12px!important;font-weight:800!important;}
+.pm-single-limit span{color:#9fb2d0!important;font-size:12px!important;font-weight:850!important;}
+.pm-single-limit b{color:#ff456b!important;font-size:12px!important;}
+.pm-single-status{
+  font-style:normal!important;
+  font-size:11px!important;
+  font-weight:950!important;
+  border-radius:999px!important;
+  padding:6px 10px!important;
+}
+.pm-single-status.pending{color:#f8bd7a!important;background:rgba(248,189,122,.13)!important;}
+.pm-single-status.approved{color:#00e7a8!important;background:rgba(0,231,168,.13)!important;}
+.pm-single-status.rejected{color:#ff456b!important;background:rgba(255,69,107,.13)!important;}
+.pm-single-saving{opacity:.75!important;pointer-events:none!important;}
+.pm-single-saved{background:#00e7a8!important;color:#06101e!important;pointer-events:none!important;}
+.pm-single-locked{color:#9fb2d0!important;font-size:12px!important;font-weight:800!important;}

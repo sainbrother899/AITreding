@@ -1109,3 +1109,14 @@ Clean ZIP Note:
 - Active app.js is the only JS logic file for the site.
 - Payment Methods / Payout Methods use only public.user_payout_methods.
 - No app-before-* backup files are included in this clean package.
+
+
+Payment Method Single Owner Final:
+- Removed previous payment-only patch modules:
+  [{"marker": "PAYMENT SUBMIT FEEDBACK + ADMIN VISIBILITY FIX", "js": 1, "css": 1}, {"marker": "PAYMENT METHOD PERSIST REFRESH FIX", "js": 1, "css": 0}, {"marker": "PAYMENT FINAL SUBMIT LOCK + ADMIN PUSH FIX", "js": 1, "css": 1}, {"marker": "ONLY USER PAYOUT METHODS TABLE FINAL", "js": 1, "css": 0}]
+- Added one payment method owner module.
+- Payment Methods save/load/approve/reject use only Supabase table: user_payout_methods.
+- New method is saved to local/state before DB call so it should not disappear.
+- Admin request list rendered by the single owner module.
+- KYC/referral/design/trade/chart/wallet untouched.
+- JS syntax check: OK
