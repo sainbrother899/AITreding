@@ -1283,3 +1283,15 @@ Wallet Restore Visible Safe:
 - Keeps new Deposit/Withdrawal/History tabs.
 - Use this instead of AI-Trading-Wallet-Old-Buttons-In-Card-Hide-Fix.zip.
 - JS syntax check: OK
+
+
+Professional Wallet Rebuild Final:
+- Old wallet visible UI is hidden completely.
+- New professional wallet UI is rebuilt from data.
+- New cards: Available Balance, Withdrawable Balance, Approved Deposit, Pending Withdrawal.
+- Deposit / Withdrawal / History tabs.
+- Deposit wizard with 12 digit UTR and duplicate UTR block.
+- Withdrawal wizard with approved payout method selection.
+- Keeps existing DB/state data.
+- Removed old wallet patches: [{"marker": "WALLET RESTORE VISIBLE SAFE FIX", "js": 1, "css": 1}, {"marker": "WALLET ONLY BALANCE CARDS SHOW FIX", "js": 1, "css": 1}, {"marker": "WALLET TOP CARDS AND BUTTON TEXT FIX", "js": 1, "css": 1}, {"marker": "WALLET HISTORY CARDS HIDE TOP FIX", "js": 1, "css": 1}, {"marker": "WALLET BUTTONS TOP POSITION FIX", "js": 0, "css": 1}, {"marker": "OLD WALLET REMOVED SINGLE OWNER FINAL", "js": 1, "css": 1}]
+- JS syntax check: OK

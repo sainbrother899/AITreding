@@ -8072,59 +8072,47 @@ function restoreManualHistoryBackup(mode = state.mode) {
 
 
 
-/* ===== OLD WALLET REMOVED SINGLE OWNER FINAL ===== */
 
-function hideLegacyWalletHistoryCardsFinal(){
-  const page = document.getElementById("wallet") || document.getElementById("walletPage");
-  if (!page) return;
-  page.querySelectorAll(".card").forEach(card => {
-    const txt = (card.textContent || "").toLowerCase();
-    if ((txt.includes("your deposit history") || txt.includes("your withdrawal history")) && !card.closest("#walletSingleOwner")) {
-      card.classList.add("wallet-old-hidden", "wallet-old-history-hidden");
-      card.style.display = "none";
-    }
-  });
-}
 
+
+/* ===== PROFESSIONAL WALLET REBUILD FINAL ===== */
 (function(){
   const DEP_TABLE = "deposit_requests";
   const WIT_TABLE = "withdrawal_requests";
   const PAY_TABLE = "user_payout_methods";
   const SETTINGS_KEY = "ai_trading_deposit_payment_settings_v1";
-  const PAGE_SIZE = 5;
 
-  const dep = { step:1, amount:"", mode:"UPI", utr:"", busy:false, page:1, search:"", status:"ALL", modeFilter:"ALL" };
-  const wit = { step:1, amount:"", methodId:"", busy:false, page:1, search:"", status:"ALL", methodFilter:"ALL" };
-  let activeTab = "deposit";
-  let owning = false;
+  const ui = {
+    tab: "deposit",
+    depStep: 1,
+    depAmount: "",
+    depMode: "UPI",
+    depUtr: "",
+    witStep: 1,
+    witAmount: "",
+    witMethodId: "",
+    busy: false
+  };
 
   function client(){
     try { return window.supabaseClient || (typeof supabaseClient !== "undefined" ? supabaseClient : null); } catch(e){ return null; }
   }
   function user(){ return state?.user || {}; }
-  function uid(){ const x=user(); return String(x.id || x.email || "local"); }
+  function uid(){ const u=user(); return String(u.id || u.email || "local"); }
   function email(){ return String(user().email || ""); }
   function norm(v){ return String(v || "").trim().toLowerCase(); }
-  function money(n){ try { if (typeof window.money === "function") return window.money(n); } catch(e){} return "₹" + Number(n || 0).toLocaleString("en-IN"); }
+  function sameUser(row){
+    return String(row.userId || row.user_id || "") === uid() || norm(row.userEmail || row.user_email || "") === norm(email());
+  }
+  function money(n){
+    try { if (typeof window.money === "function") return window.money(n); } catch(e){}
+    return "₹" + Number(n || 0).toLocaleString("en-IN");
+  }
+  function save(){
+    try { saveState?.(); } catch(e){}
+    try { saveSession?.(); } catch(e){}
+  }
   function toastMsg(msg){ try { toast?.(msg); } catch(e){ alert(msg); } }
-  function save(){ try { saveState?.(); } catch(e){} try { saveSession?.(); } catch(e){} }
-  function sameUser(r){ return String(r.userId || r.user_id || "") === uid() || norm(r.userEmail || r.user_email || "") === norm(email()); }
-
-  function isKycApproved(){
-    const st = String(user().kycStatus || user().kyc_status || "").toUpperCase();
-    if (st === "APPROVED") return true;
-    return (state?.kycRequests || []).some(k => sameUser(k) && String(k.status || "").toUpperCase() === "APPROVED");
-  }
-
-  function walletData(){
-    const id = uid();
-    state.accounts ||= {};
-    state.accounts[id] ||= {};
-    const base = Number(user().balance || state.accounts[id].balance || state.accounts[id].realBalance || 0);
-    const approvedDeposits = depRows().filter(d => sameUser(d) && d.status === "APPROVED").reduce((s,d)=>s+Number(d.amount||0),0);
-    const pendingWithdrawal = witRows().filter(w => sameUser(w) && w.status === "PENDING").reduce((s,w)=>s+Number(w.amount||0),0);
-    return { balance: base, withdrawable: Math.max(0, base - pendingWithdrawal), approvedDeposits, pendingWithdrawal };
-  }
 
   function settings(){
     const def = {
@@ -8139,53 +8127,75 @@ function hideLegacyWalletHistoryCardsFinal(){
     try { return { ...def, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") || {}) }; } catch(e){ return def; }
   }
 
+  function isKycApproved(){
+    const s = String(user().kycStatus || user().kyc_status || "").toUpperCase();
+    if (s === "APPROVED") return true;
+    return (state.kycRequests || []).some(k => sameUser(k) && String(k.status || "").toUpperCase() === "APPROVED");
+  }
+
   function depRows(){
     state.depositRequests ||= [];
     return state.depositRequests.map(d => ({
-      id:String(d.id || d.deposit_id || ""),
-      userId:String(d.userId || d.user_id || ""),
-      userEmail:String(d.userEmail || d.user_email || ""),
-      amount:Number(d.amount || 0),
-      mode:String(d.mode || d.payment_mode || d.method || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI",
-      utr:String(d.utr || d.transactionId || d.transaction_id || d.txn || d.txn_id || ""),
-      status:String(d.status || "PENDING").toUpperCase(),
-      createdAt:String(d.createdAt || d.created_at_text || d.created_at || "")
+      id: String(d.id || d.deposit_id || ""),
+      userId: String(d.userId || d.user_id || ""),
+      userEmail: String(d.userEmail || d.user_email || ""),
+      amount: Number(d.amount || 0),
+      mode: String(d.mode || d.payment_mode || d.method || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI",
+      utr: String(d.utr || d.transactionId || d.transaction_id || d.txn || d.txn_id || ""),
+      status: String(d.status || "PENDING").toUpperCase(),
+      createdAt: String(d.createdAt || d.created_at_text || d.created_at || "")
     }));
   }
   function witRows(){
     state.withdrawalRequests ||= [];
     return state.withdrawalRequests.map(w => ({
-      id:String(w.id || w.withdrawal_id || ""),
-      userId:String(w.userId || w.user_id || ""),
-      userEmail:String(w.userEmail || w.user_email || ""),
-      amount:Number(w.amount || 0),
-      methodId:String(w.methodId || w.method_id || ""),
-      methodType:String(w.methodType || w.method_type || w.method || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI",
-      methodText:String(w.methodText || w.method_text || w.account || w.upi || ""),
-      holderName:String(w.holderName || w.holder_name || ""),
-      status:String(w.status || "PENDING").toUpperCase(),
-      createdAt:String(w.createdAt || w.created_at_text || w.created_at || "")
+      id: String(w.id || w.withdrawal_id || ""),
+      userId: String(w.userId || w.user_id || ""),
+      userEmail: String(w.userEmail || w.user_email || ""),
+      amount: Number(w.amount || 0),
+      methodId: String(w.methodId || w.method_id || ""),
+      methodType: String(w.methodType || w.method_type || w.method || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI",
+      methodText: String(w.methodText || w.method_text || w.account || w.upi || ""),
+      holderName: String(w.holderName || w.holder_name || ""),
+      status: String(w.status || "PENDING").toUpperCase(),
+      createdAt: String(w.createdAt || w.created_at_text || w.created_at || "")
     }));
   }
   function payoutMethods(){
     state.userPayoutMethods ||= state.payoutMethods || [];
     return state.userPayoutMethods.map(m => ({
-      id:String(m.id || ""),
-      userId:String(m.userId || m.user_id || ""),
-      userEmail:String(m.userEmail || m.user_email || ""),
-      type:String(m.type || m.method_type || m.method || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI",
-      upi:String(m.upi || m.upi_id || ""),
-      bankName:String(m.bankName || m.bank_name || ""),
-      accountNumber:String(m.accountNumber || m.account_number || ""),
-      ifsc:String(m.ifsc || ""),
-      holderName:String(m.holderName || m.holder_name || ""),
-      status:String(m.status || "PENDING").toUpperCase()
+      id: String(m.id || ""),
+      userId: String(m.userId || m.user_id || ""),
+      userEmail: String(m.userEmail || m.user_email || ""),
+      type: String(m.type || m.method_type || m.method || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI",
+      upi: String(m.upi || m.upi_id || ""),
+      bankName: String(m.bankName || m.bank_name || ""),
+      accountNumber: String(m.accountNumber || m.account_number || ""),
+      ifsc: String(m.ifsc || ""),
+      holderName: String(m.holderName || m.holder_name || ""),
+      status: String(m.status || "PENDING").toUpperCase()
     })).filter(m => sameUser(m) && m.status === "APPROVED");
   }
   function methodLabel(m){
     if (!m) return "-";
     if (m.type === "UPI") return m.upi || "UPI";
-    return `${m.bankName || "Bank"} ${m.accountNumber ? "****" + String(m.accountNumber).slice(-4) : ""}`;
+    return `${m.bankName || "Bank"} ${m.accountNumber ? "••••" + String(m.accountNumber).slice(-4) : ""}`;
+  }
+
+  function walletData(){
+    state.accounts ||= {};
+    state.accounts[uid()] ||= {};
+    const base = Number(user().balance || state.accounts[uid()].balance || state.accounts[uid()].realBalance || 0);
+    const approvedDeposit = depRows().filter(d => sameUser(d) && d.status === "APPROVED").reduce((s,d)=>s+Number(d.amount||0),0);
+    const pendingWithdrawal = witRows().filter(w => sameUser(w) && w.status === "PENDING").reduce((s,w)=>s+Number(w.amount||0),0);
+    const pendingDeposit = depRows().filter(d => sameUser(d) && d.status === "PENDING").reduce((s,d)=>s+Number(d.amount||0),0);
+    return {
+      available: base,
+      withdrawable: Math.max(0, base - pendingWithdrawal),
+      approvedDeposit,
+      pendingWithdrawal,
+      pendingDeposit
+    };
   }
 
   async function loadDb(){
@@ -8200,11 +8210,10 @@ function hideLegacyWalletHistoryCardsFinal(){
       if (!dr.error && dr.data) mergeDeposits(dr.data);
       if (!wr.error && wr.data) mergeWithdrawals(wr.data);
       if (!pr.error && pr.data) mergePayoutMethods(pr.data);
-    } catch(e){ console.warn("Wallet DB load failed:", e); }
+    } catch(e){ console.warn("Professional wallet DB load failed", e); }
   }
   function mergeDeposits(rows){
-    const map = new Map();
-    depRows().forEach(d => map.set(d.id,d));
+    const map = new Map(); depRows().forEach(d => map.set(d.id, d));
     (rows || []).forEach(r => {
       const id = String(r.id || r.deposit_id || ("dep_" + Date.now() + "_" + Math.random()));
       map.set(id, {
@@ -8217,8 +8226,7 @@ function hideLegacyWalletHistoryCardsFinal(){
     state.depositRequests = Array.from(map.values()); save();
   }
   function mergeWithdrawals(rows){
-    const map = new Map();
-    witRows().forEach(w => map.set(w.id,w));
+    const map = new Map(); witRows().forEach(w => map.set(w.id,w));
     (rows || []).forEach(r => {
       const id = String(r.id || r.withdrawal_id || ("wd_" + Date.now() + "_" + Math.random()));
       map.set(id, {
@@ -8232,11 +8240,9 @@ function hideLegacyWalletHistoryCardsFinal(){
     state.withdrawalRequests = Array.from(map.values()); save();
   }
   function mergePayoutMethods(rows){
-    const map = new Map();
-    (state.userPayoutMethods || state.payoutMethods || []).forEach(m => map.set(String(m.id), m));
+    const map = new Map(); (state.userPayoutMethods || state.payoutMethods || []).forEach(m => map.set(String(m.id), m));
     (rows || []).forEach(r => {
-      const id = String(r.id || "");
-      if (!id) return;
+      const id=String(r.id || ""); if(!id) return;
       map.set(id, {
         id, userId:String(r.user_id || r.userId || ""), userEmail:String(r.user_email || r.userEmail || ""),
         type:String(r.method_type || r.type || "UPI").toUpperCase()==="BANK" ? "BANK":"UPI",
@@ -8249,665 +8255,286 @@ function hideLegacyWalletHistoryCardsFinal(){
   }
 
   function walletPage(){
-    return document.getElementById("wallet") || document.getElementById("walletPage") || document.querySelector('[data-page="wallet"]');
+    return document.getElementById("wallet") || document.getElementById("walletPage");
   }
   function isWalletOpen(){
     const p = walletPage();
     if (!p) return false;
     return p.classList.contains("active-page") || getComputedStyle(p).display !== "none";
   }
-  function updateTopCards(){
-    const w = walletData();
-    const values = {
-      walletPageBalance: money(w.balance),
-      withdrawableAmountText: money(w.withdrawable),
-      approvedDepositText: money(w.approvedDeposits),
-      pendingWithdrawalText: money(w.pendingWithdrawal)
-    };
-    Object.entries(values).forEach(([id,val]) => {
+
+  function hideOldWalletUi(){
+    const page = walletPage();
+    if (!page) return;
+    Array.from(page.children).forEach(child => {
+      if (child.id === "professionalWalletRoot") return;
+      child.classList?.add("professional-wallet-old-hidden");
+      child.style.display = "none";
+    });
+    ["depositModal","withdrawModal"].forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.textContent = val;
+      if (el) el.style.display = "none";
     });
   }
 
-  function takeOverWallet(){
+  function renderWallet(){
     const page = walletPage();
-    if (!page || owning) return;
-    owning = true;
-    try {
-      updateTopCards();
-      ["depositModal","withdrawModal"].forEach(id => { const el=document.getElementById(id); if(el) el.remove(); });
+    if (!page) return;
+    hideOldWalletUi();
 
-      hideLegacyWalletHistoryCardsFinal?.();
-      let container = document.getElementById("walletSingleOwner");
-      if (!container) {
-        container = document.createElement("div");
-        container.id = "walletSingleOwner";
-        container.className = "wallet-single-owner";
-
-        // Hide old deposit/withdraw buttons/cards but preserve top balance cards.
-        const oldBtns = page.querySelectorAll("#openDepositBtn,#openDepositBtn2,#openWithdrawBtn,.wallet-actions");
-        oldBtns.forEach(el => {
-          const card = el.closest(".card") || el;
-          card.classList.add("wallet-old-hidden");
-        });
-
-        // Insert directly after wallet overview/top balance cards.
-        // This keeps Deposit / Withdrawal / History buttons near the top,
-        // instead of going below old hidden action/history cards.
-        const preferredAnchors = [
-          document.getElementById("pendingWithdrawalText")?.closest(".card"),
-          document.getElementById("approvedDepositText")?.closest(".card"),
-          document.getElementById("withdrawableAmountText")?.closest(".card"),
-          document.getElementById("walletPageBalance")?.closest(".card")
-        ].filter(Boolean);
-
-        let anchor = preferredAnchors[0] || null;
-
-        if (!anchor) {
-          const visibleCards = Array.from(page.querySelectorAll(".card"))
-            .filter(card => !card.classList.contains("wallet-old-hidden") && card.offsetParent !== null);
-          anchor = visibleCards[Math.min(visibleCards.length - 1, 3)] || visibleCards[0] || null;
-        }
-
-        if (anchor && anchor.parentElement) {
-          anchor.insertAdjacentElement("afterend", container);
-        } else {
-          page.insertAdjacentElement("afterbegin", container);
-        }
-      }
-
-      container.innerHTML = `
-        <div class="wallet-tabs-final">
-          <button type="button" class="${activeTab==="deposit"?"active":""}" data-wallet-tab-final="deposit">Deposit</button>
-          <button type="button" class="${activeTab==="withdraw"?"active":""}" data-wallet-tab-final="withdraw">Withdrawal</button>
-          <button type="button" class="${activeTab==="history"?"active":""}" data-wallet-tab-final="history">History</button>
-        </div>
-        <div id="walletOwnerContent">${activeTab==="withdraw" ? withdrawHtml() : activeTab==="history" ? historyHtml() : depositHtml()}</div>
-      `;
-      bindWallet();
-    } finally {
-      owning = false;
+    let root = document.getElementById("professionalWalletRoot");
+    if (!root) {
+      root = document.createElement("div");
+      root.id = "professionalWalletRoot";
+      root.className = "professional-wallet-root";
+      page.prepend(root);
     }
+    root.style.display = "";
+    root.innerHTML = walletHtml();
+    bindWalletEvents();
   }
 
+  function walletHtml(){
+    const w = walletData();
+    return `
+      <section class="pro-wallet-hero">
+        <div>
+          <p>Wallet</p>
+          <h2>Real Wallet Equity</h2>
+          <strong>${money(w.available)}</strong>
+        </div>
+        <span>LIVE</span>
+      </section>
+
+      <section class="pro-wallet-cards">
+        ${metricCard("Available Balance", w.available, "Funds ready for trade", "💰")}
+        ${metricCard("Withdrawable Balance", w.withdrawable, "Available for withdrawal", "🏦")}
+        ${metricCard("Approved Deposit", w.approvedDeposit, "Verified funds", "✅")}
+        ${metricCard("Pending Withdrawal", w.pendingWithdrawal, "Under review", "⏳")}
+      </section>
+
+      <section class="pro-wallet-tabs">
+        <button class="${ui.tab==="deposit"?"active":""}" data-pro-wallet-tab="deposit">Deposit</button>
+        <button class="${ui.tab==="withdraw"?"active":""}" data-pro-wallet-tab="withdraw">Withdrawal</button>
+        <button class="${ui.tab==="history"?"active":""}" data-pro-wallet-tab="history">History</button>
+      </section>
+
+      <section class="pro-wallet-content">
+        ${ui.tab === "withdraw" ? withdrawHtml() : ui.tab === "history" ? historyHtml() : depositHtml()}
+      </section>
+    `;
+  }
+  function metricCard(title, value, sub, icon){
+    return `<article class="pro-wallet-metric">
+      <div><span>${icon}</span><p>${title}</p></div>
+      <b>${money(value)}</b>
+      <small>${sub}</small>
+    </article>`;
+  }
   function progress(kind, step){
     const labels = kind === "deposit" ? ["Amount","Mode","Pay","UTR"] : ["Amount","Method","Review","Submit"];
-    return `<div class="wallet-progress-final"><div><span>${kind==="deposit"?"Add Funds":"Request Withdrawal"}</span><b>Step ${step} of 4</b></div><section>${labels.map((l,i)=>`<em class="${i+1<step?'done':i+1===step?'active':''}">${i+1<step?'✓':i+1}<small>${l}</small></em>`).join("")}</section></div>`;
+    return `<div class="pro-wallet-progress">
+      <div><span>${kind==="deposit"?"Add Funds":"Request Withdrawal"}</span><b>Step ${step} of 4</b></div>
+      <section>${labels.map((l,i)=>`<em class="${i+1<step?'done':i+1===step?'active':''}">${i+1<step?'✓':i+1}<small>${l}</small></em>`).join("")}</section>
+    </div>`;
   }
+
   function depositHtml(){
-    if (!isKycApproved()) return `<div class="card wallet-flow-final"><h3>KYC Required</h3><p>Please complete approved KYC before deposit.</p></div>`;
+    if (!isKycApproved()) return `<div class="pro-wallet-panel"><h3>KYC Required</h3><p>Please complete approved KYC before deposit.</p></div>`;
     const cfg = settings();
-    const qr = cfg.upiQr ? `<img class="wallet-qr-final" src="${cfg.upiQr}" alt="UPI QR">` : `<div class="wallet-qr-final empty">QR<br>Not Set</div>`;
-    if (dep.step === 1) return `<div class="card wallet-flow-final">${progress("deposit",1)}<h3>Enter Amount</h3><label>Deposit Amount<input id="depAmountFinal" type="number" min="100" value="${dep.amount||""}" placeholder="Enter amount"></label><p>Minimum deposit ₹100. Deposit only from your own KYC verified account.</p><button id="depNext1Final">Next</button></div>`;
-    if (dep.step === 2) return `<div class="card wallet-flow-final">${progress("deposit",2)}<h3>Select Payment Mode</h3><div class="wallet-mode-final"><button class="${dep.mode==="UPI"?"active":""}" data-dep-mode-final="UPI">UPI / QR</button><button class="${dep.mode==="BANK"?"active":""}" data-dep-mode-final="BANK">Bank Transfer</button></div><div class="wallet-actions-final"><button id="depBack2Final">Back</button><button id="depNext2Final">Next</button></div></div>`;
-    if (dep.step === 3 && dep.mode === "UPI") return `<div class="card wallet-flow-final">${progress("deposit",3)}<h3>Pay via UPI</h3><div class="wallet-pay-final">${qr}<div><span>UPI ID</span><b>${cfg.upiId}</b><button data-copy-final="${cfg.upiId}">Copy UPI</button><span>Holder</span><b>${cfg.upiHolder}</b><span>Amount</span><b>${money(dep.amount)}</b></div></div><div class="wallet-actions-final"><button id="depBack3Final">Back</button><button id="depNext3Final">I Have Paid</button></div></div>`;
-    if (dep.step === 3) return `<div class="card wallet-flow-final">${progress("deposit",3)}<h3>Pay via Bank Transfer</h3><div class="wallet-bank-final"><div><span>Bank</span><b>${cfg.bankName}</b></div><div><span>Account Holder</span><b>${cfg.bankHolder}</b></div><div><span>Account Number</span><b>${cfg.accountNumber}</b></div><div><span>IFSC</span><b>${cfg.ifsc}</b></div><button data-copy-final="${cfg.bankName} | ${cfg.bankHolder} | ${cfg.accountNumber} | ${cfg.ifsc}">Copy Bank Details</button></div><div class="wallet-actions-final"><button id="depBack3Final">Back</button><button id="depNext3Final">I Have Paid</button></div></div>`;
-    return `<div class="card wallet-flow-final">${progress("deposit",4)}<h3>Confirm Deposit</h3><div class="wallet-summary-final"><div><span>Amount</span><b>${money(dep.amount)}</b></div><div><span>Mode</span><b>${dep.mode}</b></div></div><label>UTR / Transaction ID<input id="depUtrFinal" inputmode="numeric" maxlength="12" value="${dep.utr||""}" placeholder="12 digit UTR"></label><p>UTR must be exactly 12 digits. Duplicate UTR will not be accepted.</p><div class="wallet-actions-final"><button id="depBack4Final">Back</button><button id="depSubmitFinal">Submit Deposit Request</button></div></div>`;
+    const qr = cfg.upiQr ? `<img class="pro-wallet-qr" src="${cfg.upiQr}" alt="UPI QR">` : `<div class="pro-wallet-qr empty">QR<br>Not Set</div>`;
+
+    if (ui.depStep === 1) return `<div class="pro-wallet-panel">${progress("deposit",1)}<h3>Enter Amount</h3><label>Deposit Amount<input id="proDepAmount" type="number" min="100" value="${ui.depAmount||""}" placeholder="Enter amount"></label><p>Minimum deposit ₹100. Deposit only from your own KYC verified account.</p><button id="proDepNext1">Next</button></div>`;
+    if (ui.depStep === 2) return `<div class="pro-wallet-panel">${progress("deposit",2)}<h3>Select Payment Mode</h3><div class="pro-wallet-mode"><button class="${ui.depMode==="UPI"?"active":""}" data-pro-dep-mode="UPI">UPI / QR</button><button class="${ui.depMode==="BANK"?"active":""}" data-pro-dep-mode="BANK">Bank Transfer</button></div><div class="pro-wallet-actions"><button id="proDepBack2">Back</button><button id="proDepNext2">Next</button></div></div>`;
+    if (ui.depStep === 3 && ui.depMode === "UPI") return `<div class="pro-wallet-panel">${progress("deposit",3)}<h3>Pay via UPI</h3><div class="pro-wallet-pay">${qr}<div><span>UPI ID</span><b>${cfg.upiId}</b><button data-pro-copy="${cfg.upiId}">Copy UPI</button><span>Holder Name</span><b>${cfg.upiHolder}</b><span>Amount</span><b>${money(ui.depAmount)}</b></div></div><div class="pro-wallet-actions"><button id="proDepBack3">Back</button><button id="proDepNext3">I Have Paid</button></div></div>`;
+    if (ui.depStep === 3) return `<div class="pro-wallet-panel">${progress("deposit",3)}<h3>Pay via Bank Transfer</h3><div class="pro-wallet-bank"><div><span>Bank Name</span><b>${cfg.bankName}</b></div><div><span>Account Holder</span><b>${cfg.bankHolder}</b></div><div><span>Account Number</span><b>${cfg.accountNumber}</b></div><div><span>IFSC</span><b>${cfg.ifsc}</b></div><button data-pro-copy="${cfg.bankName} | ${cfg.bankHolder} | ${cfg.accountNumber} | ${cfg.ifsc}">Copy Bank Details</button></div><div class="pro-wallet-actions"><button id="proDepBack3">Back</button><button id="proDepNext3">I Have Paid</button></div></div>`;
+    return `<div class="pro-wallet-panel">${progress("deposit",4)}<h3>Confirm Deposit</h3><div class="pro-wallet-summary"><div><span>Amount</span><b>${money(ui.depAmount)}</b></div><div><span>Mode</span><b>${ui.depMode}</b></div></div><label>UTR / Transaction ID<input id="proDepUtr" inputmode="numeric" maxlength="12" value="${ui.depUtr||""}" placeholder="12 digit UTR"></label><p>UTR must be exactly 12 digits. Duplicate UTR will not be accepted.</p><div class="pro-wallet-actions"><button id="proDepBack4">Back</button><button id="proDepSubmit">Submit Deposit Request</button></div></div>`;
   }
+
   function withdrawHtml(){
-    if (!isKycApproved()) return `<div class="card wallet-flow-final"><h3>KYC Required</h3><p>Please complete approved KYC before withdrawal.</p></div>`;
+    if (!isKycApproved()) return `<div class="pro-wallet-panel"><h3>KYC Required</h3><p>Please complete approved KYC before withdrawal.</p></div>`;
     const methods = payoutMethods();
-    if (!methods.length) return `<div class="card wallet-flow-final"><h3>No Approved Payout Method</h3><p>Please add and get approval for a payment method before withdrawal.</p><button onclick="openRealMenuPage?.('paymentMethods')">Add Payment Method</button></div>`;
-    if (!wit.methodId) wit.methodId = methods[0].id;
-    const selected = methods.find(m => m.id === wit.methodId) || methods[0];
+    if (!methods.length) return `<div class="pro-wallet-panel"><h3>No Approved Payout Method</h3><p>Please add and get approval for a payment method before withdrawal.</p><button onclick="openRealMenuPage?.('paymentMethods')">Add Payment Method</button></div>`;
+    if (!ui.witMethodId) ui.witMethodId = methods[0].id;
+    const selected = methods.find(m => m.id === ui.witMethodId) || methods[0];
     const w = walletData();
-    if (wit.step === 1) return `<div class="card wallet-flow-final">${progress("withdraw",1)}<h3>Enter Withdrawal Amount</h3><label>Amount<input id="witAmountFinal" type="number" min="1" value="${wit.amount||""}" placeholder="Enter amount"></label><p>Withdrawable balance: ${money(w.withdrawable)}</p><button id="witNext1Final">Next</button></div>`;
-    if (wit.step === 2) return `<div class="card wallet-flow-final">${progress("withdraw",2)}<h3>Select Payout Method</h3><div class="wallet-methods-final">${methods.map(m=>`<button class="${m.id===wit.methodId?'active':''}" data-wit-method-final="${m.id}"><b>${m.type}</b><span>${methodLabel(m)}</span><small>${m.holderName||""}</small></button>`).join("")}</div><div class="wallet-actions-final"><button id="witBack2Final">Back</button><button id="witNext2Final">Next</button></div></div>`;
-    if (wit.step === 3) return `<div class="card wallet-flow-final">${progress("withdraw",3)}<h3>Review Request</h3><div class="wallet-summary-final"><div><span>Amount</span><b>${money(wit.amount)}</b></div><div><span>Method</span><b>${methodLabel(selected)}</b></div><div><span>Holder</span><b>${selected.holderName||"-"}</b></div></div><div class="wallet-actions-final"><button id="witBack3Final">Back</button><button id="witNext3Final">Next</button></div></div>`;
-    return `<div class="card wallet-flow-final">${progress("withdraw",4)}<h3>Submit Withdrawal</h3><p>Your withdrawal request will be reviewed by admin.</p><div class="wallet-actions-final"><button id="witBack4Final">Back</button><button id="witSubmitFinal">Submit Withdrawal Request</button></div></div>`;
+
+    if (ui.witStep === 1) return `<div class="pro-wallet-panel">${progress("withdraw",1)}<h3>Enter Withdrawal Amount</h3><label>Withdrawal Amount<input id="proWitAmount" type="number" min="1" value="${ui.witAmount||""}" placeholder="Enter amount"></label><p>Withdrawable balance: ${money(w.withdrawable)}</p><button id="proWitNext1">Next</button></div>`;
+    if (ui.witStep === 2) return `<div class="pro-wallet-panel">${progress("withdraw",2)}<h3>Select Payout Method</h3><div class="pro-wallet-methods">${methods.map(m=>`<button class="${m.id===ui.witMethodId?'active':''}" data-pro-wit-method="${m.id}"><b>${m.type}</b><span>${methodLabel(m)}</span><small>${m.holderName||""}</small></button>`).join("")}</div><div class="pro-wallet-actions"><button id="proWitBack2">Back</button><button id="proWitNext2">Next</button></div></div>`;
+    if (ui.witStep === 3) return `<div class="pro-wallet-panel">${progress("withdraw",3)}<h3>Review Request</h3><div class="pro-wallet-summary"><div><span>Amount</span><b>${money(ui.witAmount)}</b></div><div><span>Method</span><b>${methodLabel(selected)}</b></div><div><span>Holder</span><b>${selected.holderName||"-"}</b></div></div><div class="pro-wallet-actions"><button id="proWitBack3">Back</button><button id="proWitNext3">Next</button></div></div>`;
+    return `<div class="pro-wallet-panel">${progress("withdraw",4)}<h3>Submit Withdrawal</h3><p>Your withdrawal request will be reviewed by admin.</p><div class="pro-wallet-actions"><button id="proWitBack4">Back</button><button id="proWitSubmit">Submit Withdrawal Request</button></div></div>`;
   }
+
   function historyHtml(){
     const list = [
-      ...depRows().filter(sameUser).map(x=>({...x, kind:"Deposit"})),
-      ...witRows().filter(sameUser).map(x=>({...x, kind:"Withdrawal", mode:x.methodType, utr:""}))
-    ].sort((a,b)=>(Date.parse(b.createdAt)||0)-(Date.parse(a.createdAt)||0));
-    return `<div class="card wallet-flow-final"><h3>Wallet History</h3><div class="wallet-history-final">${list.length ? list.map(r=>`<div><b>${r.kind}</b><span>${money(r.amount)} • ${r.mode||""}</span><em class="${String(r.status).toLowerCase()}">${r.status}</em><small>${r.utr ? "UTR: "+r.utr+" • " : ""}${r.createdAt||""}</small></div>`).join("") : `<p>No wallet requests yet.</p>`}</div></div>`;
+      ...depRows().filter(sameUser).map(x => ({...x, kind:"Deposit"})),
+      ...witRows().filter(sameUser).map(x => ({...x, kind:"Withdrawal", mode:x.methodType, utr:""}))
+    ].sort((a,b)=>(Date.parse(b.createdAt)||Number(String(b.id).replace(/\D/g,''))||0)-(Date.parse(a.createdAt)||Number(String(a.id).replace(/\D/g,''))||0));
+
+    return `<div class="pro-wallet-panel"><h3>Wallet History</h3><div class="pro-wallet-history">${list.length ? list.map(r => `<article><div><b>${r.kind}</b><span>${money(r.amount)} • ${r.mode||""}</span></div><em class="${String(r.status).toLowerCase()}">${r.status}</em><small>${r.utr ? "UTR: "+r.utr+" • " : ""}${r.createdAt||""}</small></article>`).join("") : `<p>No wallet requests yet.</p>`}</div></div>`;
   }
 
-  function bindWallet(){
-    document.querySelectorAll("[data-wallet-tab-final]").forEach(btn => btn.addEventListener("click", () => { activeTab=btn.dataset.walletTabFinal; takeOverWallet(); }));
-    document.querySelectorAll("[data-copy-final]").forEach(btn => btn.addEventListener("click", () => { navigator.clipboard?.writeText(btn.dataset.copyFinal||""); toastMsg("Copied."); }));
-    document.querySelectorAll("[data-dep-mode-final]").forEach(btn => btn.addEventListener("click", () => { dep.mode=btn.dataset.depModeFinal; takeOverWallet(); }));
-    document.querySelectorAll("[data-wit-method-final]").forEach(btn => btn.addEventListener("click", () => { wit.methodId=btn.dataset.witMethodFinal; takeOverWallet(); }));
+  function bindWalletEvents(){
+    document.querySelectorAll("[data-pro-wallet-tab]").forEach(btn => btn.addEventListener("click", () => { ui.tab = btn.dataset.proWalletTab; renderWallet(); }));
+    document.querySelectorAll("[data-pro-copy]").forEach(btn => btn.addEventListener("click", () => { navigator.clipboard?.writeText(btn.dataset.proCopy || ""); toastMsg("Copied."); }));
+    document.querySelectorAll("[data-pro-dep-mode]").forEach(btn => btn.addEventListener("click", () => { ui.depMode = btn.dataset.proDepMode; renderWallet(); }));
+    document.querySelectorAll("[data-pro-wit-method]").forEach(btn => btn.addEventListener("click", () => { ui.witMethodId = btn.dataset.proWitMethod; renderWallet(); }));
 
     const on = (id, fn) => { const el=document.getElementById(id); if(el) el.addEventListener("click", fn); };
-    on("depNext1Final", () => { const v=Number(document.getElementById("depAmountFinal")?.value||0); if(v<100) return alert("Minimum deposit amount is ₹100."); dep.amount=v; dep.step=2; takeOverWallet(); });
-    on("depBack2Final", () => { dep.step=1; takeOverWallet(); });
-    on("depNext2Final", () => { dep.step=3; takeOverWallet(); });
-    on("depBack3Final", () => { dep.step=2; takeOverWallet(); });
-    on("depNext3Final", () => { dep.step=4; takeOverWallet(); });
-    on("depBack4Final", () => { dep.step=3; takeOverWallet(); });
-    on("depSubmitFinal", submitDeposit);
+    on("proDepNext1", () => { const v=Number(document.getElementById("proDepAmount")?.value||0); if(v<100) return alert("Minimum deposit amount is ₹100."); ui.depAmount=v; ui.depStep=2; renderWallet(); });
+    on("proDepBack2", () => { ui.depStep=1; renderWallet(); });
+    on("proDepNext2", () => { ui.depStep=3; renderWallet(); });
+    on("proDepBack3", () => { ui.depStep=2; renderWallet(); });
+    on("proDepNext3", () => { ui.depStep=4; renderWallet(); });
+    on("proDepBack4", () => { ui.depStep=3; renderWallet(); });
+    on("proDepSubmit", submitDeposit);
 
-    on("witNext1Final", () => { const v=Number(document.getElementById("witAmountFinal")?.value||0); const w=walletData(); if(v<=0) return alert("Enter valid withdrawal amount."); if(v>w.withdrawable) return alert("Amount is greater than withdrawable balance."); wit.amount=v; wit.step=2; takeOverWallet(); });
-    on("witBack2Final", () => { wit.step=1; takeOverWallet(); });
-    on("witNext2Final", () => { if(!wit.methodId) return alert("Select payout method."); wit.step=3; takeOverWallet(); });
-    on("witBack3Final", () => { wit.step=2; takeOverWallet(); });
-    on("witNext3Final", () => { wit.step=4; takeOverWallet(); });
-    on("witBack4Final", () => { wit.step=3; takeOverWallet(); });
-    on("witSubmitFinal", submitWithdrawal);
+    on("proWitNext1", () => { const v=Number(document.getElementById("proWitAmount")?.value||0); const w=walletData(); if(v<=0) return alert("Enter valid withdrawal amount."); if(v>w.withdrawable) return alert("Amount is greater than withdrawable balance."); ui.witAmount=v; ui.witStep=2; renderWallet(); });
+    on("proWitBack2", () => { ui.witStep=1; renderWallet(); });
+    on("proWitNext2", () => { if(!ui.witMethodId) return alert("Select payout method."); ui.witStep=3; renderWallet(); });
+    on("proWitBack3", () => { ui.witStep=2; renderWallet(); });
+    on("proWitNext3", () => { ui.witStep=4; renderWallet(); });
+    on("proWitBack4", () => { ui.witStep=3; renderWallet(); });
+    on("proWitSubmit", submitWithdrawal);
   }
 
-  function validUtr(x){ return /^\d{12}$/.test(String(x||"").trim()); }
-  function duplicateUtr(x){ x=String(x||"").trim(); return depRows().some(d => String(d.utr) === x); }
-  async function dbDuplicateUtr(x){
-    const db = client();
-    if (!db) return false;
+  function utrValid(x){ return /^\d{12}$/.test(String(x||"").trim()); }
+  function utrDuplicate(x){ x=String(x||"").trim(); return depRows().some(d => String(d.utr) === x); }
+  async function dbUtrDuplicate(x){
+    const db = client(); if(!db) return false;
     try {
       const r = await db.from(DEP_TABLE).select("id").eq("utr", x).limit(1);
-      if (!r.error && r.data?.length) return true;
+      if(!r.error && r.data?.length) return true;
       const r2 = await db.from(DEP_TABLE).select("id").eq("transaction_id", x).limit(1);
       return !r2.error && !!r2.data?.length;
     } catch(e){ return false; }
   }
   async function submitDeposit(){
-    if (dep.busy) return;
-    dep.busy = true;
-    const btn=document.getElementById("depSubmitFinal");
+    if(ui.busy) return;
+    ui.busy=true;
+    const btn=document.getElementById("proDepSubmit");
     if(btn){ btn.disabled=true; btn.textContent="Submitting..."; }
     try {
-      const utr = String(document.getElementById("depUtrFinal")?.value||"").trim();
-      if (!validUtr(utr)) throw new Error("UTR must be exactly 12 digits.");
-      if (duplicateUtr(utr) || await dbDuplicateUtr(utr)) throw new Error("This UTR has already been submitted. Please check your transaction ID.");
-      const row = { id:"dep_"+Date.now(), userId:uid(), userEmail:email(), amount:Number(dep.amount), mode:dep.mode, utr, status:"PENDING", createdAt:new Date().toLocaleString() };
+      const utr=String(document.getElementById("proDepUtr")?.value||"").trim();
+      if(!utrValid(utr)) throw new Error("UTR must be exactly 12 digits.");
+      if(utrDuplicate(utr) || await dbUtrDuplicate(utr)) throw new Error("This UTR has already been submitted. Please check your transaction ID.");
+      const row={ id:"dep_"+Date.now(), userId:uid(), userEmail:email(), amount:Number(ui.depAmount), mode:ui.depMode, utr, status:"PENDING", createdAt:new Date().toLocaleString() };
       state.depositRequests ||= [];
       state.depositRequests.unshift(row);
-      const db = client();
-      if (db) {
-        let r = await db.from(DEP_TABLE).insert({ id:row.id, user_id:row.userId, user_email:row.userEmail, amount:row.amount, payment_mode:row.mode, utr:row.utr, transaction_id:row.utr, status:"PENDING", created_at_text:row.createdAt });
-        if (r.error) r = await db.from(DEP_TABLE).insert({ id:row.id, user_id:row.userId, amount:row.amount, utr:row.utr, status:"PENDING" });
-        if (r.error) console.warn("Deposit DB save failed:", r.error.message);
+      const db=client();
+      if(db){
+        let r=await db.from(DEP_TABLE).insert({ id:row.id, user_id:row.userId, user_email:row.userEmail, amount:row.amount, payment_mode:row.mode, utr:row.utr, transaction_id:row.utr, status:"PENDING", created_at_text:row.createdAt });
+        if(r.error) r=await db.from(DEP_TABLE).insert({ id:row.id, user_id:row.userId, amount:row.amount, utr:row.utr, status:"PENDING" });
+        if(r.error) console.warn("Deposit DB save failed:", r.error.message);
       }
-      dep.step=1; dep.amount=""; dep.utr="";
-      save(); updateTopCards(); activeTab="history"; takeOverWallet();
-      toastMsg("Deposit request submitted for admin verification.");
+      ui.depStep=1; ui.depAmount=""; ui.depUtr=""; ui.tab="history";
+      save(); renderWallet(); toastMsg("Deposit request submitted for admin verification.");
     } catch(e) {
       alert(e.message || e);
       if(btn){ btn.disabled=false; btn.textContent="Submit Deposit Request"; }
-    } finally { dep.busy=false; }
+    } finally { ui.busy=false; }
   }
   async function submitWithdrawal(){
-    if (wit.busy) return;
-    wit.busy = true;
-    const btn=document.getElementById("witSubmitFinal");
+    if(ui.busy) return;
+    ui.busy=true;
+    const btn=document.getElementById("proWitSubmit");
     if(btn){ btn.disabled=true; btn.textContent="Submitting..."; }
     try {
-      const amount=Number(wit.amount);
-      const selected=payoutMethods().find(m=>m.id===wit.methodId);
-      if (!selected) throw new Error("Select approved payout method.");
-      if (amount<=0 || amount>walletData().withdrawable) throw new Error("Invalid withdrawal amount.");
-      const row = { id:"wd_"+Date.now(), userId:uid(), userEmail:email(), amount, methodId:selected.id, methodType:selected.type, methodText:methodLabel(selected), holderName:selected.holderName, status:"PENDING", createdAt:new Date().toLocaleString() };
+      const amount=Number(ui.witAmount);
+      const selected=payoutMethods().find(m=>m.id===ui.witMethodId);
+      if(!selected) throw new Error("Select approved payout method.");
+      if(amount<=0 || amount>walletData().withdrawable) throw new Error("Invalid withdrawal amount.");
+      const row={ id:"wd_"+Date.now(), userId:uid(), userEmail:email(), amount, methodId:selected.id, methodType:selected.type, methodText:methodLabel(selected), holderName:selected.holderName, status:"PENDING", createdAt:new Date().toLocaleString() };
       state.withdrawalRequests ||= [];
       state.withdrawalRequests.unshift(row);
       const db=client();
-      if (db) {
-        let r = await db.from(WIT_TABLE).insert({ id:row.id, user_id:row.userId, user_email:row.userEmail, amount:row.amount, method_id:row.methodId, method_type:row.methodType, method_text:row.methodText, holder_name:row.holderName, status:"PENDING", created_at_text:row.createdAt });
-        if (r.error) r = await db.from(WIT_TABLE).insert({ id:row.id, user_id:row.userId, amount:row.amount, status:"PENDING" });
-        if (r.error) console.warn("Withdrawal DB save failed:", r.error.message);
+      if(db){
+        let r=await db.from(WIT_TABLE).insert({ id:row.id, user_id:row.userId, user_email:row.userEmail, amount:row.amount, method_id:row.methodId, method_type:row.methodType, method_text:row.methodText, holder_name:row.holderName, status:"PENDING", created_at_text:row.createdAt });
+        if(r.error) r=await db.from(WIT_TABLE).insert({ id:row.id, user_id:row.userId, amount:row.amount, status:"PENDING" });
+        if(r.error) console.warn("Withdrawal DB save failed:", r.error.message);
       }
-      wit.step=1; wit.amount="";
-      save(); updateTopCards(); activeTab="history"; takeOverWallet();
-      toastMsg("Withdrawal request submitted for admin verification.");
+      ui.witStep=1; ui.witAmount=""; ui.tab="history";
+      save(); renderWallet(); toastMsg("Withdrawal request submitted for admin verification.");
     } catch(e) {
       alert(e.message || e);
       if(btn){ btn.disabled=false; btn.textContent="Submit Withdrawal Request"; }
-    } finally { wit.busy=false; }
+    } finally { ui.busy=false; }
   }
 
-  /* Admin deposit/withdraw render */
-  function isAdminView(){
-    try { return location.pathname.toLowerCase().includes("admin") || String(state?.user?.role||"").toLowerCase()==="admin" || !!document.getElementById("depositRequestsLog") || !!document.getElementById("withdrawalRequestsLog"); } catch(e){ return false; }
-  }
-  function statusBadge(s){ s=String(s||"PENDING").toUpperCase(); return `<span class="wallet-admin-status-final ${s.toLowerCase()}">${s}</span>`; }
+  /* Admin deposit/withdraw status handlers */
   function addBalance(userId, amount){
-    state.accounts ||= {};
-    state.accounts[userId] ||= {};
+    state.accounts ||= {}; state.accounts[userId] ||= {};
     state.accounts[userId].balance = Number(state.accounts[userId].balance || 0) + Number(amount || 0);
-    const uu=(state.users||[]).find(x=>String(x.id)===String(userId)||String(x.email)===String(userId));
-    if(uu) uu.balance=Number(uu.balance||0)+Number(amount||0);
+    const u = (state.users || []).find(x => String(x.id)===String(userId) || String(x.email)===String(userId));
+    if(u) u.balance = Number(u.balance || 0) + Number(amount || 0);
   }
   function deductBalance(userId, amount){
-    state.accounts ||= {};
-    state.accounts[userId] ||= {};
-    state.accounts[userId].balance = Math.max(0, Number(state.accounts[userId].balance || 0)-Number(amount||0));
-    const uu=(state.users||[]).find(x=>String(x.id)===String(userId)||String(x.email)===String(userId));
-    if(uu) uu.balance=Math.max(0,Number(uu.balance||0)-Number(amount||0));
+    state.accounts ||= {}; state.accounts[userId] ||= {};
+    state.accounts[userId].balance = Math.max(0, Number(state.accounts[userId].balance || 0) - Number(amount || 0));
+    const u = (state.users || []).find(x => String(x.id)===String(userId) || String(x.email)===String(userId));
+    if(u) u.balance = Math.max(0, Number(u.balance || 0) - Number(amount || 0));
   }
-  async function updateRequest(table,id,status){
+  async function updateReq(table,id,status){
     const db=client(); if(!db) return;
     try { let r=await db.from(table).update({status,reviewed_at:new Date().toISOString()}).eq("id",id); if(r.error) await db.from(table).update({status}).eq("id",id); } catch(e){}
   }
   async function approveDeposit(id){
     const r=state.depositRequests?.find(x=>String(x.id)===String(id));
     if(!r || String(r.status).toUpperCase()!=="PENDING") return;
-    r.status="APPROVED"; addBalance(r.userId,r.amount); await updateRequest(DEP_TABLE,id,"APPROVED"); save(); renderAdminDeposits(); updateTopCards();
+    r.status="APPROVED"; addBalance(r.userId,r.amount); await updateReq(DEP_TABLE,id,"APPROVED"); save(); if(isWalletOpen()) renderWallet();
   }
   async function rejectDeposit(id){
     const r=state.depositRequests?.find(x=>String(x.id)===String(id));
     if(!r || String(r.status).toUpperCase()!=="PENDING") return;
-    r.status="REJECTED"; await updateRequest(DEP_TABLE,id,"REJECTED"); save(); renderAdminDeposits();
+    r.status="REJECTED"; await updateReq(DEP_TABLE,id,"REJECTED"); save(); if(isWalletOpen()) renderWallet();
   }
   async function approveWithdrawal(id){
     const r=state.withdrawalRequests?.find(x=>String(x.id)===String(id));
     if(!r || String(r.status).toUpperCase()!=="PENDING") return;
-    r.status="APPROVED"; deductBalance(r.userId,r.amount); await updateRequest(WIT_TABLE,id,"APPROVED"); save(); renderAdminWithdrawals(); updateTopCards();
+    r.status="APPROVED"; deductBalance(r.userId,r.amount); await updateReq(WIT_TABLE,id,"APPROVED"); save(); if(isWalletOpen()) renderWallet();
   }
   async function rejectWithdrawal(id){
     const r=state.withdrawalRequests?.find(x=>String(x.id)===String(id));
     if(!r || String(r.status).toUpperCase()!=="PENDING") return;
-    r.status="REJECTED"; await updateRequest(WIT_TABLE,id,"REJECTED"); save(); renderAdminWithdrawals();
+    r.status="REJECTED"; await updateReq(WIT_TABLE,id,"REJECTED"); save(); if(isWalletOpen()) renderWallet();
   }
 
-  function depBody(){ return document.getElementById("depositRequestsLog") || document.querySelector("#adminDeposits tbody"); }
-  function witBody(){ return document.getElementById("withdrawalRequestsLog") || document.querySelector("#adminWithdrawals tbody"); }
-  function renderAdminDeposits(){
-    if(!isAdminView()) return;
-    const body=depBody(); if(!body) return;
-    const rows=depRows().sort((a,b)=>(Date.parse(b.createdAt)||0)-(Date.parse(a.createdAt)||0));
-    body.innerHTML=rows.length?rows.map(r=>`<tr><td>${r.userEmail||r.userId||"-"}</td><td>${money(r.amount)}</td><td>${r.mode}</td><td>${r.utr||"-"}</td><td>${statusBadge(r.status)}</td><td>${r.status==="PENDING"?`<button class="approve-btn" onclick="approveDepositRequest('${r.id}')">Approve</button><button class="reject-btn" onclick="rejectDepositRequest('${r.id}')">Reject</button>`:`<span class="wallet-admin-locked-final">Locked</span>`}</td></tr>`).join(""):`<tr><td colspan="6" class="empty">No deposit requests found.</td></tr>`;
-  }
-  function renderAdminWithdrawals(){
-    if(!isAdminView()) return;
-    const body=witBody(); if(!body) return;
-    const rows=witRows().sort((a,b)=>(Date.parse(b.createdAt)||0)-(Date.parse(a.createdAt)||0));
-    body.innerHTML=rows.length?rows.map(r=>`<tr><td>${r.userEmail||r.userId||"-"}</td><td>${money(r.amount)}</td><td>${r.methodType}</td><td>${r.methodText||"-"}</td><td>${statusBadge(r.status)}</td><td>${r.status==="PENDING"?`<button class="approve-btn" onclick="approveWithdrawalRequest('${r.id}')">Approve</button><button class="reject-btn" onclick="rejectWithdrawalRequest('${r.id}')">Reject</button>`:`<span class="wallet-admin-locked-final">Locked</span>`}</td></tr>`).join(""):`<tr><td colspan="6" class="empty">No withdrawal requests found.</td></tr>`;
-  }
+  function patch(){
+    window.renderProfessionalWallet = renderWallet;
+    window.approveDepositRequest = approveDeposit;
+    window.rejectDepositRequest = rejectDeposit;
+    window.approveWithdrawalRequest = approveWithdrawal;
+    window.rejectWithdrawalRequest = rejectWithdrawal;
 
-  function patchGlobals(){
-    window.approveDepositRequest=approveDeposit;
-    window.rejectDepositRequest=rejectDeposit;
-    window.approveWithdrawalRequest=approveWithdrawal;
-    window.rejectWithdrawalRequest=rejectWithdrawal;
-    window.renderAdminDepositsClean=renderAdminDeposits;
-    window.renderAdminWithdrawalsClean=renderAdminWithdrawals;
-    window.takeOverWalletFinal=takeOverWallet;
-
-    const oldShowPage=window.showPage;
-    if(typeof oldShowPage==="function" && !window.__walletOwnerShowPatch){
-      window.__walletOwnerShowPatch=true;
-      window.showPage=function(pageId){
-        const res=oldShowPage.apply(this,arguments);
-        if(pageId==="wallet" || pageId==="walletPage"){
-          setTimeout(takeOverWallet,60);
-          setTimeout(takeOverWallet,400);
-          setTimeout(takeOverWallet,1000);
+    const oldShowPage = window.showPage;
+    if(typeof oldShowPage === "function" && !window.__proWalletShowPatch){
+      window.__proWalletShowPatch = true;
+      window.showPage = function(pageId){
+        const res = oldShowPage.apply(this, arguments);
+        if(pageId === "wallet" || pageId === "walletPage"){
+          setTimeout(renderWallet,60);
+          setTimeout(renderWallet,400);
+          setTimeout(renderWallet,1000);
         }
         return res;
       };
-      try{ showPage=window.showPage; }catch(e){}
-    }
-    const oldRender=window.renderAdmin;
-    if(typeof oldRender==="function" && !window.__walletOwnerAdminPatch){
-      window.__walletOwnerAdminPatch=true;
-      window.renderAdmin=function(){ const res=oldRender.apply(this,arguments); setTimeout(renderAdminDeposits,80); setTimeout(renderAdminWithdrawals,100); return res; };
-      try{ renderAdmin=window.renderAdmin; }catch(e){}
+      try { showPage = window.showPage; } catch(e){}
     }
   }
 
-  document.addEventListener("click",function(e){
-    if(e.target.closest("#openDepositBtn,#openDepositBtn2")){ e.preventDefault(); e.stopPropagation(); activeTab="deposit"; dep.step=1; takeOverWallet(); return; }
-    if(e.target.closest("#openWithdrawBtn")){ e.preventDefault(); e.stopPropagation(); activeTab="withdraw"; wit.step=1; takeOverWallet(); return; }
-    const text=(e.target?.textContent||"").toLowerCase();
-    const page=e.target.closest("[data-page]")?.dataset?.page || "";
-    if(page==="wallet" || text.includes("wallet")){
-      setTimeout(takeOverWallet,150);
-      setTimeout(takeOverWallet,700);
+  document.addEventListener("click", function(e){
+    const page = e.target.closest("[data-page]")?.dataset?.page || "";
+    const text = (e.target?.textContent || "").toLowerCase();
+    if(page === "wallet" || text.includes("wallet")){
+      setTimeout(renderWallet,80);
+      setTimeout(renderWallet,500);
     }
-    if(text.includes("deposit") || text.includes("withdraw")){
-      setTimeout(()=>{renderAdminDeposits();renderAdminWithdrawals();},400);
-    }
-  },true);
+  }, true);
 
   function boot(){
-    patchGlobals();
-    loadDb().then(()=>{
-      updateTopCards();
-      if(isWalletOpen()) takeOverWallet();
-      renderAdminDeposits();
-      renderAdminWithdrawals();
-    });
+    patch();
+    loadDb().then(() => { if(isWalletOpen()) renderWallet(); });
   }
-  document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,900));
-  window.addEventListener("load",()=>{setTimeout(boot,900);setTimeout(boot,2500);});
-})();
-
-
-/* ===== WALLET HISTORY CARDS HIDE TOP FIX ===== */
-(function(){
-  function walletPage(){
-    return document.getElementById("wallet") || document.getElementById("walletPage");
-  }
-
-  function isHistoryCard(card){
-    const txt = (card?.textContent || "").toLowerCase();
-    return (
-      txt.includes("your deposit history") ||
-      txt.includes("your withdrawal history") ||
-      (txt.includes("deposit requests") && txt.includes("no records")) ||
-      (txt.includes("withdrawal requests") && txt.includes("no records"))
-    );
-  }
-
-  function hideOldHistoryCards(){
-    const page = walletPage();
-    if (!page) return;
-    page.querySelectorAll(".card").forEach(card => {
-      if (isHistoryCard(card) && !card.closest("#walletSingleOwner")) {
-        card.classList.add("wallet-old-hidden", "wallet-old-history-hidden");
-        card.style.display = "none";
-      }
-    });
-  }
-
-  function moveWalletOwnerTop(){
-    const page = walletPage();
-    const box = document.getElementById("walletSingleOwner");
-    if (!page || !box) return;
-
-    hideOldHistoryCards();
-
-    // Find the last real top balance/overview card before old histories.
-    const cardById = [
-      document.getElementById("pendingWithdrawalText")?.closest(".card"),
-      document.getElementById("approvedDepositText")?.closest(".card"),
-      document.getElementById("withdrawableAmountText")?.closest(".card"),
-      document.getElementById("walletPageBalance")?.closest(".card")
-    ].filter(Boolean);
-
-    let anchor = cardById[0] || null;
-
-    if (!anchor) {
-      const visibleCards = Array.from(page.querySelectorAll(".card"))
-        .filter(card => !card.classList.contains("wallet-old-hidden") && !isHistoryCard(card));
-      anchor = visibleCards[Math.min(visibleCards.length - 1, 3)] || visibleCards[0] || null;
-    }
-
-    if (anchor && anchor.nextElementSibling !== box) {
-      anchor.insertAdjacentElement("afterend", box);
-    } else if (!anchor && page.firstElementChild !== box) {
-      page.insertAdjacentElement("afterbegin", box);
-    }
-
-    box.style.marginTop = "14px";
-  }
-
-  function fix(){
-    hideOldHistoryCards();
-    moveWalletOwnerTop();
-  }
-
-  document.addEventListener("click", function(e){
-    const text = (e.target?.textContent || "").toLowerCase();
-    const page = e.target.closest("[data-page]")?.dataset?.page || "";
-    if (page === "wallet" || text.includes("wallet") || text.includes("deposit") || text.includes("withdraw") || text.includes("history")) {
-      setTimeout(fix, 80);
-      setTimeout(fix, 500);
-      setTimeout(fix, 1200);
-    }
-  }, true);
-
-  document.addEventListener("DOMContentLoaded", () => setTimeout(fix, 1200));
-  window.addEventListener("load", () => {
-    setTimeout(fix, 1000);
-    setTimeout(fix, 2500);
-    setTimeout(fix, 4500);
-  });
-
-  window.fixWalletTopLayout = fix;
-})();
-
-
-/* ===== WALLET TOP CARDS AND BUTTON TEXT FIX ===== */
-(function(){
-  function walletPage(){
-    return document.getElementById("wallet") || document.getElementById("walletPage");
-  }
-
-  function isHistoryCard(card){
-    const txt = (card?.textContent || "").toLowerCase();
-    return txt.includes("your deposit history") ||
-      txt.includes("your withdrawal history") ||
-      (txt.includes("deposit requests") && txt.includes("no records")) ||
-      (txt.includes("withdrawal requests") && txt.includes("no records"));
-  }
-
-  function isBalanceCard(card){
-    if (!card) return false;
-    if (card.querySelector("#walletPageBalance,#withdrawableAmountText,#approvedDepositText,#pendingWithdrawalText")) return true;
-    const txt = (card.textContent || "").toLowerCase();
-    return txt.includes("available balance") ||
-      txt.includes("withdrawable") ||
-      txt.includes("withdrawal balance") ||
-      txt.includes("approved deposit") ||
-      txt.includes("pending withdrawal");
-  }
-
-  function unhideBalanceCards(){
-    const page = walletPage();
-    if (!page) return;
-
-    page.querySelectorAll(".card").forEach(card => {
-      if (isBalanceCard(card)) {
-        card.classList.remove("wallet-old-hidden", "wallet-old-history-hidden");
-        card.style.display = "";
-        card.style.height = "";
-        card.style.minHeight = "";
-        card.style.maxHeight = "";
-        card.style.margin = "";
-        card.style.padding = "";
-        card.style.opacity = "";
-        card.style.pointerEvents = "";
-      }
-      if (isHistoryCard(card) && !card.closest("#walletSingleOwner")) {
-        card.classList.add("wallet-old-hidden", "wallet-old-history-hidden");
-        card.style.display = "none";
-      }
-    });
-  }
-
-  function moveOwnerAfterBalanceCards(){
-    const page = walletPage();
-    const box = document.getElementById("walletSingleOwner");
-    if (!page || !box) return;
-
-    unhideBalanceCards();
-
-    const balanceCards = Array.from(page.querySelectorAll(".card")).filter(isBalanceCard);
-    let anchor = balanceCards[balanceCards.length - 1] || null;
-
-    if (!anchor) {
-      const ids = ["pendingWithdrawalText", "approvedDepositText", "withdrawableAmountText", "walletPageBalance"];
-      const cards = ids.map(id => document.getElementById(id)?.closest(".card")).filter(Boolean);
-      anchor = cards[cards.length - 1] || null;
-    }
-
-    if (anchor && anchor.nextElementSibling !== box) {
-      anchor.insertAdjacentElement("afterend", box);
-    }
-  }
-
-  function fix(){
-    unhideBalanceCards();
-    moveOwnerAfterBalanceCards();
-  }
-
-  document.addEventListener("click", function(e){
-    const text = (e.target?.textContent || "").toLowerCase();
-    const page = e.target.closest("[data-page]")?.dataset?.page || "";
-    if (page === "wallet" || text.includes("wallet") || text.includes("deposit") || text.includes("withdraw") || text.includes("history")) {
-      setTimeout(fix, 80);
-      setTimeout(fix, 400);
-      setTimeout(fix, 1200);
-    }
-  }, true);
-
-  document.addEventListener("DOMContentLoaded", () => setTimeout(fix, 1200));
-  window.addEventListener("load", () => {
-    setTimeout(fix, 1000);
-    setTimeout(fix, 2500);
-    setTimeout(fix, 4500);
-  });
-
-  window.fixWalletTopCardsAndButtons = fix;
-})();
-
-
-/* ===== WALLET ONLY BALANCE CARDS SHOW FIX ===== */
-(function(){
-  function walletPage(){
-    return document.getElementById("wallet") || document.getElementById("walletPage");
-  }
-
-  function hasAny(card, ids){
-    return ids.some(id => !!card.querySelector("#" + id));
-  }
-
-  function isBalanceCard(card){
-    return hasAny(card, [
-      "walletPageBalance",
-      "withdrawableAmountText",
-      "approvedDepositText",
-      "pendingWithdrawalText"
-    ]);
-  }
-
-  function isOldActionCard(card){
-    if (!card || card.closest("#walletSingleOwner")) return false;
-    if (card.querySelector("#openDepositBtn,#openDepositBtn2,#openWithdrawBtn")) return true;
-
-    const txt = (card.textContent || "").toLowerCase();
-    const hasDeposit = txt.includes("deposit") || txt.includes("add funds");
-    const hasWithdraw = txt.includes("withdraw") || txt.includes("withdrawal");
-    const hasOldButton = !!card.querySelector("button");
-    const isHistory = txt.includes("your deposit history") || txt.includes("your withdrawal history");
-
-    return (hasOldButton && (hasDeposit || hasWithdraw)) || isHistory;
-  }
-
-  function applyWalletVisibility(){
-    const page = walletPage();
-    if (!page) return;
-
-    page.querySelectorAll(".card").forEach(card => {
-      if (isBalanceCard(card)) {
-        card.classList.remove("wallet-old-hidden", "wallet-old-history-hidden", "wallet-old-action-hidden");
-        card.style.display = "";
-        card.style.visibility = "";
-        card.style.opacity = "";
-        card.style.height = "";
-        card.style.minHeight = "";
-        card.style.maxHeight = "";
-        card.style.margin = "";
-        card.style.padding = "";
-        card.style.pointerEvents = "";
-      } else if (isOldActionCard(card)) {
-        card.classList.add("wallet-old-hidden", "wallet-old-action-hidden");
-        card.style.display = "none";
-      }
-    });
-
-    const box = document.getElementById("walletSingleOwner");
-    if (box) {
-      const balanceCards = Array.from(page.querySelectorAll(".card")).filter(isBalanceCard);
-      const anchor = balanceCards[balanceCards.length - 1];
-      if (anchor && anchor.nextElementSibling !== box) {
-        anchor.insertAdjacentElement("afterend", box);
-      }
-    }
-  }
-
-  document.addEventListener("click", function(e){
-    const text = (e.target?.textContent || "").toLowerCase();
-    const page = e.target.closest("[data-page]")?.dataset?.page || "";
-    if (page === "wallet" || text.includes("wallet") || text.includes("deposit") || text.includes("withdraw")) {
-      setTimeout(applyWalletVisibility, 60);
-      setTimeout(applyWalletVisibility, 400);
-      setTimeout(applyWalletVisibility, 1100);
-    }
-  }, true);
-
-  document.addEventListener("DOMContentLoaded", () => setTimeout(applyWalletVisibility, 1000));
-  window.addEventListener("load", () => {
-    setTimeout(applyWalletVisibility, 900);
-    setTimeout(applyWalletVisibility, 2400);
-    setTimeout(applyWalletVisibility, 4500);
-  });
-
-  window.fixWalletOnlyBalanceCards = applyWalletVisibility;
-})();
-
-
-/* ===== WALLET RESTORE VISIBLE SAFE FIX ===== */
-(function(){
-  function walletPage(){
-    return document.getElementById("wallet") || document.getElementById("walletPage");
-  }
-
-  function restoreWalletVisible(){
-    const page = walletPage();
-    if (!page) return;
-
-    // Restore all main wallet cards that may have been hidden by previous bad fix.
-    page.querySelectorAll(".card").forEach(card => {
-      const txt = (card.textContent || "").toLowerCase();
-      const isOldHistory = txt.includes("your deposit history") || txt.includes("your withdrawal history");
-      if (!isOldHistory) {
-        card.style.display = "";
-        card.style.visibility = "";
-        card.style.opacity = "";
-        card.style.height = "";
-        card.style.minHeight = "";
-        card.style.maxHeight = "";
-        card.style.margin = "";
-        card.style.padding = "";
-        card.style.pointerEvents = "";
-        card.classList.remove("wallet-old-action-hidden", "wallet-old-inline-action-hidden", "wallet-old-inline-note-hidden");
-      }
-    });
-
-    // Hide only legacy action buttons themselves, not the whole wallet card.
-    ["openDepositBtn", "openDepositBtn2", "openWithdrawBtn"].forEach(id => {
-      const btn = document.getElementById(id);
-      if (btn && !btn.closest("#walletSingleOwner")) {
-        btn.style.display = "none";
-      }
-    });
-
-    // Keep old history cards hidden, because new History tab owns history.
-    page.querySelectorAll(".card").forEach(card => {
-      const txt = (card.textContent || "").toLowerCase();
-      const isOldHistory = txt.includes("your deposit history") || txt.includes("your withdrawal history");
-      if (isOldHistory && !card.closest("#walletSingleOwner")) {
-        card.style.display = "none";
-      }
-    });
-
-    // Make sure new wallet owner is visible.
-    const owner = document.getElementById("walletSingleOwner");
-    if (owner) {
-      owner.style.display = "";
-      owner.style.visibility = "visible";
-      owner.style.opacity = "1";
-    }
-  }
-
-  document.addEventListener("click", function(e){
-    const text = (e.target?.textContent || "").toLowerCase();
-    const page = e.target.closest("[data-page]")?.dataset?.page || "";
-    if (page === "wallet" || text.includes("wallet") || text.includes("deposit") || text.includes("withdraw")) {
-      setTimeout(restoreWalletVisible, 60);
-      setTimeout(restoreWalletVisible, 400);
-      setTimeout(restoreWalletVisible, 1200);
-    }
-  }, true);
-
-  document.addEventListener("DOMContentLoaded", () => setTimeout(restoreWalletVisible, 1000));
-  window.addEventListener("load", () => {
-    setTimeout(restoreWalletVisible, 900);
-    setTimeout(restoreWalletVisible, 2400);
-    setTimeout(restoreWalletVisible, 4500);
-  });
-
-  window.restoreWalletVisibleSafe = restoreWalletVisible;
+  document.addEventListener("DOMContentLoaded", () => setTimeout(boot,900));
+  window.addEventListener("load", () => { setTimeout(boot,900); setTimeout(boot,2500); });
 })();
