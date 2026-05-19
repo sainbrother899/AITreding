@@ -1010,3 +1010,19 @@ KYC + Payment + Referral Clean Module Final:
 - Home/Trade/Chart/Wallet/P&L/History/card/menu design untouched.
 - Removed markers: [{"marker": "CLEAN KYC + PAYMENT LOGIC LOCKED BASE", "js": 1, "css": 1}, {"marker": "KYC + PAYMENT ROUTE LOCK FINAL", "js": 1, "css": 1}, {"marker": "MOBILE PAYMENT INPUT PRESERVE FIX", "js": 1, "css": 0}]
 - JS syntax check: OK
+
+
+KPR Old Conflict Removed:
+- Removed old user KYC/payment/referral conflicting blocks:
+  * MENU PROFILE KYC REFERRAL FIX
+  * PAYMENT KYC ADMIN APPROVAL FINAL
+  * DB CONNECTED KYC + PAYOUT FINAL
+- Kept design/trade/chart/wallet modules untouched.
+- Kept KYC PAYMENT REFERRAL CLEAN MODULE FINAL as the only owner for:
+  * KYC page
+  * My Payment Methods page
+  * Referral page
+- Added a light route guard; no fast 1–2 sec payment re-render.
+- Removal result: [{"marker": "MENU PROFILE KYC REFERRAL FIX", "js_removed": 1, "css_removed": 1}, {"marker": "PAYMENT KYC ADMIN APPROVAL FINAL", "js_removed": 1, "css_removed": 1}, {"marker": "DB CONNECTED KYC + PAYOUT FINAL", "js_removed": 1, "css_removed": 1}]
+- Scan result: {"PAYMENT KYC ADMIN APPROVAL FINAL": false, "DB CONNECTED KYC + PAYOUT FINAL": false, "MENU PROFILE KYC REFERRAL FIX": false, "KPR clean module present": true, "applyPaymentKycAdminApproval_count": 0, "securePaymentMethodForm_count": 0, "realPaymentMethodForm_count": 1, "kprPaymentForm_count": 3}
+- JS syntax check: OK
