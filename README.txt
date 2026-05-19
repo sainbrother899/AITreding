@@ -1174,3 +1174,13 @@ Admin KYC Requests Render Fix:
 - KYC wizard/payment/trade/chart/wallet untouched.
 - Admin KYC IDs found: ["adminKyc", "adminKycLog", "kyc", "kycDocNumber", "kycDocType", "kycFrontFile", "kycMobile", "kycName", "kycSelfieFile", "kycStatusBox", "kycStatusTitle", "submitKycBtn"]
 - JS syntax check: OK
+
+
+Admin KYC + Payout Table Filter Pagination Final:
+- KYC and payout method requests now have search, status filter, and 5-record pagination.
+- Payout has All/UPI/Bank type filter.
+- Payout has Delete button so admin can remove a method and user can add again.
+- Approved/Rejected rows show Locked instead of approve/reject buttons.
+- Removed old admin KYC render fix blocks: JS 1, CSS 1.
+- User KYC wizard/payment form/trade/chart/wallet untouched.
+- JS syntax check: OK

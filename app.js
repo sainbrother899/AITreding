@@ -7740,233 +7740,129 @@ function restoreManualHistoryBackup(mode = state.mode) {
 })();
 
 
-/* ===== ADMIN KYC REQUESTS RENDER FIX ===== */
+
+
+
+/* ===== ADMIN KYC PAYOUT TABLES FILTER PAGINATION FINAL ===== */
 (function(){
-  const TABLE = "kyc_requests";
-  const DOC_TABLE = "kyc_documents";
-  let loading = false;
+  const PAGE_SIZE = 5;
+  const st = { kycPage:1, payoutPage:1, kycSearch:"", payoutSearch:"", kycStatus:"ALL", payoutStatus:"ALL", payoutType:"ALL" };
 
-  function client(){
-    try {
-      if (window.supabaseClient) return window.supabaseClient;
-      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
-    } catch(e){}
-    return null;
-  }
-  function isAdminView(){
-    try {
-      return location.pathname.toLowerCase().includes("admin") ||
-        String(state?.user?.role || "").toLowerCase() === "admin" ||
-        !!document.getElementById("adminKycLog") ||
-        !!document.getElementById("kycRequestsLog");
-    } catch(e){
-      return false;
-    }
-  }
-  function rows(){
+  function c(){ try { return window.supabaseClient || (typeof supabaseClient !== "undefined" ? supabaseClient : null); } catch(e){ return null; } }
+  function isAdmin(){ try { return location.pathname.toLowerCase().includes("admin") || String(state?.user?.role||"").toLowerCase()==="admin" || !!document.getElementById("adminKycLog") || !!document.getElementById("paymentRequestsLog"); } catch(e){ return false; } }
+  function norm(v){ return String(v||"").trim().toLowerCase(); }
+  function save(){ try { saveState?.(); } catch(e){} }
+
+  function kycRows(){
     state.kycRequests ||= [];
-    return state.kycRequests;
+    return state.kycRequests.map(r => ({
+      id:String(r.id||r.kyc_id||""), userId:String(r.userId||r.user_id||""), userEmail:String(r.userEmail||r.user_email||r.email||""),
+      name:String(r.name||r.full_name||r.kycName||""), mobile:String(r.mobile||""), dob:String(r.dob||""), address:String(r.address||""),
+      city:String(r.city||""), stateName:String(r.stateName||r.state_name||r.state||""), pincode:String(r.pincode||""),
+      docType:String(r.docType||r.doc_type||"KYC"), docNumber:String(r.docNumber||r.doc_number||r.pan||""),
+      documents:r.documents||{}, status:String(r.status||"PENDING").toUpperCase(), createdAt:String(r.createdAt||r.submitted_at||r.created_at||"")
+    }));
   }
-  function normalize(r){
-    const docs = r.documents || {};
-    return {
-      id: String(r.id || r.kyc_id || ("kyc_" + Date.now())),
-      userId: String(r.userId || r.user_id || ""),
-      userEmail: String(r.userEmail || r.user_email || r.email || ""),
-      name: String(r.name || r.full_name || r.kycName || ""),
-      mobile: String(r.mobile || ""),
-      dob: String(r.dob || ""),
-      address: String(r.address || ""),
-      city: String(r.city || ""),
-      stateName: String(r.stateName || r.state_name || r.state || ""),
-      pincode: String(r.pincode || ""),
-      docType: String(r.docType || r.doc_type || "KYC"),
-      docNumber: String(r.docNumber || r.doc_number || r.pan || ""),
-      documents: docs,
-      status: String(r.status || "PENDING").toUpperCase(),
-      createdAt: String(r.createdAt || r.submitted_at || r.created_at || "")
-    };
+  function payoutRows(){
+    state.userPayoutMethods ||= state.payoutMethods || [];
+    state.payoutMethods = state.userPayoutMethods;
+    return state.userPayoutMethods.map(m => {
+      const type = String(m.type||m.method_type||m.method||"UPI").toUpperCase()==="BANK" ? "BANK" : "UPI";
+      return { id:String(m.id||""), userId:String(m.userId||m.user_id||""), userEmail:String(m.userEmail||m.user_email||""), type,
+        upi:String(m.upi||m.upi_id||""), holderName:String(m.holderName||m.holder_name||""), kycName:String(m.kycName||m.kyc_name_snapshot||""),
+        bankName:String(m.bankName||m.bank_name||""), accountNumber:String(m.accountNumber||m.account_number||""), ifsc:String(m.ifsc||""),
+        status:String(m.status||"PENDING").toUpperCase(), createdAt:String(m.createdAt||m.created_at_text||m.created_at||"") };
+    });
   }
-  function merge(incoming){
-    const map = new Map();
-    rows().map(normalize).forEach(r => map.set(r.id, r));
-    (incoming || []).map(normalize).forEach(r => map.set(r.id, { ...(map.get(r.id) || {}), ...r }));
-    state.kycRequests = Array.from(map.values());
-    try { saveState?.(); } catch(e){}
-    return state.kycRequests;
+  function mergeKyc(rows){
+    const map = new Map(); kycRows().forEach(r=>map.set(r.id,r));
+    (rows||[]).forEach(r=>{
+      const id=String(r.id||r.kyc_id||("kyc_"+Date.now()+"_"+Math.random()));
+      map.set(id,{id,userId:String(r.user_id||r.userId||""),userEmail:String(r.user_email||r.userEmail||r.email||""),name:String(r.full_name||r.name||""),mobile:String(r.mobile||""),dob:String(r.dob||""),address:String(r.address||""),city:String(r.city||""),stateName:String(r.state_name||r.stateName||r.state||""),pincode:String(r.pincode||""),docType:String(r.doc_type||r.docType||"KYC"),docNumber:String(r.doc_number||r.docNumber||""),documents:r.documents||{},status:String(r.status||"PENDING").toUpperCase(),createdAt:String(r.submitted_at||r.created_at||r.createdAt||"")});
+    });
+    state.kycRequests = Array.from(map.values()); save();
   }
-  async function loadDb(){
-    const c = client();
-    if (!c) return [];
-    try {
-      const res = await c.from(TABLE).select("*").order("created_at", { ascending:false });
-      if (res.error) {
-        const res2 = await c.from(TABLE).select("*");
-        if (res2.error) throw res2.error;
-        return res2.data || [];
-      }
-      return res.data || [];
-    } catch(e) {
-      console.warn("Admin KYC DB load failed:", e);
-      return [];
-    }
+  function mergePayout(rows){
+    const map = new Map(); payoutRows().forEach(r=>map.set(r.id,r));
+    (rows||[]).forEach(m=>{
+      const id=String(m.id||("pm_"+Date.now()+"_"+Math.random()));
+      map.set(id,{id,userId:String(m.user_id||m.userId||""),userEmail:String(m.user_email||m.userEmail||""),type:String(m.method_type||m.type||"UPI").toUpperCase()==="BANK"?"BANK":"UPI",upi:String(m.upi_id||m.upi||""),holderName:String(m.holder_name||m.holderName||""),kycName:String(m.kyc_name_snapshot||m.kycName||""),bankName:String(m.bank_name||m.bankName||""),accountNumber:String(m.account_number||m.accountNumber||""),ifsc:String(m.ifsc||""),status:String(m.status||"PENDING").toUpperCase(),createdAt:String(m.created_at_text||m.created_at||m.createdAt||"")});
+    });
+    state.userPayoutMethods = Array.from(map.values()); state.payoutMethods = state.userPayoutMethods; save();
   }
-  function fileCount(k){
-    const docs = k.documents || {};
-    if (Array.isArray(docs)) return docs.length;
-    if (typeof docs === "object" && docs) return Object.keys(docs).filter(Boolean).length;
-    return 0;
-  }
-  function statusBadge(st){
-    st = String(st || "PENDING").toUpperCase();
-    return `<span class="admin-kyc-status ${st.toLowerCase()}">${st}</span>`;
-  }
-  function bodyEl(){
-    return document.getElementById("adminKycLog") ||
-      document.getElementById("kycRequestsLog") ||
-      document.querySelector("#adminKycPanel tbody") ||
-      document.querySelector("#kycManagement tbody") ||
-      document.querySelector("[data-admin-kyc-log]");
-  }
-  function detailsRoot(){
-    let el = document.getElementById("adminKycDetails");
-    if (el) return el;
-    const panel = document.querySelector("#adminKycPanel") ||
-      document.querySelector("#kycManagement") ||
-      document.querySelector(".admin-panel.active-admin-panel") ||
-      document.querySelector(".admin-main") ||
-      document.body;
-    el = document.createElement("div");
-    el.id = "adminKycDetails";
-    el.className = "admin-kyc-details";
-    panel.appendChild(el);
-    return el;
-  }
-  function renderDetails(id){
-    const k = rows().map(normalize).find(x => String(x.id) === String(id));
-    const root = detailsRoot();
-    if (!k) {
-      root.innerHTML = "";
-      return;
-    }
-    const docs = k.documents && typeof k.documents === "object" ? Object.entries(k.documents) : [];
-    root.innerHTML = `<div class="card admin-kyc-detail-card">
-      <div class="admin-kyc-detail-head">
-        <div>
-          <span>KYC DETAILS</span>
-          <h3>${k.name || "User KYC"}</h3>
-          <p>${k.userEmail || k.userId || "-"}</p>
-        </div>
-        ${statusBadge(k.status)}
-      </div>
-      <div class="admin-kyc-detail-grid">
-        <div><span>Mobile</span><b>${k.mobile || "-"}</b></div>
-        <div><span>DOB</span><b>${k.dob || "-"}</b></div>
-        <div><span>Doc Type</span><b>${k.docType || "-"}</b></div>
-        <div><span>Doc No.</span><b>${k.docNumber || "-"}</b></div>
-        <div><span>Address</span><b>${k.address || "-"}</b></div>
-        <div><span>City / State / Pincode</span><b>${[k.city,k.stateName,k.pincode].filter(Boolean).join(" / ") || "-"}</b></div>
-        <div><span>Submitted</span><b>${k.createdAt || "-"}</b></div>
-        <div><span>Files</span><b>${fileCount(k)} file(s)</b></div>
-      </div>
-      <div class="admin-kyc-docs">
-        ${docs.length ? docs.map(([key,val]) => {
-          const name = val?.name || val?.file_name || key;
-          const path = val?.path || val?.file_path || "";
-          return `<div><span>${key}</span><b>${name}</b><small>${path}</small></div>`;
-        }).join("") : `<div><span>Documents</span><b>No file metadata found</b></div>`}
-      </div>
-      <div class="admin-kyc-detail-actions">
-        ${k.status === "PENDING" ? `<button class="approve-btn" onclick="approveKyc('${k.id}')">Approve</button><button class="reject-btn" onclick="rejectKyc('${k.id}')">Reject</button>` : `<span class="admin-kyc-locked">Action Locked</span>`}
-      </div>
-    </div>`;
-  }
-  function render(){
-    if (!isAdminView()) return;
-    const body = bodyEl();
-    if (!body) return;
-    const list = rows().map(normalize).sort((a,b) => (Date.parse(b.createdAt)||Number(b.id)||0) - (Date.parse(a.createdAt)||Number(a.id)||0));
-    const html = list.length ? list.map(k => {
-      const fc = fileCount(k);
-      return `<tr>
-        <td>${k.userEmail || k.userId || "-"}</td>
-        <td>${k.name || "-"}</td>
-        <td>${k.docType || "KYC"}</td>
-        <td>${k.docNumber || "-"}</td>
-        <td>${fc ? fc + " files" : "Uploaded"}</td>
-        <td>${statusBadge(k.status)}</td>
-        <td>
-          <button class="admin-kyc-view-btn" onclick="viewKycDetails('${k.id}')">View</button>
-          ${k.status === "PENDING" ? `<button class="approve-btn" onclick="approveKyc('${k.id}')">Approve</button><button class="reject-btn" onclick="rejectKyc('${k.id}')">Reject</button>` : `<span class="admin-kyc-locked">Locked</span>`}
-        </td>
-      </tr>`;
-    }).join("") : `<tr><td colspan="7" class="empty">No KYC requests found.</td></tr>`;
-    body.innerHTML = html;
-  }
-  async function refresh(){
-    if (loading) return;
-    loading = true;
-    try {
-      const dbRows = await loadDb();
-      merge(dbRows);
-      render();
-    } finally {
-      loading = false;
-    }
-  }
-  async function setStatus(id, st){
-    const list = rows();
-    const row = list.find(r => String(r.id) === String(id));
-    if (row) row.status = st;
-    const c = client();
-    if (c) {
-      try {
-        let res = await c.from(TABLE).update({ status:st, reviewed_at:new Date().toISOString() }).eq("id", id);
-        if (res.error) {
-          res = await c.from(TABLE).update({ status:st }).eq("id", id);
-        }
-        if (res.error) console.warn("KYC status DB update failed:", res.error.message);
-      } catch(e){ console.warn("KYC status DB update failed:", e); }
-    }
-    try { saveState?.(); } catch(e){}
-    render();
-    renderDetails(id);
-  }
-  function patch(){
-    window.viewKycDetails = renderDetails;
-    window.renderAdminKycRequests = render;
-    window.refreshAdminKycRequests = refresh;
-    window.approveKyc = (id) => setStatus(id, "APPROVED");
-    window.rejectKyc = (id) => setStatus(id, "REJECTED");
 
-    const oldRender = window.renderAdmin;
-    if (typeof oldRender === "function" && !window.__adminKycRenderPatched) {
-      window.__adminKycRenderPatched = true;
-      window.renderAdmin = function(){
-        const res = oldRender.apply(this, arguments);
-        setTimeout(render, 50);
-        return res;
-      };
-      try { renderAdmin = window.renderAdmin; } catch(e){}
-    }
+  async function loadKyc(){ const db=c(); if(!db)return; try{ let r=await db.from("kyc_requests").select("*").order("created_at",{ascending:false}); if(r.error) r=await db.from("kyc_requests").select("*"); if(!r.error) mergeKyc(r.data||[]); }catch(e){console.warn("KYC load failed",e);} }
+  async function loadPayout(){ const db=c(); if(!db)return; try{ let r=await db.from("user_payout_methods").select("*").order("created_at",{ascending:false}); if(r.error) r=await db.from("user_payout_methods").select("*"); if(!r.error) mergePayout(r.data||[]); }catch(e){console.warn("Payout load failed",e);} }
+
+  function badge(x){ x=String(x||"PENDING").toUpperCase(); return `<span class="admin-table-status ${x.toLowerCase()}">${x}</span>`; }
+  function pager(kind,total,page){
+    const pages=Math.max(1,Math.ceil(total/PAGE_SIZE)), start=total?((page-1)*PAGE_SIZE)+1:0, end=Math.min(total,page*PAGE_SIZE);
+    return `<div class="admin-table-pager"><span>Showing ${start}–${end} of ${total}</span><div><button data-admin-page-kind="${kind}" data-admin-page-dir="prev" ${page<=1?"disabled":""}>Previous</button><b>Page ${page} of ${pages}</b><button data-admin-page-kind="${kind}" data-admin-page-dir="next" ${page>=pages?"disabled":""}>Next</button></div></div>`;
   }
-  document.addEventListener("click", function(e){
-    const text = (e.target?.textContent || "").toLowerCase();
-    const tab = e.target.closest("[data-admin-tab]")?.dataset?.adminTab || "";
-    const page = e.target.closest("[data-page]")?.dataset?.page || "";
-    if (text.includes("kyc") || tab.toLowerCase().includes("kyc") || page.toLowerCase().includes("kyc")) {
-      setTimeout(refresh, 120);
-      setTimeout(render, 700);
-    }
-  }, true);
-  function boot(){
-    patch();
-    refresh();
-    render();
+  function toolbar(panel,kind,title){
+    let tb=document.getElementById(`admin${kind}Toolbar`); if(tb) return tb;
+    tb=document.createElement("div"); tb.id=`admin${kind}Toolbar`; tb.className="admin-table-toolbar";
+    tb.innerHTML=`<div><span>${title}</span><b>Search, filter & manage</b></div><input id="admin${kind}Search" placeholder="Search user, name, email..." /><select id="admin${kind}Status"><option value="ALL">All Status</option><option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></select>${kind==="Payout"?`<select id="adminPayoutType"><option value="ALL">All Type</option><option value="UPI">UPI</option><option value="BANK">Bank</option></select>`:""}`;
+    const t=panel?.querySelector("table")||panel?.firstElementChild; if(t) t.parentNode.insertBefore(tb,t); else panel?.prepend(tb);
+    bindToolbar(kind); return tb;
   }
-  document.addEventListener("DOMContentLoaded", () => setTimeout(boot, 900));
-  window.addEventListener("load", () => {
-    setTimeout(boot, 900);
-    setTimeout(refresh, 2500);
-  });
+  function bindToolbar(kind){
+    const s=document.getElementById(`admin${kind}Search`), f=document.getElementById(`admin${kind}Status`), typ=document.getElementById("adminPayoutType");
+    if(s&&!s.dataset.bound){s.dataset.bound=1; s.addEventListener("input",()=>{ if(kind==="Kyc"){st.kycSearch=s.value;st.kycPage=1;renderKyc();}else{st.payoutSearch=s.value;st.payoutPage=1;renderPayout();} });}
+    if(f&&!f.dataset.bound){f.dataset.bound=1; f.addEventListener("change",()=>{ if(kind==="Kyc"){st.kycStatus=f.value;st.kycPage=1;renderKyc();}else{st.payoutStatus=f.value;st.payoutPage=1;renderPayout();} });}
+    if(typ&&!typ.dataset.bound){typ.dataset.bound=1; typ.addEventListener("change",()=>{st.payoutType=typ.value;st.payoutPage=1;renderPayout();});}
+  }
+
+  function kycBody(){ return document.getElementById("adminKycLog")||document.getElementById("kycRequestsLog")||document.querySelector("#adminKycPanel tbody")||document.querySelector("#kycManagement tbody"); }
+  function kycPanel(){ const b=kycBody(); return b?.closest(".card")||b?.closest(".admin-panel")||document.body; }
+  function fileCount(k){ const d=k.documents||{}; return Array.isArray(d)?d.length:(d&&typeof d==="object"?Object.keys(d).length:0); }
+  function filteredKyc(){ const q=norm(st.kycSearch); return kycRows().filter(k=>(st.kycStatus==="ALL"||k.status===st.kycStatus)&&(!q||norm([k.userEmail,k.userId,k.name,k.mobile,k.docType,k.docNumber,k.address,k.city,k.stateName,k.pincode].join(" ")).includes(q))).sort((a,b)=>(Date.parse(b.createdAt)||Number(b.id)||0)-(Date.parse(a.createdAt)||Number(a.id)||0)); }
+  function renderKyc(){
+    if(!isAdmin())return; const body=kycBody(); if(!body)return; const panel=kycPanel(); toolbar(panel,"Kyc","KYC Requests");
+    const list=filteredKyc(), pages=Math.max(1,Math.ceil(list.length/PAGE_SIZE)); st.kycPage=Math.min(Math.max(1,st.kycPage),pages);
+    const rows=list.slice((st.kycPage-1)*PAGE_SIZE,st.kycPage*PAGE_SIZE);
+    body.innerHTML=rows.length?rows.map(k=>`<tr><td>${k.userEmail||k.userId||"-"}</td><td>${k.name||"-"}</td><td>${k.docType||"KYC"}</td><td>${k.docNumber||"-"}</td><td>${fileCount(k)?fileCount(k)+" files":"Uploaded"}</td><td>${badge(k.status)}</td><td><button class="admin-table-view" onclick="viewKycDetails('${k.id}')">View</button>${k.status==="PENDING"?`<button class="approve-btn" onclick="approveKyc('${k.id}')">Approve</button><button class="reject-btn" onclick="rejectKyc('${k.id}')">Reject</button>`:`<span class="admin-table-locked">Locked</span>`}</td></tr>`).join(""):`<tr><td colspan="7" class="empty">No KYC requests found.</td></tr>`;
+    let pg=document.getElementById("adminKycPager"); if(!pg){pg=document.createElement("div");pg.id="adminKycPager";(body.closest("table")||panel).after(pg);} pg.innerHTML=pager("kyc",list.length,st.kycPage);
+  }
+  function detailRoot(id, panel){ let el=document.getElementById(id); if(el)return el; el=document.createElement("div"); el.id=id; el.className="admin-table-details"; panel.appendChild(el); return el; }
+  function viewKycDetails(id){
+    const k=kycRows().find(x=>String(x.id)===String(id)); const root=detailRoot("adminKycDetails",kycPanel()); if(!k){root.innerHTML="";return;}
+    const docs=k.documents&&typeof k.documents==="object"?Object.entries(k.documents):[];
+    root.innerHTML=`<div class="card admin-detail-card"><div class="admin-detail-head"><div><span>KYC DETAILS</span><h3>${k.name||"User KYC"}</h3><p>${k.userEmail||k.userId||"-"}</p></div>${badge(k.status)}</div><div class="admin-detail-grid"><div><span>Mobile</span><b>${k.mobile||"-"}</b></div><div><span>DOB</span><b>${k.dob||"-"}</b></div><div><span>Doc Type</span><b>${k.docType||"-"}</b></div><div><span>Doc No.</span><b>${k.docNumber||"-"}</b></div><div><span>Address</span><b>${k.address||"-"}</b></div><div><span>City / State / Pincode</span><b>${[k.city,k.stateName,k.pincode].filter(Boolean).join(" / ")||"-"}</b></div></div><div class="admin-detail-docs">${docs.length?docs.map(([key,val])=>`<div><span>${key}</span><b>${val?.name||val?.file_name||key}</b><small>${val?.path||val?.file_path||""}</small></div>`).join(""):`<div><span>Documents</span><b>No file metadata found</b></div>`}</div><div class="admin-detail-actions">${k.status==="PENDING"?`<button class="approve-btn" onclick="approveKyc('${k.id}')">Approve</button><button class="reject-btn" onclick="rejectKyc('${k.id}')">Reject</button>`:`<span class="admin-table-locked">Action Locked</span>`}</div></div>`;
+  }
+  async function setKyc(id,x){ const row=state.kycRequests?.find(r=>String(r.id||r.kyc_id)===String(id)); if(row)row.status=x; const db=c(); if(db){try{let r=await db.from("kyc_requests").update({status:x,reviewed_at:new Date().toISOString()}).eq("id",id); if(r.error) await db.from("kyc_requests").update({status:x}).eq("id",id);}catch(e){}} save(); renderKyc(); viewKycDetails(id); }
+
+  function payoutBody(){ return document.getElementById("paymentRequestsLog")||document.getElementById("payoutRequestsLog")||document.getElementById("adminPayoutRequestsList")||document.querySelector("#adminPayoutPanel tbody")||document.querySelector("#payoutMethodsPanel tbody"); }
+  function payoutPanel(){ const b=payoutBody(); return b?.closest(".card")||b?.closest(".admin-panel")||document.body; }
+  function mask(m){ return m.type==="UPI"?(m.upi||"-"):`${m.bankName||"Bank"} ${m.accountNumber?"****"+String(m.accountNumber).slice(-4):""}`; }
+  function filteredPayout(){ const q=norm(st.payoutSearch); return payoutRows().filter(m=>(st.payoutStatus==="ALL"||m.status===st.payoutStatus)&&(st.payoutType==="ALL"||m.type===st.payoutType)&&(!q||norm([m.userEmail,m.userId,m.type,m.upi,m.holderName,m.kycName,m.bankName,m.accountNumber,m.ifsc].join(" ")).includes(q))).sort((a,b)=>(Date.parse(b.createdAt)||Number(String(b.id).replace(/\D/g,""))||0)-(Date.parse(a.createdAt)||Number(String(a.id).replace(/\D/g,""))||0));}
+  function renderPayout(){
+    if(!isAdmin())return; const body=payoutBody(); if(!body)return; const panel=payoutPanel(); toolbar(panel,"Payout","Payout Method Requests");
+    const list=filteredPayout(), pages=Math.max(1,Math.ceil(list.length/PAGE_SIZE)); st.payoutPage=Math.min(Math.max(1,st.payoutPage),pages);
+    const rows=list.slice((st.payoutPage-1)*PAGE_SIZE,st.payoutPage*PAGE_SIZE);
+    const html=rows.length?rows.map(m=>`<tr><td>${m.userEmail||m.userId||"-"}</td><td>${m.type}</td><td>${mask(m)}</td><td>${m.holderName||"-"}</td><td>${m.kycName||"-"}</td><td>${badge(m.status)}</td><td><button class="admin-table-view" onclick="viewPayoutDetails('${m.id}')">View</button>${m.status==="PENDING"?`<button class="approve-btn" onclick="approvePayoutMethod('${m.id}')">Approve</button><button class="reject-btn" onclick="rejectPayoutMethod('${m.id}')">Reject</button>`:`<span class="admin-table-locked">Locked</span>`}<button class="admin-table-delete" onclick="deletePayoutMethod('${m.id}')">Delete</button></td></tr>`).join(""):`<tr><td colspan="7" class="empty">No payout method requests found.</td></tr>`;
+    if(body.tagName==="TBODY") body.innerHTML=html; else body.innerHTML=`<table class="admin-table"><tbody>${html}</tbody></table>`;
+    let pg=document.getElementById("adminPayoutPager"); if(!pg){pg=document.createElement("div");pg.id="adminPayoutPager";(body.closest("table")||panel).after(pg);} pg.innerHTML=pager("payout",list.length,st.payoutPage);
+  }
+  function viewPayoutDetails(id){
+    const m=payoutRows().find(x=>String(x.id)===String(id)); const root=detailRoot("adminPayoutDetails",payoutPanel()); if(!m){root.innerHTML="";return;}
+    root.innerHTML=`<div class="card admin-detail-card"><div class="admin-detail-head"><div><span>PAYOUT METHOD DETAILS</span><h3>${m.type} Method</h3><p>${m.userEmail||m.userId||"-"}</p></div>${badge(m.status)}</div><div class="admin-detail-grid"><div><span>Type</span><b>${m.type}</b></div><div><span>Method</span><b>${mask(m)}</b></div><div><span>Holder Name</span><b>${m.holderName||"-"}</b></div><div><span>KYC Name</span><b>${m.kycName||"-"}</b></div><div><span>Name Match</span><b>${norm(m.holderName)===norm(m.kycName)?"YES":"NO"}</b></div><div><span>Date</span><b>${m.createdAt||"-"}</b></div></div><div class="admin-detail-actions">${m.status==="PENDING"?`<button class="approve-btn" onclick="approvePayoutMethod('${m.id}')">Approve</button><button class="reject-btn" onclick="rejectPayoutMethod('${m.id}')">Reject</button>`:`<span class="admin-table-locked">Action Locked</span>`}<button class="admin-table-delete" onclick="deletePayoutMethod('${m.id}')">Delete Method</button></div></div>`;
+  }
+  async function setPayout(id,x){ const row=state.userPayoutMethods?.find(m=>String(m.id)===String(id)); if(row)row.status=x; const db=c(); if(db){try{let r=await db.from("user_payout_methods").update({status:x,reviewed_at:new Date().toISOString()}).eq("id",id); if(r.error) await db.from("user_payout_methods").update({status:x}).eq("id",id);}catch(e){}} save(); renderPayout(); viewPayoutDetails(id); }
+  async function delPayout(id){ if(!confirm("Delete this payout method? User can add a new method again."))return; state.userPayoutMethods=(state.userPayoutMethods||[]).filter(m=>String(m.id)!==String(id)); state.payoutMethods=state.userPayoutMethods; const db=c(); if(db){try{await db.from("user_payout_methods").delete().eq("id",id);}catch(e){}} save(); const d=document.getElementById("adminPayoutDetails"); if(d)d.innerHTML=""; renderPayout(); }
+
+  async function refresh(){ await Promise.all([loadKyc(),loadPayout()]); renderKyc(); renderPayout(); }
+  function patch(){
+    window.viewKycDetails=viewKycDetails; window.approveKyc=(id)=>setKyc(id,"APPROVED"); window.rejectKyc=(id)=>setKyc(id,"REJECTED"); window.renderAdminKycRequests=renderKyc;
+    window.viewPayoutDetails=viewPayoutDetails; window.approvePayoutMethod=(id)=>setPayout(id,"APPROVED"); window.rejectPayoutMethod=(id)=>setPayout(id,"REJECTED"); window.deletePayoutMethod=delPayout; window.renderAdminPayoutRequests=renderPayout; window.renderAdminPaymentRequestsFixed=renderPayout;
+    const old=window.renderAdmin; if(typeof old==="function"&&!window.__adminTablesFinalPatch){ window.__adminTablesFinalPatch=true; window.renderAdmin=function(){const r=old.apply(this,arguments);setTimeout(renderKyc,50);setTimeout(renderPayout,80);return r;}; try{renderAdmin=window.renderAdmin;}catch(e){}}
+  }
+  document.addEventListener("click",function(e){
+    const pg=e.target.closest("[data-admin-page-kind]"); if(pg){ const kind=pg.dataset.adminPageKind, dir=pg.dataset.adminPageDir; if(kind==="kyc"){st.kycPage+=dir==="next"?1:-1;renderKyc();} if(kind==="payout"){st.payoutPage+=dir==="next"?1:-1;renderPayout();} return; }
+    const text=(e.target?.textContent||"").toLowerCase(), tab=e.target.closest("[data-admin-tab]")?.dataset?.adminTab||"", page=e.target.closest("[data-page]")?.dataset?.page||"";
+    if(text.includes("kyc")||text.includes("payout")||text.includes("payment method")||tab.toLowerCase().includes("kyc")||tab.toLowerCase().includes("payment")||page.toLowerCase().includes("admin")){setTimeout(refresh,150);setTimeout(()=>{renderKyc();renderPayout();},800);}
+  },true);
+  function boot(){ if(!isAdmin())return; patch(); refresh(); renderKyc(); renderPayout(); }
+  document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,900));
+  window.addEventListener("load",()=>{setTimeout(boot,900);setTimeout(refresh,2600);});
 })();
