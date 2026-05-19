@@ -1303,3 +1303,18 @@ Wallet Minimum Limits Fix:
 - Withdrawal still cannot exceed withdrawable balance.
 - Only wallet validation/text changed.
 - JS syntax check: OK
+
+
+Wallet Balance + Trade Logic Fix:
+- Approved Deposit card changed to Pending Deposit.
+- Deposit pending does not add balance.
+- Deposit approve adds amount once using balanceApplied flag.
+- Withdrawal submit deducts/holds amount immediately.
+- Withdrawal approve does not double deduct.
+- Withdrawal reject refunds held amount.
+- Trade open deducts trade amount once.
+- Trade close profit returns amount + profit.
+- Trade close loss returns amount - loss.
+- Referral logic intentionally NOT included.
+- Added SQL: wallet-balance-trade-logic-db-fix.sql
+- JS syntax check: OK
