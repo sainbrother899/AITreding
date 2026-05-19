@@ -6800,3 +6800,184 @@ function restoreManualHistoryBackup(mode = state.mode) {
   window.addEventListener("load", () => setTimeout(run, 1200));
   window.renderAdminPaymentRequestsFixed = renderAdminPaymentRequests;
 })();
+
+
+/* ===== PAYMENT METHOD PERSIST REFRESH FIX ===== */
+(function(){
+  const PM_STORE_KEY = "ai_trading_payment_methods_persist_v1";
+  let loadedOnce = false;
+
+  function sb(){
+    try {
+      if (window.supabaseClient) return window.supabaseClient;
+      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
+    } catch(e){}
+    return null;
+  }
+  function uid(){
+    const u = state?.user || {};
+    return String(u.id || u.email || "local");
+  }
+  function email(){
+    return String(state?.user?.email || "");
+  }
+  function norm(v){ return String(v || "").trim().toLowerCase().replace(/\s+/g, ""); }
+  function getAll(){
+    state.userPayoutMethods ||= state.payoutMethods || [];
+    state.payoutMethods = state.userPayoutMethods;
+    return state.userPayoutMethods;
+  }
+  function typeOf(m){ return String(m.type || m.method || m.method_type || "").toUpperCase(); }
+  function accountKey(m){
+    const type = typeOf(m);
+    const user = String(m.userId || m.user_id || "");
+    if (type === "UPI") return user + "|UPI|" + norm(m.upi || m.upi_id);
+    return user + "|BANK|" + norm(m.accountNumber || m.account_number) + "|" + norm(m.ifsc);
+  }
+  function normalizeMethod(m){
+    const type = typeOf(m) || "UPI";
+    return {
+      id: String(m.id || ("pm_" + Date.now() + "_" + Math.random().toString(16).slice(2))),
+      userId: String(m.userId || m.user_id || uid()),
+      userEmail: String(m.userEmail || m.user_email || email()),
+      type,
+      upi: String(m.upi || m.upi_id || ""),
+      holderName: String(m.holderName || m.holder_name || ""),
+      kycName: String(m.kycName || m.kyc_name_snapshot || ""),
+      bankName: String(m.bankName || m.bank_name || ""),
+      accountNumber: String(m.accountNumber || m.account_number || ""),
+      ifsc: String(m.ifsc || ""),
+      status: String(m.status || "PENDING").toUpperCase(),
+      createdAt: String(m.createdAt || m.created_at_text || m.created_at || new Date().toLocaleString())
+    };
+  }
+  function readLocal(){
+    try {
+      const raw = JSON.parse(localStorage.getItem(PM_STORE_KEY) || "[]");
+      return Array.isArray(raw) ? raw.map(normalizeMethod) : [];
+    } catch(e){ return []; }
+  }
+  function writeLocal(){
+    try {
+      const all = getAll().map(normalizeMethod);
+      localStorage.setItem(PM_STORE_KEY, JSON.stringify(all));
+    } catch(e){}
+  }
+  function mergeMethods(list){
+    const map = new Map();
+
+    // Existing first
+    getAll().map(normalizeMethod).forEach(m => {
+      const key = accountKey(m) || m.id;
+      map.set(key, m);
+    });
+
+    // Incoming overwrites only if newer/id exists or status is more final
+    (list || []).map(normalizeMethod).forEach(m => {
+      const key = accountKey(m) || m.id;
+      const old = map.get(key);
+      if (!old) {
+        map.set(key, m);
+        return;
+      }
+      const rank = s => s === "APPROVED" ? 3 : (s === "PENDING" ? 2 : (s === "REJECTED" ? 1 : 0));
+      if (rank(m.status) >= rank(old.status)) map.set(key, { ...old, ...m });
+    });
+
+    state.userPayoutMethods = Array.from(map.values());
+    state.payoutMethods = state.userPayoutMethods;
+    writeLocal();
+    try { saveState?.(); } catch(e){}
+  }
+  async function loadFromDb(){
+    const client = sb();
+    if (!client) return [];
+    try {
+      const id = uid();
+      let res = await client.from("user_payout_methods").select("*").eq("user_id", id);
+      if (res.error) {
+        // fallback: try all, then filter locally
+        res = await client.from("user_payout_methods").select("*");
+        if (res.error) throw res.error;
+        return (res.data || []).filter(r => String(r.user_id || "") === id).map(normalizeMethod);
+      }
+      return (res.data || []).map(normalizeMethod);
+    } catch(e) {
+      console.warn("Payment methods DB load failed", e);
+      return [];
+    }
+  }
+  async function hydratePaymentMethods(){
+    if (!state?.user) return;
+
+    const local = readLocal();
+    if (local.length) mergeMethods(local);
+
+    const dbRows = await loadFromDb();
+    if (dbRows.length) mergeMethods(dbRows);
+
+    loadedOnce = true;
+
+    try { window.renderAdminPaymentRequestsFixed?.(); } catch(e){}
+    try {
+      const p = document.getElementById("paymentMethodsPage");
+      if (p && p.classList.contains("active-page")) {
+        window.kprRenderPayment?.();
+        window.renderPaymentMethodsPage?.();
+      }
+    } catch(e){}
+  }
+
+  function patchSaveState(){
+    if (window.__paymentPersistSavePatched) return;
+    window.__paymentPersistSavePatched = true;
+
+    const oldSave = typeof window.saveState === "function" ? window.saveState : (typeof saveState === "function" ? saveState : null);
+    if (oldSave) {
+      window.saveState = function(){
+        writeLocal();
+        return oldSave.apply(this, arguments);
+      };
+      try { saveState = window.saveState; } catch(e){}
+    }
+  }
+
+  function patchSubmitToPersist(){
+    if (window.__paymentPersistSubmitPatched) return;
+    window.__paymentPersistSubmitPatched = true;
+
+    document.addEventListener("submit", function(e){
+      if (e.target?.id === "kprPaymentForm" || e.target?.id === "routePaymentForm" || e.target?.closest("#paymentMethodsPage")) {
+        setTimeout(() => {
+          writeLocal();
+          hydratePaymentMethods();
+        }, 600);
+      }
+    }, true);
+
+    document.addEventListener("click", function(e){
+      const txt = (e.target?.textContent || "").toLowerCase();
+      if (txt.includes("payment method") || txt.includes("payout") || txt.includes("approve") || txt.includes("reject")) {
+        setTimeout(() => {
+          writeLocal();
+          hydratePaymentMethods();
+        }, 700);
+      }
+    }, true);
+  }
+
+  window.hydratePaymentMethodsPersist = hydratePaymentMethods;
+  window.savePaymentMethodsPersistLocal = writeLocal;
+
+  document.addEventListener("DOMContentLoaded", () => {
+    patchSaveState();
+    patchSubmitToPersist();
+    setTimeout(hydratePaymentMethods, 900);
+  });
+  window.addEventListener("load", () => {
+    patchSaveState();
+    patchSubmitToPersist();
+    setTimeout(hydratePaymentMethods, 1200);
+    setTimeout(hydratePaymentMethods, 2500);
+  });
+})();

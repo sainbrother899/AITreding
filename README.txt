@@ -1037,3 +1037,13 @@ Payment Submit Feedback + Admin Visibility Fix:
 - Admin approve/reject handlers update local state and DB.
 - Design/chart/trade/wallet untouched.
 - JS syntax check: OK
+
+
+Payment Method Persist Refresh Fix:
+- Fixes payment details disappearing after page refresh.
+- Saves payment methods into a dedicated localStorage key: ai_trading_payment_methods_persist_v1.
+- On load/refresh, merges local saved methods + DB user_payout_methods rows.
+- Keeps userPayoutMethods and payoutMethods synced.
+- Persists when saveState is called.
+- Admin payment requests renderer is refreshed after hydration.
+- JS syntax check: OK
