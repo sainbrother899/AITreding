@@ -1264,3 +1264,12 @@ Wallet Top Cards and Button Text Fix:
 - Fixes Deposit/Withdrawal wizard button contrast and readable text.
 - Only CSS/position safety changed; wallet logic/admin/KYC untouched.
 - JS syntax check: OK
+
+
+Wallet Only Balance Cards Show Fix:
+- Shows only real wallet balance cards.
+- Hides old Deposit/Withdrawal action cards.
+- Keeps old history cards hidden.
+- Keeps new Deposit / Withdrawal / History tabs and wizard.
+- Only wallet visibility/style changed.
+- JS syntax check: OK

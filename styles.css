@@ -6618,3 +6618,43 @@ body.app-mode .menu-owned-page.active-page {
 .wallet-old-history-hidden{
   display:none!important;
 }
+
+
+/* ===== WALLET ONLY BALANCE CARDS SHOW FIX ===== */
+.wallet-old-action-hidden,
+.wallet-old-hidden.wallet-old-action-hidden{
+  display:none!important;
+  height:0!important;
+  min-height:0!important;
+  max-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  overflow:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+/* Show only real top balance cards */
+#wallet .card:has(#walletPageBalance),
+#wallet .card:has(#withdrawableAmountText),
+#wallet .card:has(#approvedDepositText),
+#wallet .card:has(#pendingWithdrawalText),
+#walletPage .card:has(#walletPageBalance),
+#walletPage .card:has(#withdrawableAmountText),
+#walletPage .card:has(#approvedDepositText),
+#walletPage .card:has(#pendingWithdrawalText){
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  height:auto!important;
+  max-height:none!important;
+  overflow:visible!important;
+  pointer-events:auto!important;
+}
+
+/* Keep new wallet tabs directly after balance cards */
+#walletSingleOwner{
+  margin-top:14px!important;
+  margin-bottom:18px!important;
+}
