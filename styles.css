@@ -6658,3 +6658,32 @@ body.app-mode .menu-owned-page.active-page {
   margin-top:14px!important;
   margin-bottom:18px!important;
 }
+
+
+/* ===== WALLET OLD BUTTONS INSIDE BALANCE CARD HIDE FIX ===== */
+.wallet-old-inline-action-hidden,
+.wallet-old-inline-note-hidden{
+  display:none!important;
+  height:0!important;
+  min-height:0!important;
+  max-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+/* Make sure new wallet tabs stay visible and clean */
+#walletSingleOwner{
+  margin-top:14px!important;
+  margin-bottom:18px!important;
+}
+
+.wallet-tabs-final{
+  display:grid!important;
+  grid-template-columns:repeat(3,1fr)!important;
+  gap:10px!important;
+  position:relative!important;
+  z-index:5!important;
+}

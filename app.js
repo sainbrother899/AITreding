@@ -8836,3 +8836,77 @@ function hideLegacyWalletHistoryCardsFinal(){
 
   window.fixWalletOnlyBalanceCards = applyWalletVisibility;
 })();
+
+
+/* ===== WALLET OLD BUTTONS INSIDE BALANCE CARD HIDE FIX ===== */
+(function(){
+  function walletPage(){
+    return document.getElementById("wallet") || document.getElementById("walletPage");
+  }
+
+  function hideOldButtonsInsideBalanceCard(){
+    const page = walletPage();
+    if (!page) return;
+
+    const oldButtonIds = ["openDepositBtn", "openDepositBtn2", "openWithdrawBtn"];
+
+    oldButtonIds.forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn && !btn.closest("#walletSingleOwner")) {
+        btn.classList.add("wallet-old-inline-action-hidden");
+        btn.style.display = "none";
+      }
+    });
+
+    page.querySelectorAll("button").forEach(btn => {
+      if (btn.closest("#walletSingleOwner")) return;
+      const txt = (btn.textContent || "").trim().toLowerCase();
+      if (txt === "deposit now" || txt === "withdraw" || txt === "deposit" || txt === "withdrawal") {
+        btn.classList.add("wallet-old-inline-action-hidden");
+        btn.style.display = "none";
+      }
+    });
+
+    page.querySelectorAll("p, small, .note, .muted, div").forEach(el => {
+      if (el.closest("#walletSingleOwner")) return;
+      const txt = (el.textContent || "").toLowerCase();
+      if (
+        txt.includes("approved deposit real wallet") ||
+        txt.includes("open trade pnl live update")
+      ) {
+        el.classList.add("wallet-old-inline-note-hidden");
+        el.style.display = "none";
+      }
+    });
+
+    // Keep the new tabs directly after the main wallet card if possible.
+    const box = document.getElementById("walletSingleOwner");
+    const walletCard = Array.from(page.querySelectorAll(".card")).find(card => {
+      const txt = (card.textContent || "").toLowerCase();
+      return txt.includes("real wallet equity") || txt.includes("approved deposit") || txt.includes("withdrawable");
+    });
+
+    if (box && walletCard && walletCard.nextElementSibling !== box) {
+      walletCard.insertAdjacentElement("afterend", box);
+    }
+  }
+
+  document.addEventListener("click", function(e){
+    const text = (e.target?.textContent || "").toLowerCase();
+    const page = e.target.closest("[data-page]")?.dataset?.page || "";
+    if (page === "wallet" || text.includes("wallet") || text.includes("deposit") || text.includes("withdraw")) {
+      setTimeout(hideOldButtonsInsideBalanceCard, 60);
+      setTimeout(hideOldButtonsInsideBalanceCard, 400);
+      setTimeout(hideOldButtonsInsideBalanceCard, 1200);
+    }
+  }, true);
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(hideOldButtonsInsideBalanceCard, 1000));
+  window.addEventListener("load", () => {
+    setTimeout(hideOldButtonsInsideBalanceCard, 900);
+    setTimeout(hideOldButtonsInsideBalanceCard, 2400);
+    setTimeout(hideOldButtonsInsideBalanceCard, 4500);
+  });
+
+  window.hideOldWalletInlineButtons = hideOldButtonsInsideBalanceCard;
+})();

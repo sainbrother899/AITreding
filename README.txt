@@ -1273,3 +1273,12 @@ Wallet Only Balance Cards Show Fix:
 - Keeps new Deposit / Withdrawal / History tabs and wizard.
 - Only wallet visibility/style changed.
 - JS syntax check: OK
+
+
+Wallet Old Buttons Inside Balance Card Hide Fix:
+- Keeps Real Wallet Equity/top wallet balance card visible.
+- Hides old Deposit Now and Withdraw buttons inside that card.
+- Hides old explanatory note inside that card.
+- Keeps new Deposit / Withdrawal / History tabs and wizard visible.
+- Only wallet visibility/styling changed.
+- JS syntax check: OK
