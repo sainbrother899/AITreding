@@ -1146,3 +1146,12 @@ KYC Step Wizard Final:
 - Payment DB Save/Admin Load fix remains active.
 - Added SQL file: kyc-step-wizard-db-fix.sql
 - JS syntax check: OK
+
+
+Menu Pages Auth Visibility Fix:
+- KYC / Payment Methods / Referral / Profile pages are moved into appPage at runtime if they are outside it.
+- Login/register screen will never show these menu pages.
+- Menu pages open only after login and only through menu/direct/page buttons.
+- Logout/auth mode hides all menu-owned pages.
+- KYC step wizard and payment DB fixes untouched.
+- JS syntax check: OK

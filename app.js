@@ -7494,3 +7494,247 @@ function restoreManualHistoryBackup(mode = state.mode) {
     setTimeout(boot, 2500);
   });
 })();
+
+
+/* ===== MENU PAGES AUTH VISIBILITY FIX ===== */
+(function(){
+  const MENU_PAGE_IDS = [
+    "kycPage",
+    "paymentMethodsPage",
+    "profilePage",
+    "referral",
+    "referralPage"
+  ];
+
+  function isLoggedIn(){
+    try {
+      return !!(state && state.user);
+    } catch(e){
+      return false;
+    }
+  }
+
+  function appPage(){
+    return document.getElementById("appPage");
+  }
+
+  function authPage(){
+    return document.getElementById("authPage");
+  }
+
+  function pageEl(id){
+    return document.getElementById(id);
+  }
+
+  function ensureInsideApp(){
+    const app = appPage();
+    if (!app) return;
+
+    MENU_PAGE_IDS.forEach(id => {
+      const el = pageEl(id);
+      if (!el) return;
+
+      // If menu pages are outside the app wrapper, move them inside appPage
+      // so login/register screen never shows them.
+      if (!app.contains(el)) {
+        app.appendChild(el);
+      }
+
+      el.classList.add("page", "menu-owned-page");
+    });
+  }
+
+  function hideMenuPages(){
+    MENU_PAGE_IDS.forEach(id => {
+      const el = pageEl(id);
+      if (!el) return;
+      el.classList.remove("active-page");
+      el.style.display = "none";
+      el.setAttribute("aria-hidden", "true");
+    });
+  }
+
+  function showOnlyMenuPage(id){
+    ensureInsideApp();
+
+    MENU_PAGE_IDS.forEach(pid => {
+      const el = pageEl(pid);
+      if (!el) return;
+      const active = pid === id;
+      el.classList.toggle("active-page", active);
+      el.style.display = active ? "" : "none";
+      el.setAttribute("aria-hidden", active ? "false" : "true");
+    });
+  }
+
+  function applyVisibility(){
+    ensureInsideApp();
+    document.body.classList.toggle("auth-mode", !isLoggedIn());
+    document.body.classList.toggle("app-mode", isLoggedIn());
+
+    if (!isLoggedIn()) {
+      hideMenuPages();
+      return;
+    }
+
+    MENU_PAGE_IDS.forEach(id => {
+      const el = pageEl(id);
+      if (!el) return;
+      const active = el.classList.contains("active-page");
+      el.style.display = active ? "" : "none";
+      el.setAttribute("aria-hidden", active ? "false" : "true");
+    });
+  }
+
+  function openMenuPage(type){
+    if (!isLoggedIn()) {
+      applyVisibility();
+      return;
+    }
+
+    const map = {
+      kyc: "kycPage",
+      paymentMethods: "paymentMethodsPage",
+      paymentMethod: "paymentMethodsPage",
+      profile: "profilePage",
+      referral: pageEl("referral") ? "referral" : "referralPage"
+    };
+
+    const id = map[type] || type;
+    if (!pageEl(id)) return;
+
+    // Hide normal dashboard pages.
+    document.querySelectorAll("#appPage .page").forEach(p => {
+      if (!MENU_PAGE_IDS.includes(p.id)) {
+        p.classList.remove("active-page");
+      }
+    });
+
+    showOnlyMenuPage(id);
+
+    setTimeout(() => {
+      if (id === "kycPage") {
+        try { window.renderKycStepWizard?.(); } catch(e){}
+        try { window.renderKycPage?.(); } catch(e){}
+      }
+      if (id === "paymentMethodsPage") {
+        try { window.renderPaymentMethodsPage?.(); } catch(e){}
+        try { window.kprRenderPayment?.(); } catch(e){}
+      }
+      if (id === "referral" || id === "referralPage") {
+        try { window.renderReferralClean?.(); } catch(e){}
+      }
+    }, 80);
+  }
+
+  function patchShowAuth(){
+    if (window.__menuPagesShowAuthPatched) return;
+    window.__menuPagesShowAuthPatched = true;
+
+    const oldShowAuth = typeof window.showAuth === "function"
+      ? window.showAuth
+      : (typeof showAuth === "function" ? showAuth : null);
+
+    if (oldShowAuth) {
+      window.showAuth = function(show){
+        const res = oldShowAuth.apply(this, arguments);
+        setTimeout(applyVisibility, 0);
+        setTimeout(applyVisibility, 100);
+        return res;
+      };
+      try { showAuth = window.showAuth; } catch(e){}
+    }
+  }
+
+  function patchShowPage(){
+    if (window.__menuPagesShowPagePatched) return;
+    window.__menuPagesShowPagePatched = true;
+
+    const oldShowPage = typeof window.showPage === "function" ? window.showPage : null;
+    if (oldShowPage) {
+      window.showPage = function(pageId){
+        const menuIds = ["kycPage","paymentMethodsPage","profilePage","referral","referralPage","paymentMethods"];
+        if (menuIds.includes(pageId)) {
+          const target = pageId === "paymentMethods" ? "paymentMethodsPage" : pageId;
+          openMenuPage(target);
+          return;
+        }
+
+        const res = oldShowPage.apply(this, arguments);
+        if (isLoggedIn()) hideMenuPages();
+        setTimeout(applyVisibility, 80);
+        return res;
+      };
+      try { showPage = window.showPage; } catch(e){}
+    }
+  }
+
+  function patchOpenRealMenuPage(){
+    if (window.__menuPagesOpenRealPatched) return;
+    window.__menuPagesOpenRealPatched = true;
+
+    const oldOpen = typeof window.openRealMenuPage === "function" ? window.openRealMenuPage : null;
+    window.openRealMenuPage = function(type){
+      const mapKeys = ["kyc","paymentMethods","paymentMethod","profile","referral"];
+      if (mapKeys.includes(type)) {
+        openMenuPage(type);
+        return;
+      }
+      if (oldOpen) return oldOpen.apply(this, arguments);
+    };
+    try { openRealMenuPage = window.openRealMenuPage; } catch(e){}
+  }
+
+  document.addEventListener("click", function(e){
+    const menuBtn = e.target.closest("[data-menu-page]");
+    if (menuBtn) {
+      const type = menuBtn.dataset.menuPage;
+      if (["kyc","paymentMethods","paymentMethod","profile","referral"].includes(type)) {
+        e.preventDefault();
+        e.stopPropagation();
+        openMenuPage(type);
+      }
+    }
+
+    const direct = e.target.closest("[data-direct-page]");
+    if (direct) {
+      const type = direct.dataset.directPage;
+      if (["kyc","kycPage","paymentMethods","paymentMethodsPage","profile","profilePage","referral","referralPage"].includes(type)) {
+        e.preventDefault();
+        e.stopPropagation();
+        openMenuPage(type);
+      }
+    }
+
+    const page = e.target.closest("[data-page]");
+    if (page) {
+      const type = page.dataset.page;
+      if (["kyc","kycPage","paymentMethods","paymentMethodsPage","profile","profilePage","referral","referralPage"].includes(type)) {
+        e.preventDefault();
+        e.stopPropagation();
+        openMenuPage(type);
+      }
+    }
+  }, true);
+
+  function boot(){
+    ensureInsideApp();
+    patchShowAuth();
+    patchShowPage();
+    patchOpenRealMenuPage();
+    applyVisibility();
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(boot, 200);
+    setTimeout(boot, 1000);
+  });
+  window.addEventListener("load", () => {
+    setTimeout(boot, 200);
+    setTimeout(boot, 1200);
+    setTimeout(applyVisibility, 2500);
+  });
+
+  window.fixMenuPagesVisibility = boot;
+  window.openMenuOwnedPage = openMenuPage;
+})();

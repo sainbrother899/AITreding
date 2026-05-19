@@ -6334,3 +6334,34 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
   .kyc-step-dot span{font-size:10px!important;}
   .kyc-step-dot em{width:25px!important;height:25px!important;}
 }
+
+
+/* ===== MENU PAGES AUTH VISIBILITY FIX ===== */
+body.auth-mode #kycPage,
+body.auth-mode #paymentMethodsPage,
+body.auth-mode #profilePage,
+body.auth-mode #referral,
+body.auth-mode #referralPage {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+#appPage.hidden #kycPage,
+#appPage.hidden #paymentMethodsPage,
+#appPage.hidden #profilePage,
+#appPage.hidden #referral,
+#appPage.hidden #referralPage {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.menu-owned-page:not(.active-page) {
+  display: none !important;
+}
+
+body.app-mode .menu-owned-page.active-page {
+  display: block;
+  visibility: visible;
+}
