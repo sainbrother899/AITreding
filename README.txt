@@ -1131,9 +1131,18 @@ Payment DB Save + Admin Load Fix:
 - JS syntax check: OK
 
 
-Restore Original KYC Design Keep Payment Fix:
-- Problem: KYC PAYMENT REFERRAL CLEAN MODULE was replacing kycPageContent with kprKycForm/kpr-kyc-card.
-- Added override so KYC keeps original index.html design and only updates status note/visibility.
-- Payment DB Save/Admin Load V2 remains active.
-- Trade/chart/wallet untouched.
+KYC Step Wizard Final:
+- User confirmed one-by-one KYC step wizard.
+- Old KYC page replacement triggers were neutralized to use wizard.
+- KYC flow:
+  1. Personal Details
+  2. PAN Details
+  3. Address Proof
+  4. Selfie + Submit
+- Status rules:
+  Not Submitted/Rejected => wizard open
+  Pending => under review card
+  Approved => approved card
+- Payment DB Save/Admin Load fix remains active.
+- Added SQL file: kyc-step-wizard-db-fix.sql
 - JS syntax check: OK

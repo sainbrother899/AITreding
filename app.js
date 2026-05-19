@@ -6438,10 +6438,10 @@ function restoreManualHistoryBackup(mode = state.mode) {
     window.rejectKyc = rejectKyc;
     window.approvePayoutMethod = approvePayoutMethod;
     window.rejectPayoutMethod = rejectPayoutMethod;
-    window.renderKycPage = renderKyc;
+    window.renderKycPage = window.renderKycStepWizard || renderKyc;
     window.renderPaymentMethodsPage = renderPayment;
     window.renderReferralClean = renderReferral;
-    window.kprRenderKyc = renderKyc;
+    window.kprRenderKyc = window.renderKycStepWizard || renderKyc;
     window.kprRenderPayment = renderPayment;
   }
 
@@ -6450,7 +6450,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
     const pageBtn = e.target.closest("[data-page]");
     const menuBtn = e.target.closest("[data-menu-page],[data-direct-page]");
     const target = pageBtn?.dataset?.page || menuBtn?.dataset?.menuPage || menuBtn?.dataset?.directPage || "";
-    if (target === "kyc" || target === "kycPage" || text.includes("kyc")) setTimeout(window.kprRenderKyc || function(){}, 80);
+    if (target === "kyc" || target === "kycPage" || text.includes("kyc")) setTimeout(window.renderKycStepWizard || function(){}, 80);
     if (target === "paymentMethods" || target === "paymentMethodsPage" || text.includes("payment method")) setTimeout(renderPayment, 80);
     if (target === "referral" || text.includes("referral")) setTimeout(renderReferral, 80);
   }, true);
@@ -6473,7 +6473,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
   function runForCurrent(){
     patchNavigation();
     const route = pageId();
-    if (route === "kyc") (window.kprRenderKyc || function(){})();
+    if (route === "kyc") (window.renderKycStepWizard || function(){})();
     if (route === "payment") renderPayment();
     if (route === "referral") renderReferral();
   }
@@ -7039,110 +7039,458 @@ function restoreManualHistoryBackup(mode = state.mode) {
 })();
 
 
-/* ===== RESTORE ORIGINAL KYC DESIGN KEEP PAYMENT FIX ===== */
+/* ===== KYC STEP WIZARD FINAL ===== */
 (function(){
-  function getUser(){
-    try { return state?.user || {}; } catch(e){ return {}; }
+  const TABLE = "kyc_requests";
+  const DOC_TABLE = "kyc_documents";
+  const BUCKET = "kyc-documents";
+  const STORE = "ai_trading_kyc_step_wizard_draft_v1";
+  let step = 1;
+  let busy = false;
+  let rendering = false;
+
+  function client(){
+    try {
+      if (window.supabaseClient) return window.supabaseClient;
+      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
+    } catch(e){}
+    return null;
   }
-  function uid(){
-    const u = getUser();
-    return String(u.id || u.email || "local");
+  function user(){ return state?.user || {}; }
+  function uid(){ const u = user(); return String(u.id || u.email || "local"); }
+  function email(){ return String(user().email || ""); }
+  function displayName(){ return user().kycName || user().name || user().email?.split("@")[0] || "User"; }
+  function toastMsg(msg){ try { toast?.(msg); } catch(e){ alert(msg); } }
+  function saveAll(){ try { saveState?.(); } catch(e){} try { saveSession?.(); } catch(e){} }
+
+  function page(){ return document.getElementById("kycPage"); }
+  function root(){
+    const p = page();
+    return document.getElementById("kycPageContent") ||
+      p?.querySelector(".menu-real-content") ||
+      p?.querySelector(".menu-full-content") ||
+      p;
   }
-  function email(){
-    return String(getUser().email || "").toLowerCase();
+  function isKycOpen(){
+    const p = page();
+    return !!(p && p.classList.contains("active-page") && getComputedStyle(p).display !== "none");
+  }
+
+  function localRows(){
+    state.kycRequests ||= [];
+    return state.kycRequests;
+  }
+  function sameUser(row){
+    return String(row.userId || row.user_id || "") === uid() ||
+      String(row.userEmail || row.user_email || row.email || "").toLowerCase() === email().toLowerCase();
+  }
+  function rank(s){
+    s = String(s || "PENDING").toUpperCase();
+    if (s === "APPROVED") return 3;
+    if (s === "PENDING") return 2;
+    if (s === "REJECTED") return 1;
+    return 0;
   }
   function latestKyc(){
+    const rows = localRows().filter(sameUser);
+    if (!rows.length) return null;
+    return rows.slice().sort((a,b) => {
+      const ra = rank(b.status) - rank(a.status);
+      if (ra) return ra;
+      const tb = Date.parse(b.reviewed_at || b.submitted_at || b.createdAt || b.created_at || "") || Number(b.id || 0) || 0;
+      const ta = Date.parse(a.reviewed_at || a.submitted_at || a.createdAt || a.created_at || "") || Number(a.id || 0) || 0;
+      return tb - ta;
+    })[0];
+  }
+  function status(){
+    return String(latestKyc()?.status || user().kycStatus || user().kyc_status || "").toUpperCase();
+  }
+  function readDraft(){
     try {
-      const id = uid(), em = email();
-      const rows = (state?.kycRequests || []).filter(k =>
-        String(k.userId || k.user_id || "") === id ||
-        String(k.userEmail || k.user_email || "").toLowerCase() === em
-      );
-      if (!rows.length) return null;
-      const rank = s => String(s || "PENDING").toUpperCase() === "APPROVED" ? 3 : (String(s || "").toUpperCase() === "PENDING" ? 2 : 1);
-      return rows.slice().sort((a,b) => rank(b.status) - rank(a.status))[0];
-    } catch(e){ return null; }
+      return JSON.parse(localStorage.getItem(STORE + "_" + uid()) || "{}") || {};
+    } catch(e){ return {}; }
   }
-  function updateOriginalKycOnly(){
-    const page = document.getElementById("kycPage");
-    if (!page || !page.classList.contains("active-page")) return;
-
-    const row = latestKyc();
-    const status = String(row?.status || getUser().kycStatus || getUser().kyc_status || "").toUpperCase();
-
-    const title = document.getElementById("kycStatusTitle");
-    if (title) title.textContent = status || "Not Submitted";
-
-    const box = document.getElementById("kycStatusBox");
-    if (box) {
-      box.classList.remove("approved","pending","rejected");
-      if (status) box.classList.add(status.toLowerCase());
+  function saveDraftFromForm(){
+    const form = document.getElementById("kycWizardForm");
+    if (!form) return readDraft();
+    const fd = new FormData(form);
+    const data = readDraft();
+    for (const [k,v] of fd.entries()) {
+      if (v && typeof v === "object" && "name" in v) continue;
+      data[k] = String(v || "");
     }
-
-    // Do not replace kycPageContent. Keep original HTML/design.
-    // Only if approved, hide existing form inputs lightly and show approved note at top.
-    const root = document.getElementById("kycPageContent") || page;
-    let note = document.getElementById("kycOriginalStatusNote");
-    if (!note) {
-      note = document.createElement("div");
-      note.id = "kycOriginalStatusNote";
-      note.className = "card kyc-original-status-note";
-      root.prepend(note);
-    }
-
-    if (status === "APPROVED") {
-      note.innerHTML = "<b>Your KYC Approved</b><span>Your identity verification is approved. You do not need to submit KYC again.</span>";
-      note.style.display = "";
-      page.querySelectorAll("input,select,textarea,#submitKycBtn").forEach(el => {
-        if (!note.contains(el)) el.style.display = "none";
-      });
-    } else if (status === "PENDING") {
-      note.innerHTML = "<b>KYC Under Review</b><span>Your KYC documents have been submitted. Please wait for admin approval.</span>";
-      note.style.display = "";
-      page.querySelectorAll("input,select,textarea,#submitKycBtn").forEach(el => {
-        if (!note.contains(el)) el.style.display = "none";
-      });
-    } else {
-      if (status === "REJECTED") {
-        note.innerHTML = "<b>KYC Rejected</b><span>Your previous KYC was rejected. Please submit again with correct details.</span>";
-        note.style.display = "";
-      } else {
-        note.style.display = "none";
+    localStorage.setItem(STORE + "_" + uid(), JSON.stringify(data));
+    return data;
+  }
+  function clearDraft(){
+    localStorage.removeItem(STORE + "_" + uid());
+  }
+  async function dbLoad(){
+    const c = client();
+    if (!c || !state?.user) return [];
+    try {
+      let res = await c.from(TABLE).select("*").eq("user_id", uid());
+      if (res.error) {
+        res = await c.from(TABLE).select("*");
+        if (res.error) throw res.error;
+        return (res.data || []).filter(sameUser);
       }
-      page.querySelectorAll("input,select,textarea,#submitKycBtn").forEach(el => {
-        if (!note.contains(el)) el.style.display = "";
-      });
+      return res.data || [];
+    } catch(e){
+      console.warn("KYC DB load failed", e);
+      return [];
     }
   }
-
-  // Override only KYC renderer from KPR. Payment renderer remains from Payment V2.
-  window.renderKycPage = updateOriginalKycOnly;
-  window.kprRenderKyc = updateOriginalKycOnly;
-
-  const oldShowPage = window.showPage;
-  if (typeof oldShowPage === "function" && !window.__restoreKycDesignShowPatched) {
-    window.__restoreKycDesignShowPatched = true;
-    window.showPage = function(pageId){
-      const res = oldShowPage.apply(this, arguments);
-      if (pageId === "kycPage" || pageId === "kyc") {
-        setTimeout(updateOriginalKycOnly, 80);
-        setTimeout(updateOriginalKycOnly, 600);
-      }
-      return res;
-    };
-    try { showPage = window.showPage; } catch(e){}
+  function mergeRows(rows){
+    if (!rows?.length) return;
+    const map = new Map();
+    localRows().forEach(r => map.set(String(r.id || Math.random()), r));
+    rows.forEach(r => {
+      const id = String(r.id || r.kyc_id || ("kyc_" + Date.now() + "_" + Math.random()));
+      map.set(id, {
+        id,
+        userId: r.userId || r.user_id || uid(),
+        userEmail: r.userEmail || r.user_email || r.email || email(),
+        name: r.name || r.full_name || r.kycName || "",
+        mobile: r.mobile || "",
+        dob: r.dob || "",
+        pan: r.pan || r.pan_number || r.doc_number || "",
+        address: r.address || "",
+        city: r.city || "",
+        stateName: r.stateName || r.state_name || r.state || "",
+        pincode: r.pincode || "",
+        docType: r.docType || r.doc_type || "",
+        docNumber: r.docNumber || r.doc_number || "",
+        documents: r.documents || {},
+        status: r.status || "PENDING",
+        createdAt: r.createdAt || r.submitted_at || r.created_at || ""
+      });
+    });
+    state.kycRequests = Array.from(map.values());
+    saveAll();
+  }
+  async function hydrate(){
+    const rows = await dbLoad();
+    mergeRows(rows);
+    if (isKycOpen()) render();
   }
 
+  function statusCard(type, title, text, extra=""){
+    return `<div class="card kyc-step-status ${type}">
+      <div class="kyc-step-status-icon">${type === "approved" ? "✓" : (type === "pending" ? "⏳" : (type === "rejected" ? "!" : "i"))}</div>
+      <h3>${title}</h3>
+      <p>${text}</p>
+      ${extra}
+    </div>`;
+  }
+  function progressHtml(){
+    const labels = ["Personal", "PAN", "Address", "Selfie"];
+    return `<div class="kyc-step-progress">
+      <div class="kyc-step-top">
+        <span>KYC Verification</span>
+        <b>Step ${step} of 4</b>
+      </div>
+      <div class="kyc-step-dots">
+        ${labels.map((l,i) => {
+          const n = i + 1;
+          return `<div class="kyc-step-dot ${n < step ? "done" : (n === step ? "active" : "")}">
+            <em>${n < step ? "✓" : n}</em><span>${l}</span>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>`;
+  }
+  function field(name, label, value="", attrs=""){
+    return `<label>${label}<input name="${name}" value="${String(value || "").replace(/"/g, "&quot;")}" ${attrs}></label>`;
+  }
+  function stepHtml(data){
+    if (step === 1) {
+      return `<div class="kyc-wizard-panel">
+        <h3>Personal Details</h3>
+        <p>Your KYC name should match your payment method account holder name.</p>
+        ${field("fullName", "Full Name as per PAN/Aadhaar", data.fullName || displayName(), "required")}
+        ${field("mobile", "Mobile Number", data.mobile || user().mobile || "", 'inputmode="numeric" required')}
+        ${field("email", "Email", data.email || email(), "readonly")}
+        ${field("dob", "Date of Birth", data.dob || "", 'type="date" required')}
+      </div>`;
+    }
+    if (step === 2) {
+      return `<div class="kyc-wizard-panel">
+        <h3>PAN Details</h3>
+        <p>Enter PAN details carefully. Wrong PAN/name can delay approval.</p>
+        ${field("panNumber", "PAN Number", data.panNumber || "", 'maxlength="10" required')}
+        ${field("panName", "Name as per PAN", data.panName || data.fullName || displayName(), "required")}
+        <label>PAN Card Upload<input type="file" name="panFile" accept="image/*,.pdf"></label>
+      </div>`;
+    }
+    if (step === 3) {
+      return `<div class="kyc-wizard-panel">
+        <h3>Address Proof</h3>
+        <p>Upload clear front/back images if your document has two sides.</p>
+        <label>Full Address<textarea name="address" required>${data.address || ""}</textarea></label>
+        ${field("city", "City", data.city || "", "required")}
+        ${field("stateName", "State", data.stateName || "", "required")}
+        ${field("pincode", "Pincode", data.pincode || "", 'inputmode="numeric" required')}
+        <label>Document Type
+          <select name="docType" required>
+            ${["Aadhaar","Passport","Driving Licence","Voter ID","Other"].map(x => `<option ${data.docType === x ? "selected" : ""}>${x}</option>`).join("")}
+          </select>
+        </label>
+        ${field("docNumber", "Document Number", data.docNumber || "", "required")}
+        <label>Document Front<input type="file" name="addressFront" accept="image/*,.pdf"></label>
+        <label>Document Back Optional<input type="file" name="addressBack" accept="image/*,.pdf"></label>
+      </div>`;
+    }
+    return `<div class="kyc-wizard-panel">
+      <h3>Selfie Verification</h3>
+      <p>Upload a clear selfie. Face should be visible and not blurred.</p>
+      <label>Selfie Upload<input type="file" name="selfie" accept="image/*"></label>
+      <label class="kyc-step-check"><input type="checkbox" name="agree" value="yes" required> I confirm that all KYC details are correct.</label>
+      <div class="kyc-step-submit-note">After submit, KYC will go to admin for approval.</div>
+    </div>`;
+  }
+  function validateStep(){
+    const data = saveDraftFromForm();
+    if (step === 1) {
+      if (!data.fullName || !data.mobile || !data.dob) return "Please complete personal details.";
+    }
+    if (step === 2) {
+      if (!data.panNumber || !data.panName) return "Please complete PAN details.";
+      if (!/^[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}$/.test(String(data.panNumber).trim())) return "Please enter valid PAN format.";
+    }
+    if (step === 3) {
+      if (!data.address || !data.city || !data.stateName || !data.pincode || !data.docNumber) return "Please complete address proof details.";
+    }
+    return "";
+  }
+  function render(){
+    if (!isKycOpen() || rendering) return;
+    const r = root();
+    if (!r) return;
+    rendering = true;
+    try {
+      const st = status();
+      const row = latestKyc();
+      if (st === "APPROVED") {
+        r.innerHTML = statusCard("approved", "Your KYC Approved", "Your identity verification is approved. You do not need to submit KYC again.", `<div class="kyc-approved-name"><span>Name</span><b>${row?.name || displayName()}</b></div>`);
+        rendering = false;
+        return;
+      }
+      if (st === "PENDING") {
+        r.innerHTML = statusCard("pending", "KYC Under Review", "Your KYC documents have been submitted. Please wait for admin approval.");
+        rendering = false;
+        return;
+      }
+
+      const data = readDraft();
+      const rejected = st === "REJECTED" ? statusCard("rejected", "KYC Rejected", "Your previous KYC was rejected. Please submit again with correct details.") : "";
+      r.innerHTML = `${rejected}
+        <form id="kycWizardForm" class="kyc-step-card">
+          ${progressHtml()}
+          ${stepHtml(data)}
+          <div class="kyc-step-actions">
+            <button type="button" id="kycStepBack" ${step === 1 ? "disabled" : ""}>Back</button>
+            <button type="button" id="kycStepNext">${step === 4 ? "Submit KYC" : "Next"}</button>
+          </div>
+        </form>`;
+
+      document.getElementById("kycStepBack")?.addEventListener("click", () => {
+        saveDraftFromForm();
+        step = Math.max(1, step - 1);
+        render();
+      });
+      document.getElementById("kycStepNext")?.addEventListener("click", async () => {
+        const err = validateStep();
+        if (err) return alert(err);
+        if (step < 4) {
+          step += 1;
+          render();
+        } else {
+          await submit();
+        }
+      });
+      document.getElementById("kycWizardForm")?.addEventListener("input", saveDraftFromForm, true);
+      document.getElementById("kycWizardForm")?.addEventListener("change", saveDraftFromForm, true);
+    } finally {
+      rendering = false;
+    }
+  }
+  async function uploadDoc(kycId, key, file){
+    const c = client();
+    if (!c || !file?.name) return null;
+    const safe = file.name.replace(/[^\w.\-]+/g, "_");
+    const path = `${uid()}/${kycId}/${key}_${Date.now()}_${safe}`;
+    const up = await c.storage.from(BUCKET).upload(path, file, { upsert:false });
+    if (up.error) throw up.error;
+    try {
+      await c.from(DOC_TABLE).insert({
+        id: `doc_${Date.now()}_${key}`,
+        kyc_id: String(kycId),
+        user_id: uid(),
+        doc_key: key,
+        file_name: file.name,
+        file_path: path,
+        file_url: "",
+        mime_type: file.type || "",
+        size_bytes: file.size || 0
+      });
+    } catch(e){}
+    return { name:file.name, path, uploadedAt:new Date().toLocaleString() };
+  }
+  async function submit(){
+    if (busy) return;
+    busy = true;
+    const form = document.getElementById("kycWizardForm");
+    const btn = document.getElementById("kycStepNext");
+    if (btn) { btn.disabled = true; btn.textContent = "Submitting..."; }
+    try {
+      const data = saveDraftFromForm();
+      const kycId = Date.now();
+      const row = {
+        id: String(kycId),
+        userId: uid(),
+        userEmail: email(),
+        name: data.fullName || displayName(),
+        mobile: data.mobile || "",
+        dob: data.dob || "",
+        pan: data.panNumber || "",
+        panName: data.panName || "",
+        address: data.address || "",
+        city: data.city || "",
+        stateName: data.stateName || "",
+        pincode: data.pincode || "",
+        docType: data.docType || "",
+        docNumber: data.docNumber || "",
+        status: "PENDING",
+        documents: {},
+        createdAt: new Date().toLocaleString()
+      };
+
+      const c = client();
+      if (c) {
+        const insertRow = {
+          id: kycId,
+          user_id: row.userId,
+          user_email: row.userEmail,
+          name: row.name,
+          full_name: row.name,
+          mobile: row.mobile,
+          dob: row.dob,
+          address: row.address,
+          doc_type: row.docType || "KYC",
+          doc_number: row.docNumber || row.pan,
+          status: "PENDING",
+          submitted_at: new Date().toISOString()
+        };
+        let res = await c.from(TABLE).insert(insertRow);
+        if (res.error) {
+          // Retry with minimal schema if columns like dob/address/user_email are missing.
+          res = await c.from(TABLE).insert({
+            id: kycId,
+            user_id: row.userId,
+            name: row.name,
+            mobile: row.mobile,
+            doc_type: row.docType || "KYC",
+            doc_number: row.docNumber || row.pan,
+            status: "PENDING"
+          });
+        }
+        if (res.error) throw res.error;
+
+        const docs = {};
+        const files = {
+          panFile: form?.querySelector('[name="panFile"]')?.files?.[0],
+          addressFront: form?.querySelector('[name="addressFront"]')?.files?.[0],
+          addressBack: form?.querySelector('[name="addressBack"]')?.files?.[0],
+          selfie: form?.querySelector('[name="selfie"]')?.files?.[0],
+        };
+        for (const [k,f] of Object.entries(files)) {
+          if (f?.name) docs[k] = await uploadDoc(kycId, k, f);
+        }
+        row.documents = docs;
+        try { await c.from(TABLE).update({ documents: docs }).eq("id", kycId); } catch(e){}
+      }
+
+      state.kycRequests ||= [];
+      state.kycRequests.unshift(row);
+      state.user.kycStatus = "PENDING";
+      state.user.kycName = row.name;
+      saveAll();
+      clearDraft();
+      step = 1;
+      toastMsg("KYC submitted for admin approval.");
+      render();
+    } catch(e) {
+      alert("KYC submit failed: " + (e.message || e));
+      if (btn) { btn.disabled = false; btn.textContent = "Submit KYC"; }
+    } finally {
+      busy = false;
+    }
+  }
+  async function setKycStatus(id, st){
+    const rows = localRows();
+    const row = rows.find(r => String(r.id) === String(id));
+    if (row) row.status = st;
+    const c = client();
+    if (c) {
+      try { await c.from(TABLE).update({ status:st, reviewed_at:new Date().toISOString() }).eq("id", id); } catch(e){}
+    }
+    saveAll();
+    render();
+    try { render?.(); } catch(e){}
+  }
+  function patchGlobals(){
+    window.renderKycStepWizard = render;
+    window.renderKycPage = render;
+    window.kprRenderKyc = render;
+    window.approveKyc = (id) => setKycStatus(id, "APPROVED");
+    window.rejectKyc = (id) => setKycStatus(id, "REJECTED");
+
+    const oldShowPage = window.showPage;
+    if (typeof oldShowPage === "function" && !window.__kycWizardShowPatched) {
+      window.__kycWizardShowPatched = true;
+      window.showPage = function(pageId){
+        const res = oldShowPage.apply(this, arguments);
+        if (pageId === "kycPage" || pageId === "kyc") {
+          setTimeout(render, 80);
+          setTimeout(render, 500);
+        }
+        return res;
+      };
+      try { showPage = window.showPage; } catch(e){}
+    }
+    const oldOpen = window.openRealMenuPage;
+    if (typeof oldOpen === "function" && !window.__kycWizardMenuPatched) {
+      window.__kycWizardMenuPatched = true;
+      window.openRealMenuPage = function(route){
+        const res = oldOpen.apply(this, arguments);
+        if (route === "kyc") {
+          setTimeout(render, 80);
+          setTimeout(render, 500);
+        }
+        return res;
+      };
+      try { openRealMenuPage = window.openRealMenuPage; } catch(e){}
+    }
+  }
   document.addEventListener("click", function(e){
     const text = (e.target?.textContent || "").toLowerCase();
     const pageId = e.target.closest("[data-page]")?.dataset?.page || "";
     const menuId = e.target.closest("[data-menu-page]")?.dataset?.menuPage || "";
     if (pageId === "kycPage" || pageId === "kyc" || menuId === "kyc" || text.includes("kyc")) {
-      setTimeout(updateOriginalKycOnly, 100);
-      setTimeout(updateOriginalKycOnly, 700);
+      setTimeout(render, 100);
+      setTimeout(render, 600);
     }
   }, true);
 
-  document.addEventListener("DOMContentLoaded", () => setTimeout(updateOriginalKycOnly, 1200));
-  window.addEventListener("load", () => setTimeout(updateOriginalKycOnly, 1300));
+  function boot(){
+    patchGlobals();
+    hydrate();
+    if (isKycOpen()) render();
+  }
+  document.addEventListener("DOMContentLoaded", () => setTimeout(boot, 900));
+  window.addEventListener("load", () => {
+    setTimeout(boot, 1000);
+    setTimeout(boot, 2500);
+  });
 })();
