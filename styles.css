@@ -6731,3 +6731,16 @@ body.app-mode .menu-owned-page.active-page {
   .pro-wallet-pay{grid-template-columns:1fr!important;}
   .pro-wallet-qr{width:100%!important;height:220px!important;}
 }
+
+
+/* ===== SAFE NORMAL SCROLL RESTORE ===== */
+html,
+body{
+  overflow-x:hidden!important;
+}
+
+#app{
+  overflow-x:hidden!important;
+}
+
+/* No vertical scroll restriction here. Page scroll stays natural. */

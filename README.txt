@@ -1326,3 +1326,19 @@ Permanent Wallet Cleanup from stop.zip:
 - Kept minimum deposit/withdrawal limit patch if present.
 - Removed blocks:
   - WALLET BALANCE TRADE LOGIC FINAL (app 1, css 0)
+
+
+Scroll Restore Normal:
+- Reverted the aggressive user-side blank scroll CSS.
+- Restored natural vertical page scrolling.
+- Kept only safe horizontal overflow protection.
+- Use this instead of stop-user-scroll-blank-space-fix.zip.
+
+
+Old Deposit/Wallet Patch Removal:
+- SUPABASE DEPOSIT ID STRIP MONKEY PATCH removed: app 1, css 0
+- DEPOSIT BIGINT HARD OVERRIDE FIX removed: app 1, css 0
+- PLAN BUY FROM WALLET FIX removed: app 1, css 0
+- UI/design untouched.
+- Professional wallet rebuild kept.
+- Minimum deposit/withdrawal limits kept.
