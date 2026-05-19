@@ -1227,3 +1227,16 @@ Wallet Deposit/Withdraw Clean Replace:
 - Added SQL: wallet-deposit-withdraw-db-fix.sql
 - Previous module removed: JS 0, CSS 0
 - JS syntax check: OK
+
+
+Old Wallet Removed Single Owner Final:
+- Previous old wallet modules removed: [{"marker": "WALLET SAFE MINIMAL FIX", "js": 1, "css": 1}, {"marker": "WALLET HISTORY BIG CARDS", "js": 1, "css": 1}, {"marker": "WALLET HISTORY ONLY NEW CARDS", "js": 1, "css": 1}]
+- Previous wallet clean module removed: JS 1, CSS 1
+- Adds a final single wallet owner that takes over wallet page after old render/navigation.
+- Preserves top wallet balance cards.
+- Removes/hides old deposit/withdraw modals/buttons.
+- Deposit wizard: Amount -> Mode -> Pay details -> 12-digit UTR.
+- Duplicate UTR blocked locally + DB check.
+- Withdrawal wizard: Amount -> Approved payout method -> Review -> Submit.
+- Admin deposit/withdraw approve/reject functions preserved/replaced.
+- JS syntax check: OK
