@@ -6187,3 +6187,16 @@ html.top-header-boot-fallback body[data-user-clean-ui="true"] .brand-row{
   font-size:12px!important;
   font-weight:800!important;
 }
+
+
+/* ===== PAYMENT FINAL SUBMIT LOCK + ADMIN PUSH FIX ===== */
+.kpr-saving{opacity:.75!important;pointer-events:none!important;}
+.kpr-saved{background:#00e7a8!important;color:#06101e!important;pointer-events:none!important;}
+.kpr-admin-status{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  border-radius:999px!important;padding:5px 9px!important;font-size:11px!important;font-weight:900!important;
+}
+.kpr-admin-status.pending{color:#f8bd7a!important;background:rgba(248,189,122,.13)!important;}
+.kpr-admin-status.approved{color:#00e7a8!important;background:rgba(0,231,168,.13)!important;}
+.kpr-admin-status.rejected{color:#ff456b!important;background:rgba(255,69,107,.13)!important;}
+.kpr-admin-locked{color:#9fb2d0!important;font-size:12px!important;font-weight:800!important;}

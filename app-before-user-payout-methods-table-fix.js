@@ -1,8 +1,8 @@
 
 /* ===== PAYMENT REQUEST TABLE NAME COMPATIBILITY FIX ===== */
 const PAYMENT_METHOD_TABLE_CANDIDATES = [
-  "user_payout_methods",
   "user_payment_methods",
+  "user_payout_methods",
   "payment_requests",
   "payment_request"
 ];
@@ -1928,7 +1928,7 @@ async function buyPlanFromWallet(planId) {
 
   if (typeof supabaseClient !== "undefined" && supabaseClient) {
     try {
-      await supabaseClient.from("user_payout_methods").insert({
+      await supabaseClient.from("user_payment_methods").insert({
         user_id: req.userId,
         user_email: req.userEmail,
         plan_id: req.planId,

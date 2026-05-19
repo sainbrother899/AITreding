@@ -1047,3 +1047,47 @@ Payment Method Persist Refresh Fix:
 - Persists when saveState is called.
 - Admin payment requests renderer is refreshed after hydration.
 - JS syntax check: OK
+
+
+Payment Final Submit Lock + Admin Push Fix:
+- Final capture-level click+submit handler controls payment form.
+- Method is saved into state + localStorage BEFORE render/DB call, so it should not disappear.
+- Blocks duplicates by same UPI or same bank account+IFSC.
+- Admin request table renders immediately from synced local/state data.
+- DB upsert still attempted; warning logged if Supabase RLS/table blocks it.
+- Approve/reject update local + DB and re-render admin/user.
+- JS syntax check: OK
+
+
+Payment Request Table Name Compatibility Fix:
+- User said Supabase table is named payment request, not user_payout_methods.
+- Added helper that tries DB table names in this order:
+  1. payment_requests
+  2. payment_request
+  3. user_payout_methods
+- Save/select/update for payment methods will now try the existing payment request table first.
+- If your exact table name is different, rename it to payment_requests or payment_request, or update PAYMENT_METHOD_TABLE_CANDIDATES in app.js.
+- JS syntax check: OK
+
+
+User Payment Methods Table Fix:
+- User said DB has a table named user_payment_methods and one old record was saved there.
+- Payment methods now prioritize table names in this order:
+  1. user_payment_methods
+  2. user_payout_methods
+  3. payment_requests
+  4. payment_request
+- For payment method DB operations, user_payment_methods is now the primary table.
+- Use payment_requests only for separate payment/deposit/plan requests, not payout methods.
+- JS syntax check: OK
+
+
+User Payout Methods Table Fix:
+- User clarified the correct table is user_payout_methods.
+- Payment methods now prioritize table names in this order:
+  1. user_payout_methods
+  2. user_payment_methods
+  3. payment_requests
+  4. payment_request
+- Direct payment method table calls now point to user_payout_methods first.
+- JS syntax check: OK
