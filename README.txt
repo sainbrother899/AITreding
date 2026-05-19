@@ -1163,3 +1163,14 @@ KYC Wizard Button Visibility Fix:
 - Button text made bold and centered.
 - Only CSS styling changed; KYC logic/payment/admin untouched.
 - JS syntax check: OK
+
+
+Admin KYC Requests Render Fix:
+- Admin KYC table now loads rows from kyc_requests.
+- Supports table body IDs: adminKycLog, kycRequestsLog, adminKycPanel tbody, kycManagement tbody.
+- Adds View Details button.
+- Approve/Reject update local state + Supabase kyc_requests.
+- Buttons lock after approved/rejected.
+- KYC wizard/payment/trade/chart/wallet untouched.
+- Admin KYC IDs found: ["adminKyc", "adminKycLog", "kyc", "kycDocNumber", "kycDocType", "kycFrontFile", "kycMobile", "kycName", "kycSelfieFile", "kycStatusBox", "kycStatusTitle", "submitKycBtn"]
+- JS syntax check: OK

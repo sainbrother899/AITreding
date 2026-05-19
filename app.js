@@ -7738,3 +7738,235 @@ function restoreManualHistoryBackup(mode = state.mode) {
   window.fixMenuPagesVisibility = boot;
   window.openMenuOwnedPage = openMenuPage;
 })();
+
+
+/* ===== ADMIN KYC REQUESTS RENDER FIX ===== */
+(function(){
+  const TABLE = "kyc_requests";
+  const DOC_TABLE = "kyc_documents";
+  let loading = false;
+
+  function client(){
+    try {
+      if (window.supabaseClient) return window.supabaseClient;
+      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
+    } catch(e){}
+    return null;
+  }
+  function isAdminView(){
+    try {
+      return location.pathname.toLowerCase().includes("admin") ||
+        String(state?.user?.role || "").toLowerCase() === "admin" ||
+        !!document.getElementById("adminKycLog") ||
+        !!document.getElementById("kycRequestsLog");
+    } catch(e){
+      return false;
+    }
+  }
+  function rows(){
+    state.kycRequests ||= [];
+    return state.kycRequests;
+  }
+  function normalize(r){
+    const docs = r.documents || {};
+    return {
+      id: String(r.id || r.kyc_id || ("kyc_" + Date.now())),
+      userId: String(r.userId || r.user_id || ""),
+      userEmail: String(r.userEmail || r.user_email || r.email || ""),
+      name: String(r.name || r.full_name || r.kycName || ""),
+      mobile: String(r.mobile || ""),
+      dob: String(r.dob || ""),
+      address: String(r.address || ""),
+      city: String(r.city || ""),
+      stateName: String(r.stateName || r.state_name || r.state || ""),
+      pincode: String(r.pincode || ""),
+      docType: String(r.docType || r.doc_type || "KYC"),
+      docNumber: String(r.docNumber || r.doc_number || r.pan || ""),
+      documents: docs,
+      status: String(r.status || "PENDING").toUpperCase(),
+      createdAt: String(r.createdAt || r.submitted_at || r.created_at || "")
+    };
+  }
+  function merge(incoming){
+    const map = new Map();
+    rows().map(normalize).forEach(r => map.set(r.id, r));
+    (incoming || []).map(normalize).forEach(r => map.set(r.id, { ...(map.get(r.id) || {}), ...r }));
+    state.kycRequests = Array.from(map.values());
+    try { saveState?.(); } catch(e){}
+    return state.kycRequests;
+  }
+  async function loadDb(){
+    const c = client();
+    if (!c) return [];
+    try {
+      const res = await c.from(TABLE).select("*").order("created_at", { ascending:false });
+      if (res.error) {
+        const res2 = await c.from(TABLE).select("*");
+        if (res2.error) throw res2.error;
+        return res2.data || [];
+      }
+      return res.data || [];
+    } catch(e) {
+      console.warn("Admin KYC DB load failed:", e);
+      return [];
+    }
+  }
+  function fileCount(k){
+    const docs = k.documents || {};
+    if (Array.isArray(docs)) return docs.length;
+    if (typeof docs === "object" && docs) return Object.keys(docs).filter(Boolean).length;
+    return 0;
+  }
+  function statusBadge(st){
+    st = String(st || "PENDING").toUpperCase();
+    return `<span class="admin-kyc-status ${st.toLowerCase()}">${st}</span>`;
+  }
+  function bodyEl(){
+    return document.getElementById("adminKycLog") ||
+      document.getElementById("kycRequestsLog") ||
+      document.querySelector("#adminKycPanel tbody") ||
+      document.querySelector("#kycManagement tbody") ||
+      document.querySelector("[data-admin-kyc-log]");
+  }
+  function detailsRoot(){
+    let el = document.getElementById("adminKycDetails");
+    if (el) return el;
+    const panel = document.querySelector("#adminKycPanel") ||
+      document.querySelector("#kycManagement") ||
+      document.querySelector(".admin-panel.active-admin-panel") ||
+      document.querySelector(".admin-main") ||
+      document.body;
+    el = document.createElement("div");
+    el.id = "adminKycDetails";
+    el.className = "admin-kyc-details";
+    panel.appendChild(el);
+    return el;
+  }
+  function renderDetails(id){
+    const k = rows().map(normalize).find(x => String(x.id) === String(id));
+    const root = detailsRoot();
+    if (!k) {
+      root.innerHTML = "";
+      return;
+    }
+    const docs = k.documents && typeof k.documents === "object" ? Object.entries(k.documents) : [];
+    root.innerHTML = `<div class="card admin-kyc-detail-card">
+      <div class="admin-kyc-detail-head">
+        <div>
+          <span>KYC DETAILS</span>
+          <h3>${k.name || "User KYC"}</h3>
+          <p>${k.userEmail || k.userId || "-"}</p>
+        </div>
+        ${statusBadge(k.status)}
+      </div>
+      <div class="admin-kyc-detail-grid">
+        <div><span>Mobile</span><b>${k.mobile || "-"}</b></div>
+        <div><span>DOB</span><b>${k.dob || "-"}</b></div>
+        <div><span>Doc Type</span><b>${k.docType || "-"}</b></div>
+        <div><span>Doc No.</span><b>${k.docNumber || "-"}</b></div>
+        <div><span>Address</span><b>${k.address || "-"}</b></div>
+        <div><span>City / State / Pincode</span><b>${[k.city,k.stateName,k.pincode].filter(Boolean).join(" / ") || "-"}</b></div>
+        <div><span>Submitted</span><b>${k.createdAt || "-"}</b></div>
+        <div><span>Files</span><b>${fileCount(k)} file(s)</b></div>
+      </div>
+      <div class="admin-kyc-docs">
+        ${docs.length ? docs.map(([key,val]) => {
+          const name = val?.name || val?.file_name || key;
+          const path = val?.path || val?.file_path || "";
+          return `<div><span>${key}</span><b>${name}</b><small>${path}</small></div>`;
+        }).join("") : `<div><span>Documents</span><b>No file metadata found</b></div>`}
+      </div>
+      <div class="admin-kyc-detail-actions">
+        ${k.status === "PENDING" ? `<button class="approve-btn" onclick="approveKyc('${k.id}')">Approve</button><button class="reject-btn" onclick="rejectKyc('${k.id}')">Reject</button>` : `<span class="admin-kyc-locked">Action Locked</span>`}
+      </div>
+    </div>`;
+  }
+  function render(){
+    if (!isAdminView()) return;
+    const body = bodyEl();
+    if (!body) return;
+    const list = rows().map(normalize).sort((a,b) => (Date.parse(b.createdAt)||Number(b.id)||0) - (Date.parse(a.createdAt)||Number(a.id)||0));
+    const html = list.length ? list.map(k => {
+      const fc = fileCount(k);
+      return `<tr>
+        <td>${k.userEmail || k.userId || "-"}</td>
+        <td>${k.name || "-"}</td>
+        <td>${k.docType || "KYC"}</td>
+        <td>${k.docNumber || "-"}</td>
+        <td>${fc ? fc + " files" : "Uploaded"}</td>
+        <td>${statusBadge(k.status)}</td>
+        <td>
+          <button class="admin-kyc-view-btn" onclick="viewKycDetails('${k.id}')">View</button>
+          ${k.status === "PENDING" ? `<button class="approve-btn" onclick="approveKyc('${k.id}')">Approve</button><button class="reject-btn" onclick="rejectKyc('${k.id}')">Reject</button>` : `<span class="admin-kyc-locked">Locked</span>`}
+        </td>
+      </tr>`;
+    }).join("") : `<tr><td colspan="7" class="empty">No KYC requests found.</td></tr>`;
+    body.innerHTML = html;
+  }
+  async function refresh(){
+    if (loading) return;
+    loading = true;
+    try {
+      const dbRows = await loadDb();
+      merge(dbRows);
+      render();
+    } finally {
+      loading = false;
+    }
+  }
+  async function setStatus(id, st){
+    const list = rows();
+    const row = list.find(r => String(r.id) === String(id));
+    if (row) row.status = st;
+    const c = client();
+    if (c) {
+      try {
+        let res = await c.from(TABLE).update({ status:st, reviewed_at:new Date().toISOString() }).eq("id", id);
+        if (res.error) {
+          res = await c.from(TABLE).update({ status:st }).eq("id", id);
+        }
+        if (res.error) console.warn("KYC status DB update failed:", res.error.message);
+      } catch(e){ console.warn("KYC status DB update failed:", e); }
+    }
+    try { saveState?.(); } catch(e){}
+    render();
+    renderDetails(id);
+  }
+  function patch(){
+    window.viewKycDetails = renderDetails;
+    window.renderAdminKycRequests = render;
+    window.refreshAdminKycRequests = refresh;
+    window.approveKyc = (id) => setStatus(id, "APPROVED");
+    window.rejectKyc = (id) => setStatus(id, "REJECTED");
+
+    const oldRender = window.renderAdmin;
+    if (typeof oldRender === "function" && !window.__adminKycRenderPatched) {
+      window.__adminKycRenderPatched = true;
+      window.renderAdmin = function(){
+        const res = oldRender.apply(this, arguments);
+        setTimeout(render, 50);
+        return res;
+      };
+      try { renderAdmin = window.renderAdmin; } catch(e){}
+    }
+  }
+  document.addEventListener("click", function(e){
+    const text = (e.target?.textContent || "").toLowerCase();
+    const tab = e.target.closest("[data-admin-tab]")?.dataset?.adminTab || "";
+    const page = e.target.closest("[data-page]")?.dataset?.page || "";
+    if (text.includes("kyc") || tab.toLowerCase().includes("kyc") || page.toLowerCase().includes("kyc")) {
+      setTimeout(refresh, 120);
+      setTimeout(render, 700);
+    }
+  }, true);
+  function boot(){
+    patch();
+    refresh();
+    render();
+  }
+  document.addEventListener("DOMContentLoaded", () => setTimeout(boot, 900));
+  window.addEventListener("load", () => {
+    setTimeout(boot, 900);
+    setTimeout(refresh, 2500);
+  });
+})();
