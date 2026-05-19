@@ -1091,3 +1091,21 @@ User Payout Methods Table Fix:
   4. payment_request
 - Direct payment method table calls now point to user_payout_methods first.
 - JS syntax check: OK
+
+
+ONLY USER PAYOUT METHODS FINAL:
+- Final decision: Payment Methods / Payout Methods use only one table:
+  public.user_payout_methods
+- Removed confusing fallback table logic for:
+  user_payment_methods, payment_requests, payment_request
+- payment_requests should NOT be used for payout/payment method saving.
+- payment_requests can remain in Supabase only if your site needs separate plan/manual payment requests.
+- For this feature, save/load/approve/reject point to user_payout_methods only.
+- JS syntax check: OK
+
+
+Clean ZIP Note:
+- Removed extra backup JS files from the ZIP.
+- Active app.js is the only JS logic file for the site.
+- Payment Methods / Payout Methods use only public.user_payout_methods.
+- No app-before-* backup files are included in this clean package.

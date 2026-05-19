@@ -1,27 +1,16 @@
 
-/* ===== PAYMENT REQUEST TABLE NAME COMPATIBILITY FIX ===== */
-const PAYMENT_METHOD_TABLE_CANDIDATES = [
-  "user_payout_methods",
-  "user_payment_methods",
-  "payment_requests",
-  "payment_request"
-];
+/* ===== ONLY USER PAYOUT METHODS TABLE FINAL ===== */
+const PAYMENT_METHOD_TABLE = "user_payout_methods";
 
 async function paymentDbTry(operation) {
   const client = (typeof supabaseClient !== "undefined" && supabaseClient) ? supabaseClient : window.supabaseClient;
-  if (!client) return { data: null, error: { message: "Supabase client not found" }, table: null };
-
-  let last = null;
-  for (const table of PAYMENT_METHOD_TABLE_CANDIDATES) {
-    try {
-      const res = await operation(client.from(table), table);
-      if (!res?.error) return { ...res, table };
-      last = { ...res, table };
-    } catch (e) {
-      last = { data: null, error: e, table };
-    }
+  if (!client) return { data: null, error: { message: "Supabase client not found" }, table: PAYMENT_METHOD_TABLE };
+  try {
+    const res = await operation(client.from(PAYMENT_METHOD_TABLE), PAYMENT_METHOD_TABLE);
+    return { ...(res || {}), table: PAYMENT_METHOD_TABLE };
+  } catch (e) {
+    return { data: null, error: e, table: PAYMENT_METHOD_TABLE };
   }
-  return last || { data: null, error: { message: "No payment table tried" }, table: null };
 }
 
 function paymentMethodDbRow(method) {
