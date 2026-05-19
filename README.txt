@@ -1214,3 +1214,16 @@ Admin Users Section Render Fix:
 - Updates admin total users counters.
 - Touches only Admin Users section.
 - JS syntax check: OK
+
+
+Wallet Deposit/Withdraw Clean Replace:
+- Top wallet balance cards preserved.
+- Old screenshot deposit flow is hidden/replaced.
+- Deposit wizard: Amount -> Mode -> Pay details -> 12-digit UTR.
+- UTR must be exactly 12 digits and duplicate UTR is blocked locally + DB check.
+- Withdrawal wizard: Amount -> Approved payout method -> Review -> Submit.
+- Admin deposit/withdraw logs replaced with filter + pagination table.
+- Admin approve/reject locks actions after status change.
+- Added SQL: wallet-deposit-withdraw-db-fix.sql
+- Previous module removed: JS 0, CSS 0
+- JS syntax check: OK

@@ -8418,3 +8418,526 @@ function restoreManualHistoryBackup(mode = state.mode) {
     setTimeout(() => loadProfiles().then(render), 2500);
   });
 })();
+
+
+/* ===== WALLET DEPOSIT WITHDRAW CLEAN REPLACE FINAL ===== */
+(function(){
+  const DEP_TABLE = "deposit_requests";
+  const WIT_TABLE = "withdrawal_requests";
+  const PAY_TABLE = "user_payout_methods";
+  const SETTINGS_KEY = "ai_trading_deposit_payment_settings_v1";
+  const DRAFT_KEY = "ai_trading_wallet_step_draft_v1";
+  const PAGE_SIZE = 5;
+
+  const dep = { step:1, amount:"", mode:"UPI", utr:"", busy:false, page:1, search:"", status:"ALL", modeFilter:"ALL" };
+  const wit = { step:1, amount:"", methodId:"", busy:false, page:1, search:"", status:"ALL", methodFilter:"ALL" };
+
+  function client(){
+    try {
+      if (window.supabaseClient) return window.supabaseClient;
+      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
+    } catch(e){}
+    return null;
+  }
+  function u(){ return state?.user || {}; }
+  function uid(){ const x=u(); return String(x.id || x.email || "local"); }
+  function email(){ return String(u().email || ""); }
+  function norm(v){ return String(v || "").trim().toLowerCase(); }
+  function money(n){ try { if (typeof window.money === "function") return window.money(n); } catch(e){} return "₹" + Number(n || 0).toLocaleString("en-IN"); }
+  function toastMsg(msg){ try { toast?.(msg); } catch(e){ alert(msg); } }
+  function save(){ try { saveState?.(); } catch(e){} try { saveSession?.(); } catch(e){} }
+
+  function isKycApproved(){
+    const st = String(u().kycStatus || u().kyc_status || "").toUpperCase();
+    if (st === "APPROVED") return true;
+    const rows = state?.kycRequests || [];
+    return rows.some(k => {
+      const same = String(k.userId || k.user_id || "") === uid() || norm(k.userEmail || k.user_email || "") === norm(email());
+      return same && String(k.status || "").toUpperCase() === "APPROVED";
+    });
+  }
+
+  function wallet(){
+    const id = uid();
+    const acct = state.accounts?.[id] || {};
+    const base = Number(u().balance || acct.balance || acct.realBalance || 0);
+    const approvedDeposits = (state.depositRequests || []).filter(d => sameUser(d) && String(d.status || "").toUpperCase()==="APPROVED").reduce((s,d)=>s+Number(d.amount||0),0);
+    const pendingWithdraw = (state.withdrawalRequests || []).filter(w => sameUser(w) && String(w.status || "").toUpperCase()==="PENDING").reduce((s,w)=>s+Number(w.amount||0),0);
+    return { balance: base, withdrawable: Math.max(0, base - pendingWithdraw), approvedDeposits, pendingWithdraw };
+  }
+  function sameUser(r){
+    return String(r.userId || r.user_id || "") === uid() || norm(r.userEmail || r.user_email || "") === norm(email());
+  }
+  function updateWalletCards(){
+    const w = wallet();
+    const map = {
+      walletPageBalance: money(w.balance),
+      withdrawableAmountText: money(w.withdrawable),
+      approvedDepositText: money(w.approvedDeposits),
+      pendingWithdrawalText: money(w.pendingWithdraw)
+    };
+    Object.entries(map).forEach(([id,val]) => { const el=document.getElementById(id); if(el) el.textContent = val; });
+  }
+
+  function settings(){
+    const def = {
+      upiId: "company@upi",
+      upiHolder: "Company Account",
+      upiQr: "",
+      bankName: "Company Bank",
+      bankHolder: "Company Account",
+      accountNumber: "000000000000",
+      ifsc: "BANK0000000"
+    };
+    try { return { ...def, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") || {}) }; } catch(e){ return def; }
+  }
+  function saveSettings(data){
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settings(), ...data }));
+  }
+
+  function depRows(){
+    state.depositRequests ||= [];
+    return state.depositRequests.map(d => ({
+      id:String(d.id || d.deposit_id || ""),
+      userId:String(d.userId || d.user_id || ""),
+      userEmail:String(d.userEmail || d.user_email || ""),
+      amount:Number(d.amount || 0),
+      mode:String(d.mode || d.payment_mode || d.method || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI",
+      utr:String(d.utr || d.transactionId || d.transaction_id || d.txn || d.txn_id || ""),
+      status:String(d.status || "PENDING").toUpperCase(),
+      createdAt:String(d.createdAt || d.created_at_text || d.created_at || new Date().toLocaleString())
+    }));
+  }
+  function witRows(){
+    state.withdrawalRequests ||= [];
+    return state.withdrawalRequests.map(w => ({
+      id:String(w.id || w.withdrawal_id || ""),
+      userId:String(w.userId || w.user_id || ""),
+      userEmail:String(w.userEmail || w.user_email || ""),
+      amount:Number(w.amount || 0),
+      methodId:String(w.methodId || w.method_id || ""),
+      methodType:String(w.methodType || w.method_type || w.method || "UPI").toUpperCase()==="BANK" ? "BANK" : "UPI",
+      methodText:String(w.methodText || w.method_text || w.account || w.upi || ""),
+      holderName:String(w.holderName || w.holder_name || ""),
+      status:String(w.status || "PENDING").toUpperCase(),
+      createdAt:String(w.createdAt || w.created_at_text || w.created_at || new Date().toLocaleString())
+    }));
+  }
+  function payoutMethods(){
+    state.userPayoutMethods ||= state.payoutMethods || [];
+    return state.userPayoutMethods
+      .map(m => ({
+        id:String(m.id || ""),
+        userId:String(m.userId || m.user_id || ""),
+        userEmail:String(m.userEmail || m.user_email || ""),
+        type:String(m.type || m.method_type || m.method || "UPI").toUpperCase()==="BANK" ? "BANK" : "UPI",
+        upi:String(m.upi || m.upi_id || ""),
+        bankName:String(m.bankName || m.bank_name || ""),
+        accountNumber:String(m.accountNumber || m.account_number || ""),
+        ifsc:String(m.ifsc || ""),
+        holderName:String(m.holderName || m.holder_name || ""),
+        status:String(m.status || "PENDING").toUpperCase()
+      }))
+      .filter(m => (String(m.userId)===uid() || norm(m.userEmail)===norm(email())) && m.status==="APPROVED");
+  }
+  function methodLabel(m){
+    if (!m) return "-";
+    if (m.type === "UPI") return m.upi || "UPI";
+    return `${m.bankName || "Bank"} ${m.accountNumber ? "****"+String(m.accountNumber).slice(-4) : ""}`;
+  }
+
+  async function loadDb(){
+    const db = client();
+    if (!db) return;
+    try {
+      const [dr, wr, pr] = await Promise.all([
+        db.from(DEP_TABLE).select("*"),
+        db.from(WIT_TABLE).select("*"),
+        db.from(PAY_TABLE).select("*")
+      ]);
+      if (!dr.error && dr.data) mergeDeposits(dr.data);
+      if (!wr.error && wr.data) mergeWithdrawals(wr.data);
+      if (!pr.error && pr.data) mergePayoutMethods(pr.data);
+    } catch(e){ console.warn("Wallet DB load failed", e); }
+  }
+  function mergeDeposits(rows){
+    const map = new Map(); depRows().forEach(d => map.set(d.id, d));
+    (rows || []).forEach(r => {
+      const id = String(r.id || r.deposit_id || ("dep_" + Date.now() + "_" + Math.random()));
+      map.set(id, {
+        id, userId:String(r.user_id || r.userId || ""), userEmail:String(r.user_email || r.userEmail || ""),
+        amount:Number(r.amount || 0), mode:String(r.payment_mode || r.mode || "UPI").toUpperCase()==="BANK" ? "BANK":"UPI",
+        utr:String(r.utr || r.transaction_id || r.txn_id || ""), status:String(r.status || "PENDING").toUpperCase(),
+        createdAt:String(r.created_at_text || r.created_at || r.createdAt || "")
+      });
+    });
+    state.depositRequests = Array.from(map.values()); save();
+  }
+  function mergeWithdrawals(rows){
+    const map = new Map(); witRows().forEach(w => map.set(w.id, w));
+    (rows || []).forEach(r => {
+      const id = String(r.id || r.withdrawal_id || ("wd_" + Date.now() + "_" + Math.random()));
+      map.set(id, {
+        id, userId:String(r.user_id || r.userId || ""), userEmail:String(r.user_email || r.userEmail || ""),
+        amount:Number(r.amount || 0), methodId:String(r.method_id || r.methodId || ""),
+        methodType:String(r.method_type || r.methodType || r.method || "UPI").toUpperCase()==="BANK" ? "BANK":"UPI",
+        methodText:String(r.method_text || r.methodText || r.account || ""), holderName:String(r.holder_name || r.holderName || ""),
+        status:String(r.status || "PENDING").toUpperCase(), createdAt:String(r.created_at_text || r.created_at || r.createdAt || "")
+      });
+    });
+    state.withdrawalRequests = Array.from(map.values()); save();
+  }
+  function mergePayoutMethods(rows){
+    const map = new Map(); (state.userPayoutMethods || state.payoutMethods || []).forEach(m => map.set(String(m.id), m));
+    (rows || []).forEach(r => {
+      const id = String(r.id || "");
+      if (!id) return;
+      map.set(id, {
+        id, userId:String(r.user_id || r.userId || ""), userEmail:String(r.user_email || r.userEmail || ""),
+        type:String(r.method_type || r.type || "UPI").toUpperCase()==="BANK" ? "BANK":"UPI",
+        upi:String(r.upi_id || r.upi || ""), bankName:String(r.bank_name || r.bankName || ""),
+        accountNumber:String(r.account_number || r.accountNumber || ""), ifsc:String(r.ifsc || ""),
+        holderName:String(r.holder_name || r.holderName || ""), status:String(r.status || "PENDING").toUpperCase()
+      });
+    });
+    state.userPayoutMethods = Array.from(map.values()); state.payoutMethods = state.userPayoutMethods; save();
+  }
+
+  /* ------------------- User Wallet UI replacement ------------------- */
+  function walletPage(){ return document.getElementById("wallet") || document.getElementById("walletPage"); }
+  function ensureWalletUI(){
+    const page = walletPage();
+    if (!page || document.getElementById("walletCleanFlow")) return;
+
+    // Hide old modals/old screenshot field, but keep original page/cards intact.
+    ["depositModal","withdrawModal"].forEach(id => { const el=document.getElementById(id); if(el) el.style.display="none"; });
+    const shot = document.getElementById("depositScreenshot");
+    if (shot) { const wrap = shot.closest("label") || shot.parentElement; if (wrap) wrap.style.display="none"; }
+
+    const anchor = document.getElementById("openDepositBtn")?.closest(".card") ||
+                   document.getElementById("openWithdrawBtn")?.closest(".card") ||
+                   page.querySelector(".wallet-actions") ||
+                   page.querySelector(".card:last-of-type") ||
+                   page;
+
+    const box = document.createElement("div");
+    box.id = "walletCleanFlow";
+    box.className = "wallet-clean-flow";
+    box.innerHTML = `
+      <div class="wallet-flow-tabs">
+        <button type="button" class="active" data-wallet-flow="deposit">Deposit</button>
+        <button type="button" data-wallet-flow="withdraw">Withdrawal</button>
+        <button type="button" data-wallet-flow="history">History</button>
+      </div>
+      <div id="walletFlowContent"></div>
+    `;
+    anchor.insertAdjacentElement("afterend", box);
+    bindWalletTabs();
+    renderWalletFlow("deposit");
+  }
+  function bindWalletTabs(){
+    document.querySelectorAll("[data-wallet-flow]").forEach(btn => {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("[data-wallet-flow]").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        renderWalletFlow(btn.dataset.walletFlow);
+      });
+    });
+  }
+  function renderWalletFlow(type){
+    ensureWalletUI();
+    updateWalletCards();
+    const root = document.getElementById("walletFlowContent");
+    if (!root) return;
+    if (type === "withdraw") root.innerHTML = withdrawHtml();
+    else if (type === "history") root.innerHTML = historyHtml();
+    else root.innerHTML = depositHtml();
+    bindFlowButtons();
+  }
+  function progress(kind, step, total=4){
+    const labels = kind === "deposit" ? ["Amount","Mode","Pay","UTR"] : ["Amount","Method","Review","Submit"];
+    return `<div class="wallet-step-progress">
+      <div><span>${kind === "deposit" ? "Add Funds" : "Request Withdrawal"}</span><b>Step ${step} of ${total}</b></div>
+      <section>${labels.map((l,i)=>`<em class="${i+1<step?'done':(i+1===step?'active':'')}">${i+1<step?'✓':i+1}<small>${l}</small></em>`).join("")}</section>
+    </div>`;
+  }
+  function depositHtml(){
+    const cfg = settings();
+    const qr = cfg.upiQr ? `<img src="${cfg.upiQr}" alt="UPI QR" class="wallet-upi-qr">` : `<div class="wallet-upi-qr empty">QR<br>Not Set</div>`;
+    const kyc = isKycApproved();
+    if (!kyc) return `<div class="card wallet-flow-card"><h3>KYC Required</h3><p>Please complete approved KYC before deposit.</p></div>`;
+    if (dep.step === 1) return `<div class="card wallet-flow-card">${progress("deposit",1)}<h3>Enter Amount</h3><label>Deposit Amount<input id="depCleanAmount" type="number" min="100" placeholder="Enter amount" value="${dep.amount||""}"></label><p class="wallet-note">Minimum deposit ₹100. Use only your own KYC verified account.</p><button id="depNext1">Next</button></div>`;
+    if (dep.step === 2) return `<div class="card wallet-flow-card">${progress("deposit",2)}<h3>Select Payment Mode</h3><div class="wallet-mode-grid"><button class="${dep.mode==="UPI"?"active":""}" data-dep-mode="UPI">UPI / QR</button><button class="${dep.mode==="BANK"?"active":""}" data-dep-mode="BANK">Bank Transfer</button></div><div class="wallet-step-actions"><button id="depBack2">Back</button><button id="depNext2">Next</button></div></div>`;
+    if (dep.step === 3 && dep.mode === "UPI") return `<div class="card wallet-flow-card">${progress("deposit",3)}<h3>Pay via UPI</h3><div class="wallet-pay-box">${qr}<div><span>UPI ID</span><b>${cfg.upiId}</b><button data-copy="${cfg.upiId}">Copy UPI</button><span>Holder</span><b>${cfg.upiHolder}</b><span>Amount</span><b>${money(dep.amount)}</b></div></div><div class="wallet-step-actions"><button id="depBack3">Back</button><button id="depNext3">I Have Paid</button></div></div>`;
+    if (dep.step === 3) return `<div class="card wallet-flow-card">${progress("deposit",3)}<h3>Pay via Bank Transfer</h3><div class="wallet-bank-box"><div><span>Bank</span><b>${cfg.bankName}</b></div><div><span>Account Holder</span><b>${cfg.bankHolder}</b></div><div><span>Account Number</span><b>${cfg.accountNumber}</b></div><div><span>IFSC</span><b>${cfg.ifsc}</b></div><button data-copy="${cfg.bankName} | ${cfg.bankHolder} | ${cfg.accountNumber} | ${cfg.ifsc}">Copy Bank Details</button></div><div class="wallet-step-actions"><button id="depBack3">Back</button><button id="depNext3">I Have Paid</button></div></div>`;
+    return `<div class="card wallet-flow-card">${progress("deposit",4)}<h3>Confirm Deposit</h3><div class="wallet-summary"><div><span>Amount</span><b>${money(dep.amount)}</b></div><div><span>Mode</span><b>${dep.mode}</b></div></div><label>UTR / Transaction ID <input id="depCleanUtr" inputmode="numeric" maxlength="12" placeholder="12 digit UTR" value="${dep.utr||""}"></label><p class="wallet-note">UTR must be exactly 12 digits. Duplicate UTR will be rejected.</p><div class="wallet-step-actions"><button id="depBack4">Back</button><button id="depSubmit">Submit Deposit Request</button></div></div>`;
+  }
+  function withdrawHtml(){
+    const kyc = isKycApproved();
+    const w = wallet();
+    const methods = payoutMethods();
+    if (!kyc) return `<div class="card wallet-flow-card"><h3>KYC Required</h3><p>Please complete approved KYC before withdrawal.</p></div>`;
+    if (!methods.length) return `<div class="card wallet-flow-card"><h3>No Approved Payout Method</h3><p>Please add and get approval for a payment method before requesting withdrawal.</p><button onclick="openRealMenuPage?.('paymentMethods')">Add Payment Method</button></div>`;
+    const selected = methods.find(m => m.id === wit.methodId) || methods[0];
+    if (!wit.methodId && selected) wit.methodId = selected.id;
+    if (wit.step === 1) return `<div class="card wallet-flow-card">${progress("withdraw",1)}<h3>Enter Withdrawal Amount</h3><label>Amount<input id="witCleanAmount" type="number" min="1" max="${w.withdrawable}" placeholder="Enter amount" value="${wit.amount||""}"></label><p class="wallet-note">Withdrawable balance: ${money(w.withdrawable)}</p><button id="witNext1">Next</button></div>`;
+    if (wit.step === 2) return `<div class="card wallet-flow-card">${progress("withdraw",2)}<h3>Select Payout Method</h3><div class="wallet-method-list">${methods.map(m=>`<button class="${m.id===wit.methodId?'active':''}" data-wit-method="${m.id}"><b>${m.type}</b><span>${methodLabel(m)}</span><small>${m.holderName||""}</small></button>`).join("")}</div><div class="wallet-step-actions"><button id="witBack2">Back</button><button id="witNext2">Next</button></div></div>`;
+    if (wit.step === 3) return `<div class="card wallet-flow-card">${progress("withdraw",3)}<h3>Review Request</h3><div class="wallet-summary"><div><span>Amount</span><b>${money(wit.amount)}</b></div><div><span>Method</span><b>${methodLabel(selected)}</b></div><div><span>Holder</span><b>${selected.holderName||"-"}</b></div></div><div class="wallet-step-actions"><button id="witBack3">Back</button><button id="witNext3">Next</button></div></div>`;
+    return `<div class="card wallet-flow-card">${progress("withdraw",4)}<h3>Submit Withdrawal</h3><p class="wallet-note">Your withdrawal request will be reviewed by admin.</p><div class="wallet-step-actions"><button id="witBack4">Back</button><button id="witSubmit">Submit Withdrawal Request</button></div></div>`;
+  }
+  function historyHtml(){
+    const deps = depRows().filter(sameUser).map(x => ({...x, kind:"Deposit"}));
+    const wits = witRows().filter(sameUser).map(x => ({...x, kind:"Withdrawal", mode:x.methodType, utr:"-"}));
+    const list = [...deps, ...wits].sort((a,b)=>(Date.parse(b.createdAt)||0)-(Date.parse(a.createdAt)||0));
+    return `<div class="card wallet-flow-card"><h3>Wallet Requests History</h3><div class="wallet-history-list">${list.length ? list.map(r=>`<div><b>${r.kind}</b><span>${money(r.amount)} • ${r.mode||""}</span><em class="${String(r.status).toLowerCase()}">${r.status}</em><small>${r.utr&&r.utr!=="-"?"UTR: "+r.utr:""} ${r.createdAt||""}</small></div>`).join("") : `<p class="wallet-note">No wallet requests yet.</p>`}</div></div>`;
+  }
+  function bindFlowButtons(){
+    document.querySelectorAll("[data-copy]").forEach(btn => {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", () => { navigator.clipboard?.writeText(btn.dataset.copy || ""); toastMsg("Copied."); });
+    });
+    document.querySelectorAll("[data-dep-mode]").forEach(btn => btn.addEventListener("click", () => { dep.mode = btn.dataset.depMode; renderWalletFlow("deposit"); }));
+    document.querySelectorAll("[data-wit-method]").forEach(btn => btn.addEventListener("click", () => { wit.methodId = btn.dataset.witMethod; renderWalletFlow("withdraw"); }));
+
+    const set = (id, fn) => { const el=document.getElementById(id); if(el && !el.dataset.bound){ el.dataset.bound="1"; el.addEventListener("click", fn); } };
+    set("depNext1", () => { const v=Number(document.getElementById("depCleanAmount")?.value||0); if(v<100) return alert("Minimum deposit amount is ₹100."); dep.amount=v; dep.step=2; renderWalletFlow("deposit"); });
+    set("depBack2", () => { dep.step=1; renderWalletFlow("deposit"); });
+    set("depNext2", () => { dep.step=3; renderWalletFlow("deposit"); });
+    set("depBack3", () => { dep.step=2; renderWalletFlow("deposit"); });
+    set("depNext3", () => { dep.step=4; renderWalletFlow("deposit"); });
+    set("depBack4", () => { dep.step=3; renderWalletFlow("deposit"); });
+    set("depSubmit", submitDeposit);
+
+    set("witNext1", () => { const v=Number(document.getElementById("witCleanAmount")?.value||0); const w=wallet(); if(v<=0) return alert("Enter valid withdrawal amount."); if(v>w.withdrawable) return alert("Amount is greater than withdrawable balance."); wit.amount=v; wit.step=2; renderWalletFlow("withdraw"); });
+    set("witBack2", () => { wit.step=1; renderWalletFlow("withdraw"); });
+    set("witNext2", () => { if(!wit.methodId) return alert("Select payout method."); wit.step=3; renderWalletFlow("withdraw"); });
+    set("witBack3", () => { wit.step=2; renderWalletFlow("withdraw"); });
+    set("witNext3", () => { wit.step=4; renderWalletFlow("withdraw"); });
+    set("witBack4", () => { wit.step=3; renderWalletFlow("withdraw"); });
+    set("witSubmit", submitWithdrawal);
+  }
+
+  function utrValid(utr){ return /^\d{12}$/.test(String(utr || "").trim()); }
+  function utrDuplicate(utr){
+    const x = String(utr || "").trim();
+    return depRows().some(d => String(d.utr) === x);
+  }
+  async function dbUtrDuplicate(utr){
+    const db = client();
+    if (!db) return false;
+    try {
+      const res = await db.from(DEP_TABLE).select("id").eq("utr", utr).limit(1);
+      if (!res.error && res.data?.length) return true;
+      const res2 = await db.from(DEP_TABLE).select("id").eq("transaction_id", utr).limit(1);
+      return !res2.error && !!res2.data?.length;
+    } catch(e){ return false; }
+  }
+  async function submitDeposit(){
+    if (dep.busy) return;
+    dep.busy = true;
+    const btn=document.getElementById("depSubmit");
+    if(btn){ btn.disabled=true; btn.textContent="Submitting..."; }
+    try {
+      const utr = String(document.getElementById("depCleanUtr")?.value || "").trim();
+      if (!utrValid(utr)) throw new Error("UTR must be exactly 12 digits.");
+      if (utrDuplicate(utr) || await dbUtrDuplicate(utr)) throw new Error("This UTR has already been submitted. Please check your transaction ID.");
+      const id = "dep_" + Date.now();
+      const row = { id, userId:uid(), userEmail:email(), amount:Number(dep.amount), mode:dep.mode, utr, status:"PENDING", createdAt:new Date().toLocaleString() };
+      state.depositRequests ||= [];
+      state.depositRequests.unshift(row);
+      const db = client();
+      if (db) {
+        let res = await db.from(DEP_TABLE).insert({
+          id, user_id:row.userId, user_email:row.userEmail, amount:row.amount, payment_mode:row.mode, utr:row.utr, transaction_id:row.utr, status:"PENDING", created_at_text:row.createdAt
+        });
+        if (res.error) {
+          res = await db.from(DEP_TABLE).insert({ id, user_id:row.userId, amount:row.amount, status:"PENDING", utr:row.utr });
+        }
+        if (res.error) console.warn("Deposit DB save failed:", res.error.message);
+      }
+      save();
+      dep.step=1; dep.amount=""; dep.utr="";
+      toastMsg("Deposit request submitted for admin verification.");
+      updateWalletCards();
+      renderWalletFlow("history");
+    } catch(e) {
+      alert(e.message || e);
+      if(btn){ btn.disabled=false; btn.textContent="Submit Deposit Request"; }
+    } finally { dep.busy=false; }
+  }
+  async function submitWithdrawal(){
+    if (wit.busy) return;
+    wit.busy = true;
+    const btn=document.getElementById("witSubmit");
+    if(btn){ btn.disabled=true; btn.textContent="Submitting..."; }
+    try {
+      const amount = Number(wit.amount);
+      const selected = payoutMethods().find(m => m.id === wit.methodId);
+      if (!selected) throw new Error("Select approved payout method.");
+      if (amount <= 0 || amount > wallet().withdrawable) throw new Error("Invalid withdrawal amount.");
+      const id = "wd_" + Date.now();
+      const row = { id, userId:uid(), userEmail:email(), amount, methodId:selected.id, methodType:selected.type, methodText:methodLabel(selected), holderName:selected.holderName, status:"PENDING", createdAt:new Date().toLocaleString() };
+      state.withdrawalRequests ||= [];
+      state.withdrawalRequests.unshift(row);
+      const db = client();
+      if (db) {
+        let res = await db.from(WIT_TABLE).insert({
+          id, user_id:row.userId, user_email:row.userEmail, amount:row.amount, method_id:row.methodId, method_type:row.methodType, method_text:row.methodText, holder_name:row.holderName, status:"PENDING", created_at_text:row.createdAt
+        });
+        if (res.error) {
+          res = await db.from(WIT_TABLE).insert({ id, user_id:row.userId, amount:row.amount, status:"PENDING" });
+        }
+        if (res.error) console.warn("Withdrawal DB save failed:", res.error.message);
+      }
+      save();
+      wit.step=1; wit.amount="";
+      toastMsg("Withdrawal request submitted for admin verification.");
+      updateWalletCards();
+      renderWalletFlow("history");
+    } catch(e){
+      alert(e.message || e);
+      if(btn){ btn.disabled=false; btn.textContent="Submit Withdrawal Request"; }
+    } finally { wit.busy=false; }
+  }
+
+  /* ------------------- Admin requests replacement ------------------- */
+  function isAdminView(){
+    try { return location.pathname.toLowerCase().includes("admin") || String(state?.user?.role||"").toLowerCase()==="admin" || !!document.getElementById("depositRequestsLog") || !!document.getElementById("withdrawalRequestsLog"); } catch(e){ return false; }
+  }
+  function badge(s){ s=String(s||"PENDING").toUpperCase(); return `<span class="wallet-admin-status ${s.toLowerCase()}">${s}</span>`; }
+  function filtered(list, kind){
+    const q = norm(kind==="dep" ? dep.search : wit.search);
+    const status = kind==="dep" ? dep.status : wit.status;
+    const modeF = kind==="dep" ? dep.modeFilter : wit.methodFilter;
+    return list.filter(r => {
+      const sOk = status==="ALL" || r.status===status;
+      const mOk = modeF==="ALL" || (kind==="dep" ? r.mode===modeF : r.methodType===modeF);
+      const text = norm(Object.values(r).join(" "));
+      return sOk && mOk && (!q || text.includes(q));
+    }).sort((a,b)=>(Date.parse(b.createdAt)||Number(String(b.id).replace(/\D/g,""))||0)-(Date.parse(a.createdAt)||Number(String(a.id).replace(/\D/g,""))||0));
+  }
+  function adminToolbar(kind){
+    const title = kind==="dep" ? "Deposit Requests" : "Withdrawal Requests";
+    const modeLabel = kind==="dep" ? "Mode" : "Method";
+    return `<div class="wallet-admin-toolbar">
+      <div><span>${kind==="dep"?"Funds":"Payout"}</span><b>${title}</b></div>
+      <input id="${kind}AdminSearch" placeholder="Search user, amount, UTR..." value="${(kind==="dep"?dep.search:wit.search).replace(/"/g,"&quot;")}">
+      <select id="${kind}AdminStatus"><option value="ALL">All Status</option><option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></select>
+      <select id="${kind}AdminMode"><option value="ALL">All ${modeLabel}</option><option value="UPI">UPI</option><option value="BANK">Bank</option></select>
+    </div>`;
+  }
+  function adminPager(kind,total,page){
+    const pages=Math.max(1,Math.ceil(total/5));
+    const start=total?((page-1)*5)+1:0, end=Math.min(total,page*5);
+    return `<div class="wallet-admin-pager"><span>Showing ${start}–${end} of ${total}</span><div><button data-wallet-admin-page="${kind}" data-dir="prev" ${page<=1?"disabled":""}>Previous</button><b>Page ${page} of ${pages}</b><button data-wallet-admin-page="${kind}" data-dir="next" ${page>=pages?"disabled":""}>Next</button></div></div>`;
+  }
+  function depBody(){ return document.getElementById("depositRequestsLog") || document.querySelector("#adminDeposits tbody"); }
+  function witBody(){ return document.getElementById("withdrawalRequestsLog") || document.querySelector("#adminWithdrawals tbody"); }
+  function renderAdminDeposits(){
+    if(!isAdminView()) return;
+    const body=depBody(); if(!body) return;
+    const panel=body.closest(".card") || body.closest(".admin-panel") || document.body;
+    let toolbar=document.getElementById("depAdminToolbarWrap");
+    if(!toolbar){ toolbar=document.createElement("div"); toolbar.id="depAdminToolbarWrap"; (body.closest("table")||panel).parentNode.insertBefore(toolbar, body.closest("table")||panel.firstChild); }
+    toolbar.innerHTML=adminToolbar("dep");
+    const list=filtered(depRows(),"dep"); const pages=Math.max(1,Math.ceil(list.length/5)); dep.page=Math.min(Math.max(1,dep.page),pages); const rows=list.slice((dep.page-1)*5,dep.page*5);
+    body.innerHTML=rows.length?rows.map(r=>`<tr><td>${r.userEmail||r.userId||"-"}</td><td>${money(r.amount)}</td><td>${r.mode}</td><td>${r.utr||"-"}</td><td>${badge(r.status)}</td><td>${r.status==="PENDING"?`<button class="approve-btn" onclick="approveDepositRequest('${r.id}')">Approve</button><button class="reject-btn" onclick="rejectDepositRequest('${r.id}')">Reject</button>`:`<span class="wallet-admin-locked">Locked</span>`}</td></tr>`).join(""):`<tr><td colspan="6" class="empty">No deposit requests found.</td></tr>`;
+    let pager=document.getElementById("depAdminPager"); if(!pager){ pager=document.createElement("div"); pager.id="depAdminPager"; (body.closest("table")||panel).after(pager); } pager.innerHTML=adminPager("dep",list.length,dep.page);
+    bindAdminFilters("dep");
+  }
+  function renderAdminWithdrawals(){
+    if(!isAdminView()) return;
+    const body=witBody(); if(!body) return;
+    const panel=body.closest(".card") || body.closest(".admin-panel") || document.body;
+    let toolbar=document.getElementById("witAdminToolbarWrap");
+    if(!toolbar){ toolbar=document.createElement("div"); toolbar.id="witAdminToolbarWrap"; (body.closest("table")||panel).parentNode.insertBefore(toolbar, body.closest("table")||panel.firstChild); }
+    toolbar.innerHTML=adminToolbar("wit");
+    const list=filtered(witRows(),"wit"); const pages=Math.max(1,Math.ceil(list.length/5)); wit.page=Math.min(Math.max(1,wit.page),pages); const rows=list.slice((wit.page-1)*5,wit.page*5);
+    body.innerHTML=rows.length?rows.map(r=>`<tr><td>${r.userEmail||r.userId||"-"}</td><td>${money(r.amount)}</td><td>${r.methodType}</td><td>${r.methodText||"-"}</td><td>${badge(r.status)}</td><td>${r.status==="PENDING"?`<button class="approve-btn" onclick="approveWithdrawalRequest('${r.id}')">Approve</button><button class="reject-btn" onclick="rejectWithdrawalRequest('${r.id}')">Reject</button>`:`<span class="wallet-admin-locked">Locked</span>`}</td></tr>`).join(""):`<tr><td colspan="6" class="empty">No withdrawal requests found.</td></tr>`;
+    let pager=document.getElementById("witAdminPager"); if(!pager){ pager=document.createElement("div"); pager.id="witAdminPager"; (body.closest("table")||panel).after(pager); } pager.innerHTML=adminPager("wit",list.length,wit.page);
+    bindAdminFilters("wit");
+  }
+  function bindAdminFilters(kind){
+    const search=document.getElementById(kind+"AdminSearch"), status=document.getElementById(kind+"AdminStatus"), mode=document.getElementById(kind+"AdminMode");
+    if(status) status.value = kind==="dep" ? dep.status : wit.status;
+    if(mode) mode.value = kind==="dep" ? dep.modeFilter : wit.methodFilter;
+    if(search && !search.dataset.bound){ search.dataset.bound=1; search.addEventListener("input",()=>{ if(kind==="dep"){dep.search=search.value;dep.page=1;renderAdminDeposits();}else{wit.search=search.value;wit.page=1;renderAdminWithdrawals();} });}
+    if(status && !status.dataset.bound){ status.dataset.bound=1; status.addEventListener("change",()=>{ if(kind==="dep"){dep.status=status.value;dep.page=1;renderAdminDeposits();}else{wit.status=status.value;wit.page=1;renderAdminWithdrawals();} });}
+    if(mode && !mode.dataset.bound){ mode.dataset.bound=1; mode.addEventListener("change",()=>{ if(kind==="dep"){dep.modeFilter=mode.value;dep.page=1;renderAdminDeposits();}else{wit.methodFilter=mode.value;wit.page=1;renderAdminWithdrawals();} });}
+  }
+  function addBalance(userId, amount){
+    state.accounts ||= {};
+    state.accounts[userId] ||= {};
+    state.accounts[userId].balance = Number(state.accounts[userId].balance || 0) + Number(amount || 0);
+    const user = (state.users || []).find(x => String(x.id)===String(userId) || String(x.email)===String(userId));
+    if(user) user.balance = Number(user.balance || 0) + Number(amount || 0);
+  }
+  function deductBalance(userId, amount){
+    state.accounts ||= {};
+    state.accounts[userId] ||= {};
+    state.accounts[userId].balance = Math.max(0, Number(state.accounts[userId].balance || 0) - Number(amount || 0));
+    const user = (state.users || []).find(x => String(x.id)===String(userId) || String(x.email)===String(userId));
+    if(user) user.balance = Math.max(0, Number(user.balance || 0) - Number(amount || 0));
+  }
+  async function updateReq(table,id,status){
+    const db=client(); if(!db) return;
+    try{ let r=await db.from(table).update({status, reviewed_at:new Date().toISOString()}).eq("id", id); if(r.error) await db.from(table).update({status}).eq("id", id); }catch(e){}
+  }
+  async function approveDeposit(id){
+    const r=state.depositRequests?.find(x=>String(x.id)===String(id)); if(!r || String(r.status).toUpperCase()!=="PENDING") return;
+    r.status="APPROVED"; addBalance(r.userId, r.amount); await updateReq(DEP_TABLE,id,"APPROVED"); save(); renderAdminDeposits(); updateWalletCards();
+  }
+  async function rejectDeposit(id){
+    const r=state.depositRequests?.find(x=>String(x.id)===String(id)); if(!r || String(r.status).toUpperCase()!=="PENDING") return;
+    r.status="REJECTED"; await updateReq(DEP_TABLE,id,"REJECTED"); save(); renderAdminDeposits();
+  }
+  async function approveWithdrawal(id){
+    const r=state.withdrawalRequests?.find(x=>String(x.id)===String(id)); if(!r || String(r.status).toUpperCase()!=="PENDING") return;
+    r.status="APPROVED"; deductBalance(r.userId, r.amount); await updateReq(WIT_TABLE,id,"APPROVED"); save(); renderAdminWithdrawals(); updateWalletCards();
+  }
+  async function rejectWithdrawal(id){
+    const r=state.withdrawalRequests?.find(x=>String(x.id)===String(id)); if(!r || String(r.status).toUpperCase()!=="PENDING") return;
+    r.status="REJECTED"; await updateReq(WIT_TABLE,id,"REJECTED"); save(); renderAdminWithdrawals();
+  }
+
+  function patchGlobals(){
+    window.approveDepositRequest = approveDeposit;
+    window.rejectDepositRequest = rejectDeposit;
+    window.approveWithdrawalRequest = approveWithdrawal;
+    window.rejectWithdrawalRequest = rejectWithdrawal;
+    window.renderAdminDepositsClean = renderAdminDeposits;
+    window.renderAdminWithdrawalsClean = renderAdminWithdrawals;
+    const oldRender=window.renderAdmin;
+    if(typeof oldRender==="function" && !window.__walletCleanAdminRenderPatch){
+      window.__walletCleanAdminRenderPatch=true;
+      window.renderAdmin=function(){ const res=oldRender.apply(this,arguments); setTimeout(renderAdminDeposits,80); setTimeout(renderAdminWithdrawals,100); return res; };
+      try{ renderAdmin=window.renderAdmin; }catch(e){}
+    }
+  }
+
+  document.addEventListener("click", function(e){
+    const pg=e.target.closest("[data-wallet-admin-page]");
+    if(pg){ const kind=pg.dataset.walletAdminPage, dir=pg.dataset.dir; if(kind==="dep"){dep.page += dir==="next"?1:-1;renderAdminDeposits();} else {wit.page += dir==="next"?1:-1;renderAdminWithdrawals();} return; }
+    const t=(e.target?.textContent||"").toLowerCase();
+    const tab=e.target.closest("[data-admin-tab]")?.dataset?.adminTab||"";
+    if(t.includes("deposit") || t.includes("withdraw") || tab.toLowerCase().includes("deposit") || tab.toLowerCase().includes("withdraw")){
+      setTimeout(()=>loadDb().then(()=>{renderAdminDeposits();renderAdminWithdrawals();}),150);
+      setTimeout(()=>{renderAdminDeposits();renderAdminWithdrawals();},900);
+    }
+  }, true);
+
+  document.addEventListener("click", function(e){
+    if(e.target.closest("#openDepositBtn,#openDepositBtn2")){ e.preventDefault(); e.stopPropagation(); dep.step=1; renderWalletFlow("deposit"); }
+    if(e.target.closest("#openWithdrawBtn")){ e.preventDefault(); e.stopPropagation(); wit.step=1; renderWalletFlow("withdraw"); }
+  }, true);
+
+  function boot(){
+    patchGlobals();
+    loadDb().then(()=>{ updateWalletCards(); ensureWalletUI(); renderAdminDeposits(); renderAdminWithdrawals(); });
+  }
+  document.addEventListener("DOMContentLoaded", () => setTimeout(boot, 900));
+  window.addEventListener("load", () => { setTimeout(boot, 900); setTimeout(boot, 2500); });
+})();
