@@ -8153,3 +8153,145 @@ function restoreManualHistoryBackup(mode = state.mode) {
 
 
 
+
+
+/* ===== SESSION REFRESH LOGIN PERSIST FIX ===== */
+(function(){
+  const SESSION_KEYS = [
+    "ai_trading_session",
+    "trading_session",
+    "session",
+    "currentUser",
+    "authUser",
+    "loggedInUser"
+  ];
+
+  function safeParse(v){
+    try { return JSON.parse(v); } catch(e){ return null; }
+  }
+
+  function getState(){
+    try { return window.state || (typeof state !== "undefined" ? state : null); } catch(e){ return null; }
+  }
+
+  function findUserBySession(sess){
+    const st = getState();
+    if (!st || !Array.isArray(st.users)) return null;
+    const sid = String(sess?.id || sess?.userId || sess?.uid || sess?.email || sess || "");
+    const semail = String(sess?.email || "").toLowerCase();
+    return st.users.find(u =>
+      String(u.id || "") === sid ||
+      String(u.userId || "") === sid ||
+      String(u.email || "").toLowerCase() === sid.toLowerCase() ||
+      (semail && String(u.email || "").toLowerCase() === semail)
+    ) || null;
+  }
+
+  function readSavedSession(){
+    for (const key of SESSION_KEYS) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const obj = safeParse(raw) || raw;
+      const user = findUserBySession(obj);
+      if (user) return { key, user, raw: obj };
+    }
+    return null;
+  }
+
+  function writeSession(user){
+    if (!user) return;
+    const sess = { id: user.id || user.userId || user.email, email: user.email || "", role: user.role || "user", savedAt: Date.now() };
+    for (const key of SESSION_KEYS.slice(0,3)) {
+      try { localStorage.setItem(key, JSON.stringify(sess)); } catch(e){}
+    }
+  }
+
+  function restoreSession(){
+    const st = getState();
+    if (!st) return false;
+    const saved = readSavedSession();
+    if (!saved?.user) return false;
+
+    try {
+      window.currentUser = saved.user;
+      window.loggedInUser = saved.user;
+      window.authUser = saved.user;
+      if (typeof currentUser !== "undefined") currentUser = saved.user;
+      if (typeof loggedInUser !== "undefined") loggedInUser = saved.user;
+      if (typeof authUser !== "undefined") authUser = saved.user;
+    } catch(e){}
+
+    try {
+      if (typeof session !== "undefined") session = { id: saved.user.id || saved.user.email };
+      window.session = { id: saved.user.id || saved.user.email };
+    } catch(e){}
+
+    writeSession(saved.user);
+    return true;
+  }
+
+  // Intercept localStorage clearing during refresh boot only if a valid session exists.
+  const originalRemoveItem = localStorage.removeItem.bind(localStorage);
+  localStorage.removeItem = function(key){
+    if (SESSION_KEYS.includes(key)) {
+      const saved = readSavedSession();
+      if (saved?.user && document.readyState !== "complete") return;
+    }
+    return originalRemoveItem(key);
+  };
+
+  function patchLoginPersistence(){
+    // Save session whenever the app sets current user/session and user clicks login.
+    document.addEventListener("submit", function(){
+      setTimeout(function(){
+        const st = getState();
+        let u = null;
+        try { u = window.currentUser || window.loggedInUser || window.authUser || (typeof currentUser !== "undefined" ? currentUser : null); } catch(e){}
+        if (!u && st?.users) {
+          const email = document.querySelector('input[type="email"]')?.value?.trim()?.toLowerCase();
+          if (email) u = st.users.find(x => String(x.email || "").toLowerCase() === email);
+        }
+        if (u) writeSession(u);
+      }, 300);
+    }, true);
+
+    document.addEventListener("click", function(e){
+      const txt = (e.target?.textContent || "").toLowerCase();
+      if (txt.includes("login") || txt.includes("sign in")) {
+        setTimeout(function(){
+          let u = null;
+          try { u = window.currentUser || window.loggedInUser || window.authUser || (typeof currentUser !== "undefined" ? currentUser : null); } catch(e){}
+          if (u) writeSession(u);
+        }, 500);
+      }
+      if (txt.includes("logout")) {
+        SESSION_KEYS.forEach(k => { try { originalRemoveItem(k); } catch(err){} });
+      }
+    }, true);
+  }
+
+  function rerenderIfNeeded(){
+    const restored = restoreSession();
+    if (!restored) return;
+    try {
+      if (typeof renderApp === "function") renderApp();
+      else if (typeof render === "function") render();
+      else if (typeof initApp === "function") initApp();
+      else if (typeof showPage === "function") showPage("dashboard");
+    } catch(e){}
+  }
+
+  document.addEventListener("DOMContentLoaded", function(){
+    restoreSession();
+    patchLoginPersistence();
+    setTimeout(rerenderIfNeeded, 300);
+    setTimeout(rerenderIfNeeded, 900);
+  });
+
+  window.addEventListener("load", function(){
+    setTimeout(rerenderIfNeeded, 400);
+    setTimeout(rerenderIfNeeded, 1400);
+  });
+
+  window.fixSessionRefreshLogin = restoreSession;
+})();

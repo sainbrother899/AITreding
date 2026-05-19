@@ -1342,3 +1342,11 @@ Old Deposit/Wallet Patch Removal:
 - UI/design untouched.
 - Professional wallet rebuild kept.
 - Minimum deposit/withdrawal limits kept.
+
+
+Session Refresh Login Persist Fix:
+- Fixes user/admin logout after page refresh.
+- Saves session in localStorage after login.
+- Restores saved session on DOMContentLoaded/load.
+- Clears session only on real logout.
+- Only app.js session persistence changed.
