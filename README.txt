@@ -1240,3 +1240,11 @@ Old Wallet Removed Single Owner Final:
 - Withdrawal wizard: Amount -> Approved payout method -> Review -> Submit.
 - Admin deposit/withdraw approve/reject functions preserved/replaced.
 - JS syntax check: OK
+
+
+Wallet Buttons Top Position Fix:
+- Deposit / Withdrawal / History tabs now insert directly after wallet overview cards.
+- Old hidden wallet action cards take no space.
+- Wallet logic untouched.
+- Admin/KYC/Payout untouched.
+- JS syntax check: OK

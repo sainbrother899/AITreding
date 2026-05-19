@@ -8278,11 +8278,29 @@ function restoreManualHistoryBackup(mode = state.mode) {
           card.classList.add("wallet-old-hidden");
         });
 
-        // Insert after the first grid/cards area if possible.
-        const cards = page.querySelectorAll(".card");
-        const lastTopCard = cards.length ? cards[Math.min(cards.length - 1, 3)] : null;
-        if (lastTopCard && lastTopCard.parentElement) lastTopCard.insertAdjacentElement("afterend", container);
-        else page.appendChild(container);
+        // Insert directly after wallet overview/top balance cards.
+        // This keeps Deposit / Withdrawal / History buttons near the top,
+        // instead of going below old hidden action/history cards.
+        const preferredAnchors = [
+          document.getElementById("pendingWithdrawalText")?.closest(".card"),
+          document.getElementById("approvedDepositText")?.closest(".card"),
+          document.getElementById("withdrawableAmountText")?.closest(".card"),
+          document.getElementById("walletPageBalance")?.closest(".card")
+        ].filter(Boolean);
+
+        let anchor = preferredAnchors[0] || null;
+
+        if (!anchor) {
+          const visibleCards = Array.from(page.querySelectorAll(".card"))
+            .filter(card => !card.classList.contains("wallet-old-hidden") && card.offsetParent !== null);
+          anchor = visibleCards[Math.min(visibleCards.length - 1, 3)] || visibleCards[0] || null;
+        }
+
+        if (anchor && anchor.parentElement) {
+          anchor.insertAdjacentElement("afterend", container);
+        } else {
+          page.insertAdjacentElement("afterbegin", container);
+        }
       }
 
       container.innerHTML = `

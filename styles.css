@@ -6472,3 +6472,23 @@ body.app-mode .menu-owned-page.active-page {
 .wallet-admin-status-final{display:inline-flex!important;border-radius:999px!important;padding:6px 10px!important;font-size:11px!important;font-weight:950!important}.wallet-admin-status-final.pending{color:#f8bd7a!important;background:rgba(248,189,122,.13)!important}.wallet-admin-status-final.approved{color:#00e7a8!important;background:rgba(0,231,168,.13)!important}.wallet-admin-status-final.rejected{color:#ff456b!important;background:rgba(255,69,107,.13)!important}
 .wallet-admin-locked-final{color:#9fb2d0!important;font-size:12px!important;font-weight:800!important}
 @media(max-width:800px){.wallet-pay-final{grid-template-columns:1fr!important}.wallet-qr-final{width:100%!important;height:220px!important}.wallet-tabs-final{grid-template-columns:1fr!important}}
+
+
+/* ===== WALLET BUTTONS TOP POSITION FIX ===== */
+#walletSingleOwner{
+  order: 2!important;
+  margin-top: 14px!important;
+  margin-bottom: 16px!important;
+}
+.wallet-tabs-final{
+  position: relative!important;
+  z-index: 3!important;
+}
+.wallet-old-hidden{
+  display: none!important;
+  height: 0!important;
+  min-height: 0!important;
+  margin: 0!important;
+  padding: 0!important;
+  overflow: hidden!important;
+}
