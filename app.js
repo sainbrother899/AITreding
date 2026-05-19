@@ -6539,3 +6539,264 @@ function restoreManualHistoryBackup(mode = state.mode) {
     window.addEventListener("load", () => setTimeout(rerender, 1000));
   }
 })();
+
+
+/* ===== PAYMENT SUBMIT FEEDBACK + ADMIN VISIBILITY FIX ===== */
+(function(){
+  let submitLock = false;
+
+  function sb(){
+    try {
+      if (window.supabaseClient) return window.supabaseClient;
+      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
+    } catch(e){}
+    return null;
+  }
+  function u(){ return state?.user || {}; }
+  function uid(){ return String(u().id || u().email || "local"); }
+  function email(){ return String(u().email || ""); }
+  function kycName(){ return u().kycName || u().kyc_name || u().name || u().email?.split("@")[0] || "User"; }
+  function norm(v){ return String(v || "").trim().toLowerCase().replace(/\s+/g, ""); }
+  function methods(){ return state?.userPayoutMethods || state?.payoutMethods || []; }
+  function myMethods(){ return methods().filter(m => String(m.userId || m.user_id || "") === uid()); }
+  function typeOf(m){ return String(m.type || m.method || m.method_type || "").toUpperCase(); }
+  function accountKey(m){
+    const type = typeOf(m);
+    if (type === "UPI") return "UPI:" + norm(m.upi || m.upi_id);
+    return "BANK:" + norm(m.accountNumber || m.account_number) + ":" + norm(m.ifsc);
+  }
+  function currentType(){
+    const select = document.getElementById("kprPayType") || document.querySelector("#paymentMethodsPage select[name='type']");
+    return String(select?.value || localStorage.getItem("kpr_pm_type") || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI";
+  }
+  function currentKey(form){
+    const fd = new FormData(form);
+    const type = currentType();
+    if (type === "UPI") return "UPI:" + norm(fd.get("upi"));
+    return "BANK:" + norm(fd.get("accountNumber")) + ":" + norm(fd.get("ifsc"));
+  }
+  function hasDuplicate(form){
+    const key = currentKey(form);
+    if (key === "UPI:" || key === "BANK::") return false;
+    return myMethods().some(m => {
+      const st = String(m.status || "PENDING").toUpperCase();
+      return (st === "PENDING" || st === "APPROVED") && accountKey(m) === key;
+    });
+  }
+  function setBtn(btn, mode, text){
+    if (!btn) return;
+    if (mode === "loading") {
+      btn.dataset.oldText = btn.dataset.oldText || btn.textContent || "Add Method for Admin Approval";
+      btn.disabled = true;
+      btn.classList.add("kpr-saving");
+      btn.textContent = text || "Saving...";
+    } else if (mode === "success") {
+      btn.disabled = true;
+      btn.classList.remove("kpr-saving");
+      btn.classList.add("kpr-saved");
+      btn.textContent = text || "Request Sent ✓";
+    } else {
+      btn.disabled = false;
+      btn.classList.remove("kpr-saving","kpr-saved");
+      btn.textContent = btn.dataset.oldText || "Add Method for Admin Approval";
+      delete btn.dataset.oldText;
+    }
+  }
+  function notify(msg){
+    try { toast?.(msg); } catch(e){ alert(msg); }
+  }
+
+  async function savePaymentMethodClean(form){
+    if (submitLock) return;
+    submitLock = true;
+
+    const btn = form.querySelector("button[type='submit'],button");
+    setBtn(btn, "loading", "Sending request...");
+
+    try {
+      if (hasDuplicate(form)) {
+        setBtn(btn, "normal");
+        alert("This payment method request is already added or pending approval.");
+        return;
+      }
+
+      const fd = new FormData(form);
+      const type = currentType();
+      const method = {
+        id: "pm_" + Date.now(),
+        userId: uid(),
+        userEmail: email(),
+        type,
+        upi: type === "UPI" ? String(fd.get("upi") || "").trim() : "",
+        holderName: kycName(),
+        kycName: kycName(),
+        bankName: type === "BANK" ? String(fd.get("bankName") || "").trim() : "",
+        accountNumber: type === "BANK" ? String(fd.get("accountNumber") || "").trim() : "",
+        ifsc: type === "BANK" ? String(fd.get("ifsc") || "").trim().toUpperCase() : "",
+        status: "PENDING",
+        createdAt: new Date().toLocaleString()
+      };
+
+      if (type === "UPI" && !method.upi) {
+        setBtn(btn, "normal");
+        alert("Please enter UPI ID.");
+        return;
+      }
+      if (type === "BANK" && (!method.bankName || !method.accountNumber || !method.ifsc)) {
+        setBtn(btn, "normal");
+        alert("Please enter complete bank details.");
+        return;
+      }
+
+      // Add locally first so UI/admin can show it immediately.
+      state.userPayoutMethods ||= state.payoutMethods || [];
+      state.userPayoutMethods.unshift(method);
+      state.payoutMethods = state.userPayoutMethods;
+
+      let dbOk = true;
+      const client = sb();
+      if (client) {
+        const res = await client.from("user_payout_methods").upsert({
+          id: method.id,
+          user_id: method.userId,
+          user_email: method.userEmail,
+          method_type: method.type,
+          holder_name: method.holderName,
+          kyc_name_snapshot: method.kycName,
+          upi_id: method.upi,
+          bank_name: method.bankName,
+          account_number: method.accountNumber,
+          ifsc: method.ifsc,
+          status: "PENDING",
+          name_match: true,
+          created_at_text: method.createdAt
+        }, { onConflict: "id" });
+        if (res.error) {
+          dbOk = false;
+          console.warn("Payout method DB save failed", res.error);
+        }
+      }
+
+      try { saveState?.(); } catch(e){}
+      try { saveSession?.(); } catch(e){}
+
+      setBtn(btn, "success", dbOk ? "Request Sent ✓" : "Saved locally ✓");
+      notify(dbOk ? "Payment method request sent to admin." : "Request saved locally. DB save failed; check Supabase policy/table.");
+
+      renderAdminPaymentRequests();
+      setTimeout(() => {
+        try { window.kprRenderPayment?.(); } catch(e){}
+        try { window.renderPaymentMethodsPage?.(); } catch(e){}
+      }, 800);
+    } finally {
+      setTimeout(() => { submitLock = false; }, 1200);
+    }
+  }
+
+  function mask(m){
+    const type = typeOf(m);
+    if (type === "UPI") return m.upi || m.upi_id || "-";
+    const acc = String(m.accountNumber || m.account_number || "");
+    return `${m.bankName || m.bank_name || "Bank"} ${acc ? "****" + acc.slice(-4) : ""}`;
+  }
+  function statusBadge(s){
+    s = String(s || "PENDING").toUpperCase();
+    return `<span class="kpr-admin-status ${s.toLowerCase()}">${s}</span>`;
+  }
+
+  function renderAdminPaymentRequests(){
+    const body = document.getElementById("paymentRequestsLog") ||
+      document.getElementById("payoutRequestsLog") ||
+      document.getElementById("adminPayoutRequestsList");
+    if (!body) return;
+
+    const rows = methods();
+    const html = rows.length ? rows.map(m => {
+      const st = String(m.status || "PENDING").toUpperCase();
+      const id = String(m.id || "");
+      return `
+        <tr>
+          <td>${m.userEmail || m.user_email || m.userId || m.user_id || "-"}</td>
+          <td>${typeOf(m)}</td>
+          <td>${mask(m)}</td>
+          <td>${m.holderName || m.holder_name || "-"}</td>
+          <td>${statusBadge(st)}</td>
+          <td>${st === "PENDING" ? `
+            <button class="approve-btn" onclick="approvePayoutMethod('${id}')">Approve</button>
+            <button class="reject-btn" onclick="rejectPayoutMethod('${id}')">Reject</button>
+          ` : `<span class="kpr-admin-locked">Locked</span>`}</td>
+        </tr>`;
+    }).join("") : `<tr><td colspan="6" class="empty">No payout method requests.</td></tr>`;
+
+    if (body.tagName === "TBODY") body.innerHTML = html;
+    else body.innerHTML = `<table><tbody>${html}</tbody></table>`;
+  }
+
+  function bindPaymentSubmit(){
+    const form = document.getElementById("kprPaymentForm") ||
+      document.getElementById("routePaymentForm") ||
+      document.querySelector("#paymentMethodsPage form");
+    if (!form || form.dataset.submitFeedbackFixed === "1") return;
+    form.dataset.submitFeedbackFixed = "1";
+
+    form.addEventListener("submit", function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      savePaymentMethodClean(form);
+    }, true);
+  }
+
+  function patchAdminApprovals(){
+    if (window.__paymentSubmitAdminApprovalsPatched) return;
+    window.__paymentSubmitAdminApprovalsPatched = true;
+
+    const oldApprove = window.approvePayoutMethod;
+    window.approvePayoutMethod = async function(id){
+      const row = methods().find(m => String(m.id) === String(id));
+      if (row) row.status = "APPROVED";
+      const client = sb();
+      if (client) {
+        const res = await client.from("user_payout_methods").update({ status:"APPROVED", reviewed_at:new Date().toISOString() }).eq("id", id);
+        if (res.error) console.warn("Approve payout DB failed", res.error);
+      }
+      try { saveState?.(); } catch(e){}
+      renderAdminPaymentRequests();
+      try { render?.(); } catch(e){}
+    };
+
+    const oldReject = window.rejectPayoutMethod;
+    window.rejectPayoutMethod = async function(id){
+      const row = methods().find(m => String(m.id) === String(id));
+      if (row) row.status = "REJECTED";
+      const client = sb();
+      if (client) {
+        const res = await client.from("user_payout_methods").update({ status:"REJECTED", reviewed_at:new Date().toISOString() }).eq("id", id);
+        if (res.error) console.warn("Reject payout DB failed", res.error);
+      }
+      try { saveState?.(); } catch(e){}
+      renderAdminPaymentRequests();
+      try { render?.(); } catch(e){}
+    };
+  }
+
+  function run(){
+    bindPaymentSubmit();
+    patchAdminApprovals();
+    renderAdminPaymentRequests();
+  }
+
+  document.addEventListener("click", function(e){
+    const text = (e.target?.textContent || "").toLowerCase();
+    const page = e.target.closest("[data-page]")?.dataset?.page || "";
+    const tab = e.target.closest("[data-admin-tab]")?.dataset?.adminTab || "";
+    if (text.includes("payment method") || text.includes("payout") || page.includes("payment") || tab.includes("payment")) {
+      setTimeout(run, 150);
+      setTimeout(run, 700);
+    }
+  }, true);
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(run, 1000));
+  window.addEventListener("load", () => setTimeout(run, 1200));
+  window.renderAdminPaymentRequestsFixed = renderAdminPaymentRequests;
+})();

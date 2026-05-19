@@ -1026,3 +1026,14 @@ KPR Old Conflict Removed:
 - Removal result: [{"marker": "MENU PROFILE KYC REFERRAL FIX", "js_removed": 1, "css_removed": 1}, {"marker": "PAYMENT KYC ADMIN APPROVAL FINAL", "js_removed": 1, "css_removed": 1}, {"marker": "DB CONNECTED KYC + PAYOUT FINAL", "js_removed": 1, "css_removed": 1}]
 - Scan result: {"PAYMENT KYC ADMIN APPROVAL FINAL": false, "DB CONNECTED KYC + PAYOUT FINAL": false, "MENU PROFILE KYC REFERRAL FIX": false, "KPR clean module present": true, "applyPaymentKycAdminApproval_count": 0, "securePaymentMethodForm_count": 0, "realPaymentMethodForm_count": 1, "kprPaymentForm_count": 3}
 - JS syntax check: OK
+
+
+Payment Submit Feedback + Admin Visibility Fix:
+- Payment method submit button now shows "Sending request..." then "Request Sent ✓".
+- Double-click duplicate submit is blocked with submitLock.
+- Same UPI / same bank account+IFSC pending/approved duplicate request is blocked.
+- Request is added locally immediately and DB upsert is attempted.
+- Admin payment/payout requests table is rendered from userPayoutMethods.
+- Admin approve/reject handlers update local state and DB.
+- Design/chart/trade/wallet untouched.
+- JS syntax check: OK
