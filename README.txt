@@ -1204,3 +1204,13 @@ Admin Restore Stable Payout Table:
 - Checks: {"ADMIN PAYMENT STABLE PAGE FIX": true, "PAYOUT STABLE PAGE TABLE OVERRIDE FINAL": true, "ADMIN KYC PAYOUT TABLES FILTER PAGINATION FINAL": true, "KYC STEP WIZARD FINAL": true, "PAYMENT METHOD SINGLE OWNER DB SAVE V2": true}
 - Added safety rerender so payout table overrides old card renderer after opening.
 - JS syntax check: OK
+
+
+Admin Users Section Render Fix:
+- Loads users from Supabase profiles table and merges with local state.users.
+- Renders adminUsersLog/adminHardUsersLog users table.
+- Adds search, status/KYC filter, 8-record pagination.
+- Adds View and Block/Unblock buttons.
+- Updates admin total users counters.
+- Touches only Admin Users section.
+- JS syntax check: OK

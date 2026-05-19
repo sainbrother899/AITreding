@@ -8070,3 +8070,351 @@ function restoreManualHistoryBackup(mode = state.mode) {
   }, true);
   window.addEventListener("load", () => setTimeout(rerenderPayoutTable, 1600));
 })();
+
+
+/* ===== ADMIN USERS SECTION RENDER FIX ===== */
+(function(){
+  const PAGE_SIZE = 8;
+  const ui = {
+    page: 1,
+    search: "",
+    status: "ALL"
+  };
+
+  function client(){
+    try {
+      if (window.supabaseClient) return window.supabaseClient;
+      if (typeof supabaseClient !== "undefined" && supabaseClient) return supabaseClient;
+    } catch(e){}
+    return null;
+  }
+  function isAdminView(){
+    try {
+      return location.pathname.toLowerCase().includes("admin") ||
+        String(state?.user?.role || "").toLowerCase() === "admin" ||
+        !!document.getElementById("adminUsers") ||
+        !!document.getElementById("adminUsersLog");
+    } catch(e){ return false; }
+  }
+  function norm(v){ return String(v || "").trim().toLowerCase(); }
+  function money(n){
+    try { if (typeof window.money === "function") return window.money(n); } catch(e){}
+    return "₹" + Number(n || 0).toLocaleString("en-IN");
+  }
+  function save(){
+    try { saveState?.(); } catch(e){}
+  }
+
+  function normalizeUser(u){
+    const id = String(u.id || u.user_id || u.email || "");
+    const email = String(u.email || u.user_email || "");
+    return {
+      id,
+      email,
+      name: String(u.name || u.full_name || (email ? email.split("@")[0] : "User")),
+      mobile: String(u.mobile || u.phone || ""),
+      role: String(u.role || "user"),
+      plan: String(u.plan || "Free"),
+      status: String(u.status || (u.is_active === false ? "BLOCKED" : "ACTIVE")).toUpperCase(),
+      balance: Number(u.balance || u.wallet || u.demoBalance || 0),
+      kycStatus: String(u.kycStatus || u.kyc_status || "").toUpperCase(),
+      referralCode: String(u.referralCode || u.referral_code || ""),
+      referredBy: String(u.referredBy || u.referred_by || ""),
+      createdAt: String(u.createdAt || u.created_at || "")
+    };
+  }
+  function users(){
+    state.users ||= [];
+    return state.users.map(normalizeUser).filter(u => u.email || u.id);
+  }
+  function mergeUsers(list){
+    const map = new Map();
+    users().forEach(u => map.set(String(u.id || u.email), u));
+    (list || []).forEach(raw => {
+      const u = normalizeUser(raw);
+      const key = String(u.id || u.email);
+      if (!key) return;
+      map.set(key, { ...(map.get(key) || {}), ...u });
+    });
+    state.users = Array.from(map.values());
+    save();
+  }
+  async function loadProfiles(){
+    const db = client();
+    if (!db) return;
+    try {
+      const res = await db.from("profiles").select("*");
+      if (!res.error && res.data) mergeUsers(res.data);
+      else if (res.error) console.warn("Admin users profiles load failed:", res.error.message);
+    } catch(e){
+      console.warn("Admin users profiles load failed:", e);
+    }
+  }
+
+  function updateCounts(){
+    const total = users().filter(u => String(u.role).toLowerCase() !== "admin").length;
+    ["adminTotalUsers", "adminTotalUsersMini"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = String(total);
+    });
+  }
+
+  function bodyEl(){
+    return document.getElementById("adminUsersLog") ||
+      document.getElementById("adminHardUsersLog") ||
+      document.querySelector("#adminUsers tbody") ||
+      document.querySelector("[data-admin-users-log]");
+  }
+  function panelEl(){
+    const body = bodyEl();
+    return body?.closest(".card") || document.getElementById("adminUsers") || body?.closest(".admin-panel") || document.body;
+  }
+  function searchEl(){
+    return document.getElementById("adminUserSearch") || document.getElementById("adminHardUserSearch");
+  }
+  function filterEl(){
+    return document.getElementById("adminUserStatusFilter") || document.getElementById("adminHardUserStatusFilter");
+  }
+  function detailCard(){
+    return document.getElementById("adminUserDetailCard") || document.getElementById("adminHardUserDetailCard");
+  }
+
+  function ensureToolbar(){
+    const panel = panelEl();
+    if (!panel || document.getElementById("adminUsersFixToolbar")) return;
+
+    const toolbar = document.createElement("div");
+    toolbar.id = "adminUsersFixToolbar";
+    toolbar.className = "admin-users-fix-toolbar";
+    toolbar.innerHTML = `
+      <div>
+        <span>Users</span>
+        <b>Manage registered users</b>
+      </div>
+      <input id="adminUsersFixSearch" placeholder="Search name, email, mobile..." />
+      <select id="adminUsersFixStatus">
+        <option value="ALL">All Users</option>
+        <option value="ACTIVE">Active</option>
+        <option value="BLOCKED">Blocked</option>
+        <option value="KYC_APPROVED">KYC Approved</option>
+        <option value="KYC_PENDING">KYC Pending</option>
+      </select>
+    `;
+
+    const table = panel.querySelector("table") || bodyEl()?.closest("table") || panel.firstElementChild;
+    if (table) table.parentNode.insertBefore(toolbar, table);
+    else panel.prepend(toolbar);
+
+    const s = document.getElementById("adminUsersFixSearch");
+    const f = document.getElementById("adminUsersFixStatus");
+    s?.addEventListener("input", () => {
+      ui.search = s.value;
+      ui.page = 1;
+      render();
+    });
+    f?.addEventListener("change", () => {
+      ui.status = f.value;
+      ui.page = 1;
+      render();
+    });
+
+    const oldSearch = searchEl();
+    const oldFilter = filterEl();
+    oldSearch?.addEventListener("input", () => {
+      ui.search = oldSearch.value;
+      if (s) s.value = ui.search;
+      ui.page = 1;
+      render();
+    });
+    oldFilter?.addEventListener("change", () => {
+      ui.status = oldFilter.value || "ALL";
+      if (f) f.value = ui.status;
+      ui.page = 1;
+      render();
+    });
+  }
+
+  function statusBadge(u){
+    const status = u.status === "BLOCKED" ? "BLOCKED" : "ACTIVE";
+    const kyc = u.kycStatus || "NOT SET";
+    return `<div class="admin-users-badges">
+      <span class="admin-user-status ${status.toLowerCase()}">${status}</span>
+      <span class="admin-user-kyc ${kyc.toLowerCase().replace(/\s+/g,'-')}">KYC: ${kyc}</span>
+    </div>`;
+  }
+  function filteredUsers(){
+    const q = norm(ui.search);
+    return users()
+      .filter(u => String(u.role).toLowerCase() !== "admin")
+      .filter(u => {
+        if (ui.status === "ACTIVE" && u.status === "BLOCKED") return false;
+        if (ui.status === "BLOCKED" && u.status !== "BLOCKED") return false;
+        if (ui.status === "KYC_APPROVED" && u.kycStatus !== "APPROVED") return false;
+        if (ui.status === "KYC_PENDING" && u.kycStatus !== "PENDING") return false;
+        if (!q) return true;
+        return norm([u.name,u.email,u.mobile,u.id,u.plan,u.status,u.kycStatus].join(" ")).includes(q);
+      })
+      .sort((a,b) => (Date.parse(b.createdAt)||0) - (Date.parse(a.createdAt)||0));
+  }
+  function pager(total){
+    const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    ui.page = Math.min(Math.max(1, ui.page), pages);
+    const start = total ? ((ui.page - 1) * PAGE_SIZE) + 1 : 0;
+    const end = Math.min(total, ui.page * PAGE_SIZE);
+    return `<div class="admin-users-pager">
+      <span>Showing ${start}–${end} of ${total}</span>
+      <div>
+        <button type="button" data-users-page="prev" ${ui.page <= 1 ? "disabled" : ""}>Previous</button>
+        <b>Page ${ui.page} of ${pages}</b>
+        <button type="button" data-users-page="next" ${ui.page >= pages ? "disabled" : ""}>Next</button>
+      </div>
+    </div>`;
+  }
+  function render(){
+    if (!isAdminView()) return;
+    const body = bodyEl();
+    if (!body) return;
+
+    ensureToolbar();
+    updateCounts();
+
+    const list = filteredUsers();
+    const pageRows = list.slice((ui.page - 1) * PAGE_SIZE, ui.page * PAGE_SIZE);
+
+    const html = pageRows.length ? pageRows.map(u => `
+      <tr>
+        <td>
+          <div class="admin-user-main">
+            <b>${u.name || "User"}</b>
+            <span>${u.email || u.id || "-"}</span>
+          </div>
+        </td>
+        <td>${u.mobile || "-"}</td>
+        <td>${u.plan || "Free"}</td>
+        <td>${money(u.balance)}</td>
+        <td>${statusBadge(u)}</td>
+        <td>
+          <button class="admin-user-view-btn" onclick="viewAdminUser('${u.id || u.email}')">View</button>
+          <button class="admin-user-toggle-btn" onclick="toggleAdminUserStatus('${u.id || u.email}')">${u.status === "BLOCKED" ? "Unblock" : "Block"}</button>
+        </td>
+      </tr>
+    `).join("") : `<tr><td colspan="6" class="empty">No users found.</td></tr>`;
+
+    body.innerHTML = html;
+
+    let pg = document.getElementById("adminUsersFixPager");
+    const table = body.closest("table");
+    if (!pg) {
+      pg = document.createElement("div");
+      pg.id = "adminUsersFixPager";
+      (table || panelEl()).after(pg);
+    }
+    pg.innerHTML = pager(list.length);
+  }
+
+  function userDetailHtml(u){
+    const deposits = (state.depositRequests || []).filter(d => String(d.userId || d.user_id || d.userEmail || d.user_email) === String(u.id) || norm(d.userEmail || d.user_email) === norm(u.email));
+    const withdrawals = (state.withdrawalRequests || []).filter(w => String(w.userId || w.user_id || w.userEmail || w.user_email) === String(u.id) || norm(w.userEmail || w.user_email) === norm(u.email));
+    return `
+      <div class="admin-user-detail-head">
+        <div>
+          <span>USER DETAILS</span>
+          <h3>${u.name || "User"}</h3>
+          <p>${u.email || u.id || "-"}</p>
+        </div>
+        ${statusBadge(u)}
+      </div>
+      <div class="admin-user-detail-grid">
+        <div><span>Mobile</span><b>${u.mobile || "-"}</b></div>
+        <div><span>Plan</span><b>${u.plan || "Free"}</b></div>
+        <div><span>Balance</span><b>${money(u.balance)}</b></div>
+        <div><span>KYC</span><b>${u.kycStatus || "NOT SET"}</b></div>
+        <div><span>Referral Code</span><b>${u.referralCode || "-"}</b></div>
+        <div><span>Referred By</span><b>${u.referredBy || "-"}</b></div>
+        <div><span>Deposits</span><b>${deposits.length}</b></div>
+        <div><span>Withdrawals</span><b>${withdrawals.length}</b></div>
+      </div>
+    `;
+  }
+  function viewUser(id){
+    const u = users().find(x => String(x.id) === String(id) || String(x.email) === String(id));
+    if (!u) return;
+    const card = detailCard();
+    const title = document.getElementById("adminSelectedUserTitle") || document.getElementById("adminHardSelectedUserTitle");
+    const sub = document.getElementById("adminSelectedUserSub") || document.getElementById("adminHardSelectedUserSub");
+    if (title) title.textContent = u.name || "User";
+    if (sub) sub.textContent = u.email || u.id || "";
+    if (card) {
+      card.innerHTML = userDetailHtml(u);
+      card.style.display = "";
+    }
+    window.__adminSelectedUserId = u.id || u.email;
+  }
+  async function updateProfileStatus(u){
+    const db = client();
+    if (!db || !u?.id) return;
+    try {
+      await db.from("profiles").update({ status:u.status, is_active:u.status !== "BLOCKED" }).eq("id", u.id);
+    } catch(e){
+      console.warn("Profile status update failed:", e);
+    }
+  }
+  function toggleStatus(id){
+    const u = state.users?.find(x => String(x.id) === String(id) || String(x.email) === String(id));
+    if (!u) return;
+    const nu = normalizeUser(u);
+    u.status = nu.status === "BLOCKED" ? "ACTIVE" : "BLOCKED";
+    u.is_active = u.status !== "BLOCKED";
+    updateProfileStatus(u);
+    save();
+    render();
+    viewUser(id);
+  }
+
+  function patchGlobals(){
+    window.renderAdminUsers = render;
+    window.adminRenderUsers = render;
+    window.refreshAdminUsers = () => loadProfiles().then(render);
+    window.viewAdminUser = viewUser;
+    window.toggleAdminUserStatus = toggleStatus;
+
+    const oldRender = window.renderAdmin;
+    if (typeof oldRender === "function" && !window.__adminUsersRenderPatch) {
+      window.__adminUsersRenderPatch = true;
+      window.renderAdmin = function(){
+        const res = oldRender.apply(this, arguments);
+        setTimeout(render, 80);
+        return res;
+      };
+      try { renderAdmin = window.renderAdmin; } catch(e){}
+    }
+  }
+
+  document.addEventListener("click", function(e){
+    const p = e.target.closest("[data-users-page]");
+    if (p) {
+      ui.page += p.dataset.usersPage === "next" ? 1 : -1;
+      render();
+      return;
+    }
+    const tab = e.target.closest("[data-admin-tab]")?.dataset?.adminTab || "";
+    const text = (e.target?.textContent || "").toLowerCase();
+    if (tab === "adminUsers" || text.includes("users") || text.includes("👥")) {
+      setTimeout(() => loadProfiles().then(render), 150);
+      setTimeout(render, 800);
+    }
+  }, true);
+
+  function boot(){
+    if (!isAdminView()) return;
+    patchGlobals();
+    loadProfiles().then(render);
+    render();
+  }
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(boot, 900));
+  window.addEventListener("load", () => {
+    setTimeout(boot, 900);
+    setTimeout(() => loadProfiles().then(render), 2500);
+  });
+})();

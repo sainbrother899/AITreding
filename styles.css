@@ -6456,3 +6456,172 @@ body.app-mode .menu-owned-page.active-page {
 .aps-payout-details{margin-top:16px!important}.aps-detail-card{padding:18px!important}.aps-detail-head{display:flex!important;justify-content:space-between!important;gap:12px!important;align-items:flex-start!important;margin-bottom:14px!important}.aps-detail-head span{color:#9fb2d0!important;font-size:12px!important;letter-spacing:.08em!important}.aps-detail-head h3{color:#f4f7ff!important;margin:4px 0!important;font-size:22px!important}.aps-detail-head p{color:#9fb2d0!important;margin:0!important}
 .aps-detail-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}.aps-detail-grid div{border:1px solid rgba(255,255,255,.08)!important;background:rgba(255,255,255,.035)!important;border-radius:14px!important;padding:10px!important}.aps-detail-grid span{display:block!important;color:#9fb2d0!important;font-size:11px!important;margin-bottom:4px!important}.aps-detail-grid b{color:#f4f7ff!important;font-size:13px!important;word-break:break-word!important}.aps-detail-actions{display:flex!important;gap:10px!important;margin-top:14px!important;flex-wrap:wrap!important}
 @media(max-width:900px){.aps-table-toolbar{grid-template-columns:1fr!important}.aps-table-pager{align-items:flex-start!important;flex-direction:column!important}.aps-detail-grid{grid-template-columns:1fr!important}}
+
+
+/* ===== ADMIN USERS SECTION RENDER FIX ===== */
+.admin-users-fix-toolbar{
+  display:grid!important;
+  grid-template-columns:1.2fr 1.5fr .8fr!important;
+  gap:10px!important;
+  align-items:end!important;
+  margin:14px 0 16px!important;
+}
+.admin-users-fix-toolbar > div span{
+  display:block!important;
+  color:#9fb2d0!important;
+  font-size:12px!important;
+  letter-spacing:.08em!important;
+  text-transform:uppercase!important;
+}
+.admin-users-fix-toolbar > div b{
+  display:block!important;
+  color:#f4f7ff!important;
+  font-size:15px!important;
+  margin-top:3px!important;
+}
+.admin-users-fix-toolbar input,
+.admin-users-fix-toolbar select{
+  min-height:42px!important;
+  border-radius:13px!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  background:rgba(255,255,255,.06)!important;
+  color:#f4f7ff!important;
+  padding:0 12px!important;
+  outline:none!important;
+}
+.admin-user-main{
+  display:grid!important;
+  gap:3px!important;
+}
+.admin-user-main b{
+  color:#f4f7ff!important;
+  font-size:13px!important;
+}
+.admin-user-main span{
+  color:#9fb2d0!important;
+  font-size:12px!important;
+  word-break:break-word!important;
+}
+.admin-users-badges{
+  display:flex!important;
+  gap:6px!important;
+  flex-wrap:wrap!important;
+}
+.admin-user-status,
+.admin-user-kyc{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  border-radius:999px!important;
+  padding:5px 9px!important;
+  font-size:10.5px!important;
+  font-weight:950!important;
+  white-space:nowrap!important;
+}
+.admin-user-status.active{color:#00e7a8!important;background:rgba(0,231,168,.13)!important;}
+.admin-user-status.blocked{color:#ff456b!important;background:rgba(255,69,107,.13)!important;}
+.admin-user-kyc.approved{color:#00e7a8!important;background:rgba(0,231,168,.13)!important;}
+.admin-user-kyc.pending{color:#f8bd7a!important;background:rgba(248,189,122,.13)!important;}
+.admin-user-kyc.not-set,
+.admin-user-kyc:not(.approved):not(.pending){color:#9fb2d0!important;background:rgba(255,255,255,.07)!important;}
+.admin-user-view-btn,
+.admin-user-toggle-btn{
+  border-radius:12px!important;
+  padding:9px 12px!important;
+  font-weight:900!important;
+  margin:3px!important;
+  border:1px solid rgba(255,255,255,.12)!important;
+}
+.admin-user-view-btn{
+  background:rgba(255,255,255,.08)!important;
+  color:#f4f7ff!important;
+}
+.admin-user-toggle-btn{
+  background:rgba(248,189,122,.12)!important;
+  color:#f8bd7a!important;
+  border-color:rgba(248,189,122,.24)!important;
+}
+.admin-users-pager{
+  display:flex!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+  align-items:center!important;
+  margin:14px 0!important;
+  color:#9fb2d0!important;
+  font-size:12px!important;
+}
+.admin-users-pager > div{
+  display:flex!important;
+  gap:8px!important;
+  align-items:center!important;
+}
+.admin-users-pager button{
+  border-radius:12px!important;
+  padding:9px 12px!important;
+  border:1px solid rgba(255,255,255,.12)!important;
+  background:rgba(255,255,255,.07)!important;
+  color:#f4f7ff!important;
+  font-weight:900!important;
+}
+.admin-users-pager button[disabled]{
+  opacity:.45!important;
+  cursor:not-allowed!important;
+}
+.admin-users-pager b{
+  color:#f4f7ff!important;
+}
+.admin-user-detail-head{
+  display:flex!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+  align-items:flex-start!important;
+  margin-bottom:14px!important;
+}
+.admin-user-detail-head span{
+  color:#9fb2d0!important;
+  font-size:12px!important;
+  letter-spacing:.08em!important;
+}
+.admin-user-detail-head h3{
+  color:#f4f7ff!important;
+  margin:4px 0!important;
+  font-size:22px!important;
+}
+.admin-user-detail-head p{
+  color:#9fb2d0!important;
+  margin:0!important;
+}
+.admin-user-detail-grid{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:10px!important;
+}
+.admin-user-detail-grid div{
+  border:1px solid rgba(255,255,255,.08)!important;
+  background:rgba(255,255,255,.035)!important;
+  border-radius:14px!important;
+  padding:10px!important;
+}
+.admin-user-detail-grid span{
+  display:block!important;
+  color:#9fb2d0!important;
+  font-size:11px!important;
+  margin-bottom:4px!important;
+}
+.admin-user-detail-grid b{
+  color:#f4f7ff!important;
+  font-size:13px!important;
+  word-break:break-word!important;
+}
+@media(max-width:900px){
+  .admin-users-fix-toolbar{
+    grid-template-columns:1fr!important;
+  }
+  .admin-users-pager{
+    align-items:flex-start!important;
+    flex-direction:column!important;
+  }
+  .admin-user-detail-grid{
+    grid-template-columns:1fr!important;
+  }
+}
