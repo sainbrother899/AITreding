@@ -1275,10 +1275,11 @@ Wallet Only Balance Cards Show Fix:
 - JS syntax check: OK
 
 
-Wallet Old Buttons Inside Balance Card Hide Fix:
-- Keeps Real Wallet Equity/top wallet balance card visible.
-- Hides old Deposit Now and Withdraw buttons inside that card.
-- Hides old explanatory note inside that card.
-- Keeps new Deposit / Withdrawal / History tabs and wizard visible.
-- Only wallet visibility/styling changed.
+Wallet Restore Visible Safe:
+- Restored from stable wallet ZIP before aggressive hide.
+- Removed aggressive wallet button/card hide module if present: [{"marker": "WALLET OLD BUTTONS INSIDE BALANCE CARD HIDE FIX", "js_removed": 0, "css_removed": 0}]
+- Restores wallet cards visibility.
+- Hides only legacy button elements by ID, not card containers.
+- Keeps new Deposit/Withdrawal/History tabs.
+- Use this instead of AI-Trading-Wallet-Old-Buttons-In-Card-Hide-Fix.zip.
 - JS syntax check: OK

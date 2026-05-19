@@ -8838,56 +8838,57 @@ function hideLegacyWalletHistoryCardsFinal(){
 })();
 
 
-/* ===== WALLET OLD BUTTONS INSIDE BALANCE CARD HIDE FIX ===== */
+/* ===== WALLET RESTORE VISIBLE SAFE FIX ===== */
 (function(){
   function walletPage(){
     return document.getElementById("wallet") || document.getElementById("walletPage");
   }
 
-  function hideOldButtonsInsideBalanceCard(){
+  function restoreWalletVisible(){
     const page = walletPage();
     if (!page) return;
 
-    const oldButtonIds = ["openDepositBtn", "openDepositBtn2", "openWithdrawBtn"];
+    // Restore all main wallet cards that may have been hidden by previous bad fix.
+    page.querySelectorAll(".card").forEach(card => {
+      const txt = (card.textContent || "").toLowerCase();
+      const isOldHistory = txt.includes("your deposit history") || txt.includes("your withdrawal history");
+      if (!isOldHistory) {
+        card.style.display = "";
+        card.style.visibility = "";
+        card.style.opacity = "";
+        card.style.height = "";
+        card.style.minHeight = "";
+        card.style.maxHeight = "";
+        card.style.margin = "";
+        card.style.padding = "";
+        card.style.pointerEvents = "";
+        card.classList.remove("wallet-old-action-hidden", "wallet-old-inline-action-hidden", "wallet-old-inline-note-hidden");
+      }
+    });
 
-    oldButtonIds.forEach(id => {
+    // Hide only legacy action buttons themselves, not the whole wallet card.
+    ["openDepositBtn", "openDepositBtn2", "openWithdrawBtn"].forEach(id => {
       const btn = document.getElementById(id);
       if (btn && !btn.closest("#walletSingleOwner")) {
-        btn.classList.add("wallet-old-inline-action-hidden");
         btn.style.display = "none";
       }
     });
 
-    page.querySelectorAll("button").forEach(btn => {
-      if (btn.closest("#walletSingleOwner")) return;
-      const txt = (btn.textContent || "").trim().toLowerCase();
-      if (txt === "deposit now" || txt === "withdraw" || txt === "deposit" || txt === "withdrawal") {
-        btn.classList.add("wallet-old-inline-action-hidden");
-        btn.style.display = "none";
-      }
-    });
-
-    page.querySelectorAll("p, small, .note, .muted, div").forEach(el => {
-      if (el.closest("#walletSingleOwner")) return;
-      const txt = (el.textContent || "").toLowerCase();
-      if (
-        txt.includes("approved deposit real wallet") ||
-        txt.includes("open trade pnl live update")
-      ) {
-        el.classList.add("wallet-old-inline-note-hidden");
-        el.style.display = "none";
-      }
-    });
-
-    // Keep the new tabs directly after the main wallet card if possible.
-    const box = document.getElementById("walletSingleOwner");
-    const walletCard = Array.from(page.querySelectorAll(".card")).find(card => {
+    // Keep old history cards hidden, because new History tab owns history.
+    page.querySelectorAll(".card").forEach(card => {
       const txt = (card.textContent || "").toLowerCase();
-      return txt.includes("real wallet equity") || txt.includes("approved deposit") || txt.includes("withdrawable");
+      const isOldHistory = txt.includes("your deposit history") || txt.includes("your withdrawal history");
+      if (isOldHistory && !card.closest("#walletSingleOwner")) {
+        card.style.display = "none";
+      }
     });
 
-    if (box && walletCard && walletCard.nextElementSibling !== box) {
-      walletCard.insertAdjacentElement("afterend", box);
+    // Make sure new wallet owner is visible.
+    const owner = document.getElementById("walletSingleOwner");
+    if (owner) {
+      owner.style.display = "";
+      owner.style.visibility = "visible";
+      owner.style.opacity = "1";
     }
   }
 
@@ -8895,18 +8896,18 @@ function hideLegacyWalletHistoryCardsFinal(){
     const text = (e.target?.textContent || "").toLowerCase();
     const page = e.target.closest("[data-page]")?.dataset?.page || "";
     if (page === "wallet" || text.includes("wallet") || text.includes("deposit") || text.includes("withdraw")) {
-      setTimeout(hideOldButtonsInsideBalanceCard, 60);
-      setTimeout(hideOldButtonsInsideBalanceCard, 400);
-      setTimeout(hideOldButtonsInsideBalanceCard, 1200);
+      setTimeout(restoreWalletVisible, 60);
+      setTimeout(restoreWalletVisible, 400);
+      setTimeout(restoreWalletVisible, 1200);
     }
   }, true);
 
-  document.addEventListener("DOMContentLoaded", () => setTimeout(hideOldButtonsInsideBalanceCard, 1000));
+  document.addEventListener("DOMContentLoaded", () => setTimeout(restoreWalletVisible, 1000));
   window.addEventListener("load", () => {
-    setTimeout(hideOldButtonsInsideBalanceCard, 900);
-    setTimeout(hideOldButtonsInsideBalanceCard, 2400);
-    setTimeout(hideOldButtonsInsideBalanceCard, 4500);
+    setTimeout(restoreWalletVisible, 900);
+    setTimeout(restoreWalletVisible, 2400);
+    setTimeout(restoreWalletVisible, 4500);
   });
 
-  window.hideOldWalletInlineButtons = hideOldButtonsInsideBalanceCard;
+  window.restoreWalletVisibleSafe = restoreWalletVisible;
 })();
