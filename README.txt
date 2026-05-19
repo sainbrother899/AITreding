@@ -1184,3 +1184,13 @@ Admin KYC + Payout Table Filter Pagination Final:
 - Removed old admin KYC render fix blocks: JS 1, CSS 1.
 - User KYC wizard/payment form/trade/chart/wallet untouched.
 - JS syntax check: OK
+
+
+Payout Stable Page Table Override Final:
+- Root cause: ADMIN PAYMENT STABLE PAGE FIX was rendering Payout Method Requests with apsRenderPayout() card layout.
+- This patch overrides the stable payout page content itself.
+- Adds search, status filter, UPI/Bank filter, 5-record pagination.
+- Pending: Approve/Reject/Delete.
+- Approved/Rejected: Locked/Delete.
+- Delete removes user_payout_methods row and user can add a new method again.
+- JS syntax check: OK

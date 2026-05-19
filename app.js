@@ -7866,3 +7866,190 @@ function restoreManualHistoryBackup(mode = state.mode) {
   document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,900));
   window.addEventListener("load",()=>{setTimeout(boot,900);setTimeout(refresh,2600);});
 })();
+
+
+/* ===== PAYOUT STABLE PAGE TABLE OVERRIDE FINAL ===== */
+(function(){
+  const PAGE_SIZE = 5;
+  const ps = { page:1, search:"", status:"ALL", type:"ALL" };
+
+  function c(){ try { return window.supabaseClient || (typeof supabaseClient !== "undefined" ? supabaseClient : null); } catch(e){ return null; } }
+  function norm(v){ return String(v||"").trim().toLowerCase(); }
+  function save(){ try { saveState?.(); } catch(e){} }
+
+  function rows(){
+    state.userPayoutMethods ||= state.payoutMethods || [];
+    state.payoutMethods = state.userPayoutMethods;
+    return state.userPayoutMethods.map(m => {
+      const type = String(m.type||m.method_type||m.method||"UPI").toUpperCase()==="BANK" ? "BANK" : "UPI";
+      return {
+        id:String(m.id||""), userId:String(m.userId||m.user_id||""), userEmail:String(m.userEmail||m.user_email||""),
+        type, upi:String(m.upi||m.upi_id||""), holderName:String(m.holderName||m.holder_name||""),
+        kycName:String(m.kycName||m.kyc_name_snapshot||""), bankName:String(m.bankName||m.bank_name||""),
+        accountNumber:String(m.accountNumber||m.account_number||""), ifsc:String(m.ifsc||""),
+        status:String(m.status||"PENDING").toUpperCase(), createdAt:String(m.createdAt||m.created_at_text||m.created_at||"")
+      };
+    });
+  }
+  function merge(dbRows){
+    const map = new Map();
+    rows().forEach(r => map.set(r.id, r));
+    (dbRows||[]).forEach(m => {
+      const id = String(m.id||("pm_"+Date.now()+"_"+Math.random()));
+      map.set(id, {
+        id, userId:String(m.user_id||m.userId||""), userEmail:String(m.user_email||m.userEmail||""),
+        type:String(m.method_type||m.type||"UPI").toUpperCase()==="BANK" ? "BANK" : "UPI",
+        upi:String(m.upi_id||m.upi||""), holderName:String(m.holder_name||m.holderName||""),
+        kycName:String(m.kyc_name_snapshot||m.kycName||""), bankName:String(m.bank_name||m.bankName||""),
+        accountNumber:String(m.account_number||m.accountNumber||""), ifsc:String(m.ifsc||""),
+        status:String(m.status||"PENDING").toUpperCase(), createdAt:String(m.created_at_text||m.created_at||m.createdAt||"")
+      });
+    });
+    state.userPayoutMethods = Array.from(map.values());
+    state.payoutMethods = state.userPayoutMethods;
+    save();
+  }
+  async function load(){
+    const db=c(); if(!db) return;
+    try {
+      let r = await db.from("user_payout_methods").select("*").order("created_at",{ascending:false});
+      if(r.error) r = await db.from("user_payout_methods").select("*");
+      if(!r.error) merge(r.data||[]);
+    } catch(e){ console.warn("Payout stable load failed", e); }
+  }
+  function badge(x){ x=String(x||"PENDING").toUpperCase(); return `<span class="aps-table-status ${x.toLowerCase()}">${x}</span>`; }
+  function mask(m){ return m.type==="UPI" ? (m.upi||"-") : `${m.bankName||"Bank"} ${m.accountNumber ? "****"+String(m.accountNumber).slice(-4) : ""}`; }
+  function filtered(){
+    const q=norm(ps.search);
+    return rows().filter(m => {
+      const stOk = ps.status==="ALL" || m.status===ps.status;
+      const typeOk = ps.type==="ALL" || m.type===ps.type;
+      const text = norm([m.userEmail,m.userId,m.type,m.upi,m.holderName,m.kycName,m.bankName,m.accountNumber,m.ifsc].join(" "));
+      return stOk && typeOk && (!q || text.includes(q));
+    }).sort((a,b)=>(Date.parse(b.createdAt)||Number(String(b.id).replace(/\D/g,""))||0)-(Date.parse(a.createdAt)||Number(String(a.id).replace(/\D/g,""))||0));
+  }
+  function toolbar(){
+    return `<div class="aps-table-toolbar">
+      <div><span>User Security</span><b>Payout Method Requests</b><small>Approve only if holder name matches approved KYC name.</small></div>
+      <input id="apsPayoutSearch" placeholder="Search user, name, UPI, bank..." value="${ps.search.replace(/"/g,"&quot;")}">
+      <select id="apsPayoutStatus">
+        <option value="ALL" ${ps.status==="ALL"?"selected":""}>All Status</option>
+        <option value="PENDING" ${ps.status==="PENDING"?"selected":""}>Pending</option>
+        <option value="APPROVED" ${ps.status==="APPROVED"?"selected":""}>Approved</option>
+        <option value="REJECTED" ${ps.status==="REJECTED"?"selected":""}>Rejected</option>
+      </select>
+      <select id="apsPayoutType">
+        <option value="ALL" ${ps.type==="ALL"?"selected":""}>All Type</option>
+        <option value="UPI" ${ps.type==="UPI"?"selected":""}>UPI</option>
+        <option value="BANK" ${ps.type==="BANK"?"selected":""}>Bank</option>
+      </select>
+    </div>`;
+  }
+  function pager(total){
+    const pages=Math.max(1,Math.ceil(total/PAGE_SIZE));
+    ps.page=Math.min(Math.max(1,ps.page),pages);
+    const start=total?((ps.page-1)*PAGE_SIZE)+1:0, end=Math.min(total,ps.page*PAGE_SIZE);
+    return `<div class="aps-table-pager">
+      <span>Showing ${start}–${end} of ${total}</span>
+      <div>
+        <button type="button" data-aps-page="prev" ${ps.page<=1?"disabled":""}>Previous</button>
+        <b>Page ${ps.page} of ${pages}</b>
+        <button type="button" data-aps-page="next" ${ps.page>=pages?"disabled":""}>Next</button>
+      </div>
+    </div>`;
+  }
+  function table(){
+    const list=filtered(), pageRows=list.slice((ps.page-1)*PAGE_SIZE, ps.page*PAGE_SIZE);
+    return `${toolbar()}
+      <div class="aps-table-wrap">
+        <table class="aps-payout-table">
+          <thead><tr><th>User</th><th>Type</th><th>Method</th><th>Holder</th><th>KYC Name</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            ${pageRows.length ? pageRows.map(m => `<tr>
+              <td>${m.userEmail||m.userId||"-"}</td>
+              <td>${m.type}</td>
+              <td>${mask(m)}</td>
+              <td>${m.holderName||"-"}</td>
+              <td>${m.kycName||"-"}</td>
+              <td>${badge(m.status)}</td>
+              <td>
+                <button class="aps-view-btn" onclick="viewPayoutDetails('${m.id}')">View</button>
+                ${m.status==="PENDING" ? `<button class="approve-btn" onclick="approvePayoutMethod('${m.id}')">Approve</button><button class="reject-btn" onclick="rejectPayoutMethod('${m.id}')">Reject</button>` : `<span class="aps-locked">Locked</span>`}
+                <button class="aps-delete-btn" onclick="deletePayoutMethod('${m.id}')">Delete</button>
+              </td>
+            </tr>`).join("") : `<tr><td colspan="7" class="empty">No payout method requests found.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+      ${pager(list.length)}
+      <div id="apsPayoutDetails" class="aps-payout-details"></div>`;
+  }
+  function detail(id){
+    const m=rows().find(x=>String(x.id)===String(id));
+    const root=document.getElementById("apsPayoutDetails") || document.getElementById("adminPayoutDetails");
+    if(!root || !m) return;
+    root.innerHTML=`<div class="card aps-detail-card">
+      <div class="aps-detail-head"><div><span>PAYOUT DETAILS</span><h3>${m.type} Method</h3><p>${m.userEmail||m.userId||"-"}</p></div>${badge(m.status)}</div>
+      <div class="aps-detail-grid">
+        <div><span>Type</span><b>${m.type}</b></div><div><span>Method</span><b>${mask(m)}</b></div>
+        <div><span>Holder Name</span><b>${m.holderName||"-"}</b></div><div><span>KYC Name</span><b>${m.kycName||"-"}</b></div>
+        <div><span>Name Match</span><b>${norm(m.holderName)===norm(m.kycName)?"YES":"NO"}</b></div><div><span>Date</span><b>${m.createdAt||"-"}</b></div>
+      </div>
+      <div class="aps-detail-actions">
+        ${m.status==="PENDING" ? `<button class="approve-btn" onclick="approvePayoutMethod('${m.id}')">Approve</button><button class="reject-btn" onclick="rejectPayoutMethod('${m.id}')">Reject</button>` : `<span class="aps-locked">Action Locked</span>`}
+        <button class="aps-delete-btn" onclick="deletePayoutMethod('${m.id}')">Delete Method</button>
+      </div>
+    </div>`;
+  }
+  async function setStatus(id,x){
+    const m=state.userPayoutMethods?.find(v=>String(v.id)===String(id)); if(m) m.status=x;
+    const db=c(); if(db){ try{ let r=await db.from("user_payout_methods").update({status:x,reviewed_at:new Date().toISOString()}).eq("id",id); if(r.error) await db.from("user_payout_methods").update({status:x}).eq("id",id); }catch(e){} }
+    save(); render(); setTimeout(()=>detail(id),50);
+  }
+  async function del(id){
+    if(!confirm("Delete this payout method? User can add a new method again.")) return;
+    state.userPayoutMethods=(state.userPayoutMethods||[]).filter(m=>String(m.id)!==String(id));
+    state.payoutMethods=state.userPayoutMethods;
+    const db=c(); if(db){ try{ await db.from("user_payout_methods").delete().eq("id",id); }catch(e){} }
+    save(); render();
+  }
+  function content(){
+    const el=document.getElementById("apsContent");
+    return el;
+  }
+  function render(){
+    const el=content();
+    if(el && document.body.classList.contains("aps-page-open")) {
+      const title=document.getElementById("apsTitle");
+      const label=document.getElementById("apsLabel");
+      if(title && title.textContent.toLowerCase().includes("payout")) {
+        title.textContent="Payout Method Requests";
+        if(label) label.textContent="User Security";
+        el.innerHTML=table();
+        bind();
+      }
+    }
+  }
+  function bind(){
+    const s=document.getElementById("apsPayoutSearch"), stSel=document.getElementById("apsPayoutStatus"), ty=document.getElementById("apsPayoutType");
+    if(s&&!s.dataset.bound){s.dataset.bound=1; s.addEventListener("input",()=>{ps.search=s.value; ps.page=1; render();});}
+    if(stSel&&!stSel.dataset.bound){stSel.dataset.bound=1; stSel.addEventListener("change",()=>{ps.status=stSel.value; ps.page=1; render();});}
+    if(ty&&!ty.dataset.bound){ty.dataset.bound=1; ty.addEventListener("change",()=>{ps.type=ty.value; ps.page=1; render();});}
+  }
+  function patch(){
+    window.viewPayoutDetails=detail;
+    window.approvePayoutMethod=(id)=>setStatus(id,"APPROVED");
+    window.rejectPayoutMethod=(id)=>setStatus(id,"REJECTED");
+    window.deletePayoutMethod=del;
+    window.renderPayoutStableTable=render;
+  }
+  document.addEventListener("click",function(e){
+    const pg=e.target.closest("[data-aps-page]");
+    if(pg){ ps.page += pg.dataset.apsPage==="next" ? 1 : -1; render(); return; }
+    const btn=e.target.closest("[data-admin-stable-pay]");
+    if(btn && btn.dataset.adminStablePay==="payout"){ setTimeout(()=>load().then(render),120); setTimeout(render,700); }
+  },true);
+  function boot(){ patch(); load().then(render); }
+  document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,1000));
+  window.addEventListener("load",()=>{setTimeout(boot,1200);setTimeout(()=>load().then(render),2500);});
+})();
