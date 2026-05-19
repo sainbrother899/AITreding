@@ -5618,6 +5618,313 @@ function restoreManualHistoryBackup(mode = state.mode) {
 
 
 
+/* ===== ADMIN PAYMENT STABLE PAGE FIX ===== */
+(function(){
+  function apsIsAdmin(){
+    return location.pathname.toLowerCase().includes("admin") ||
+      document.body.classList.contains("admin-pc-restore") ||
+      document.body.classList.contains("admin") ||
+      !!document.getElementById("adminPage") ||
+      !!document.getElementById("adminApp") ||
+      !!document.querySelector("[id*='admin' i], [class*='admin' i]");
+  }
+
+  function apsEnsureState(){
+    state.userPayoutMethods ||= state.payoutMethods || [];
+    state.payoutMethods = state.userPayoutMethods;
+    state.paymentSettings ||= {
+      upi: { active:true, upiId:"admin@upi", name:"AI Trading", qrUrl:"" },
+      bank: { active:true, accountName:"AI Trading", bankName:"Demo Bank", accountNumber:"0000000000", ifsc:"DEMO0000001", branch:"Main" }
+    };
+    try {
+      const raw = localStorage.getItem("ai_payment_security_v1");
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d.payoutMethods && !(state.userPayoutMethods || []).length) {
+          state.userPayoutMethods = d.payoutMethods;
+          state.payoutMethods = d.payoutMethods;
+        }
+        if (d.paymentSettings) state.paymentSettings = d.paymentSettings;
+      }
+    } catch(e) {}
+  }
+
+  function apsSave(){
+    try { saveState?.(); } catch(e){}
+    try { saveSession?.(); } catch(e){}
+    try {
+      localStorage.setItem("ai_payment_security_v1", JSON.stringify({
+        payoutMethods: state.userPayoutMethods || state.payoutMethods || [],
+        paymentSettings: state.paymentSettings || {}
+      }));
+    } catch(e){}
+  }
+
+  function apsStatus(s){
+    s = String(s || "PENDING").toUpperCase();
+    const cls = s === "APPROVED" ? "approved" : (s === "REJECTED" ? "rejected" : "pending");
+    return `<em class="aps-status ${cls}">${s}</em>`;
+  }
+
+  function apsMaskMethod(m){
+    const type = String(m.type || m.method || "").toUpperCase();
+    if (type === "UPI") return m.upi || "-";
+    const acc = String(m.accountNumber || m.account_number || "");
+    return `${m.bankName || m.bank_name || "Bank"} ${acc ? "****" + acc.slice(-4) : ""}`.trim();
+  }
+
+  function apsNameMatch(m){
+    const holder = String(m.holderName || m.holder_name || "").trim().toLowerCase();
+    const kyc = String(m.kycName || m.kyc_name || "").trim().toLowerCase();
+    return holder && kyc && holder === kyc;
+  }
+
+  function apsFindMenu(){
+    const selectors = [
+      ".admin-sidebar nav",".admin-sidebar",".admin-menu",".admin-nav",".admin-tabs",
+      ".sidebar nav",".sidebar","aside nav","aside","[class*='sidebar' i]","[class*='menu' i]"
+    ];
+    for (const s of selectors) {
+      const el = document.querySelector(s);
+      if (!el) continue;
+      if (el.querySelector("button,a") || /user|deposit|withdraw|trade|admin/i.test(el.textContent || "")) return el;
+    }
+    return null;
+  }
+
+  function apsRoot(){
+    return document.getElementById("adminPage") ||
+      document.getElementById("adminApp") ||
+      document.querySelector(".admin-page,.admin-shell,.admin-layout,.admin-main,.admin-content") ||
+      document.body;
+  }
+
+  function apsMakeBtn(type, icon, label){
+    let btn = document.querySelector(`[data-admin-stable-pay="${type}"]`);
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "aps-menu-btn";
+      btn.dataset.adminStablePay = type;
+      btn.innerHTML = `<span>${icon}</span><b>${label}</b>`;
+    }
+    return btn;
+  }
+
+  function apsEnsureButtons(){
+    if (!apsIsAdmin()) return;
+    const menu = apsFindMenu();
+    const payout = apsMakeBtn("payout", "💳", "Payout Method Requests");
+    const settings = apsMakeBtn("settings", "🏦", "Payment Settings");
+
+    if (menu) {
+      if (!menu.querySelector('[data-admin-stable-pay="payout"]')) menu.appendChild(payout);
+      if (!menu.querySelector('[data-admin-stable-pay="settings"]')) menu.appendChild(settings);
+    }
+
+    let quick = document.getElementById("adminStablePaymentQuickMenu");
+    if (!quick) {
+      quick = document.createElement("div");
+      quick.id = "adminStablePaymentQuickMenu";
+      quick.className = "aps-quick-menu";
+      quick.innerHTML = `
+        <button type="button" data-admin-stable-pay="payout"><span>💳</span><b>Payout Method Requests</b></button>
+        <button type="button" data-admin-stable-pay="settings"><span>🏦</span><b>Payment Settings</b></button>
+      `;
+      apsRoot().insertAdjacentElement("afterbegin", quick);
+    }
+    quick.classList.toggle("hide-quick", !!menu);
+  }
+
+  function apsPanel(){
+    let panel = document.getElementById("adminStablePaymentPage");
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.id = "adminStablePaymentPage";
+      panel.className = "aps-page";
+      panel.innerHTML = `
+        <div class="aps-head">
+          <button type="button" id="apsBackBtn">‹</button>
+          <div><p class="label" id="apsLabel">Admin Payment</p><h2 id="apsTitle">Payment</h2></div>
+        </div>
+        <div id="apsContent" class="aps-content"></div>
+      `;
+      document.body.appendChild(panel);
+      panel.querySelector("#apsBackBtn").addEventListener("click", () => {
+        panel.classList.remove("show");
+        document.body.classList.remove("aps-page-open");
+      });
+    }
+    return panel;
+  }
+
+  function apsRenderPayout(){
+    apsEnsureState();
+    const rows = (state.userPayoutMethods || state.payoutMethods || []).slice().reverse();
+    return `
+      <div class="aps-section-card">
+        <p class="label">User Security</p>
+        <h3>Payout Method Requests</h3>
+        <small>Approve only if holder name matches approved KYC name.</small>
+      </div>
+      <div class="aps-list">
+        ${rows.length ? rows.map(m => `
+          <div class="aps-request-card">
+            <div class="aps-request-top">
+              <div><span>User</span><b>${m.userId || "-"}</b></div>
+              ${apsStatus(m.status || "PENDING")}
+            </div>
+            <div class="aps-grid">
+              <p><span>Type</span><b>${m.type || "-"}</b></p>
+              <p><span>Method</span><b>${apsMaskMethod(m)}</b></p>
+              <p><span>Holder Name</span><b>${m.holderName || "-"}</b></p>
+              <p><span>KYC Name</span><b>${m.kycName || "-"}</b></p>
+              <p><span>Name Match</span><b class="${apsNameMatch(m) ? "plc-profit" : "plc-loss"}">${apsNameMatch(m) ? "YES" : "NO ⚠️"}</b></p>
+              <p><span>Date</span><b>${m.createdAt || "-"}</b></p>
+            </div>
+            <div class="aps-actions">
+              <button type="button" data-aps-approve="${m.id}">Approve</button>
+              <button type="button" data-aps-reject="${m.id}">Reject</button>
+            </div>
+          </div>
+        `).join("") : `<div class="aps-empty">No payout method requests.</div>`}
+      </div>
+    `;
+  }
+
+  function apsRenderSettings(){
+    apsEnsureState();
+    const upi = state.paymentSettings?.upi || {};
+    const bank = state.paymentSettings?.bank || {};
+    return `
+      <div class="aps-section-card">
+        <p class="label">Deposit Account</p>
+        <h3>Payment Settings</h3>
+        <small>User deposit page will show active UPI/Bank details.</small>
+      </div>
+      <form id="apsPaymentSettingsForm" class="aps-form">
+        <label>UPI Active
+          <select name="upiActive">
+            <option value="true" ${upi.active !== false ? "selected" : ""}>Active</option>
+            <option value="false" ${upi.active === false ? "selected" : ""}>Inactive</option>
+          </select>
+        </label>
+        <label>UPI ID
+          <input name="upiId" value="${upi.upiId || ""}" placeholder="admin@upi">
+        </label>
+        <label>UPI Name
+          <input name="upiName" value="${upi.name || ""}" placeholder="Account name">
+        </label>
+        <label>Bank Active
+          <select name="bankActive">
+            <option value="true" ${bank.active !== false ? "selected" : ""}>Active</option>
+            <option value="false" ${bank.active === false ? "selected" : ""}>Inactive</option>
+          </select>
+        </label>
+        <label>Account Name
+          <input name="accountName" value="${bank.accountName || ""}" placeholder="Account holder">
+        </label>
+        <label>Bank Name
+          <input name="bankName" value="${bank.bankName || ""}" placeholder="Bank name">
+        </label>
+        <label>Account Number
+          <input name="accountNumber" value="${bank.accountNumber || ""}" placeholder="Account number">
+        </label>
+        <label>IFSC
+          <input name="ifsc" value="${bank.ifsc || ""}" placeholder="IFSC code">
+        </label>
+        <button type="submit">Save Payment Settings</button>
+      </form>
+    `;
+  }
+
+  function apsOpen(type){
+    apsEnsureState();
+    const panel = apsPanel();
+    const title = panel.querySelector("#apsTitle");
+    const label = panel.querySelector("#apsLabel");
+    const content = panel.querySelector("#apsContent");
+
+    if (type === "settings") {
+      title.textContent = "Payment Settings";
+      label.textContent = "Deposit Account";
+      content.innerHTML = apsRenderSettings();
+    } else {
+      title.textContent = "Payout Method Requests";
+      label.textContent = "User Security";
+      content.innerHTML = apsRenderPayout();
+    }
+
+    panel.classList.add("show");
+    document.body.classList.add("aps-page-open");
+  }
+
+  function apsBind(){
+    if (!apsIsAdmin()) return;
+    apsEnsureButtons();
+
+    document.querySelectorAll("[data-admin-stable-pay]").forEach(btn => {
+      if (btn.dataset.apsBound === "1") return;
+      btn.dataset.apsBound = "1";
+      btn.addEventListener("click", function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        apsOpen(btn.dataset.adminStablePay);
+      }, true);
+    });
+
+    const panel = apsPanel();
+    if (panel.dataset.apsActionsBound !== "1") {
+      panel.dataset.apsActionsBound = "1";
+
+      panel.addEventListener("click", function(e){
+        const approve = e.target.dataset.apsApprove;
+        const reject = e.target.dataset.apsReject;
+        if (!approve && !reject) return;
+
+        const id = approve || reject;
+        const m = (state.userPayoutMethods || state.payoutMethods || []).find(x => String(x.id) === String(id));
+        if (m) {
+          m.status = approve ? "APPROVED" : "REJECTED";
+          m.reviewedAt = new Date().toLocaleString();
+          state.payoutMethods = state.userPayoutMethods;
+          apsSave();
+          apsOpen("payout");
+        }
+      });
+
+      panel.addEventListener("submit", function(e){
+        if (e.target.id !== "apsPaymentSettingsForm") return;
+        e.preventDefault();
+        const f = e.target;
+        state.paymentSettings = {
+          upi: { active:f.upiActive.value === "true", upiId:f.upiId.value, name:f.upiName.value, qrUrl:"" },
+          bank: { active:f.bankActive.value === "true", accountName:f.accountName.value, bankName:f.bankName.value, accountNumber:f.accountNumber.value, ifsc:f.ifsc.value, branch:"" }
+        };
+        apsSave();
+        apsOpen("settings");
+        alert("Payment settings saved.");
+      });
+    }
+
+    // Hide older inline payment panels permanently so they do not flicker in admin content.
+    document.querySelectorAll("#adminPayoutRequestsPanel,#adminPaymentSettingsPanel").forEach(el => {
+      el.style.setProperty("display", "none", "important");
+      el.classList.add("force-admin-pay-hidden");
+    });
+  }
+
+  window.openAdminStablePaymentPage = apsOpen;
+  document.addEventListener("DOMContentLoaded", () => setTimeout(apsBind, 700));
+  window.addEventListener("load", () => setTimeout(apsBind, 900));
+  setInterval(apsBind, 2500);
+})();
+
+
+
+
+
 /* ===== KYC PAYMENT REFERRAL CLEAN MODULE FINAL ===== */
 (function(){
   const MAX_UPI = 2;
@@ -7561,68 +7868,41 @@ function restoreManualHistoryBackup(mode = state.mode) {
 })();
 
 
-
-
-
-/* ===== CLEAN ADMIN PAYOUT PAGE SHELL FINAL ===== */
+/* ===== PAYOUT STABLE PAGE TABLE OVERRIDE FINAL ===== */
 (function(){
   const PAGE_SIZE = 5;
-  const stateLocal = { page:1, search:"", status:"ALL", type:"ALL" };
+  const ps = { page:1, search:"", status:"ALL", type:"ALL" };
 
-  function client(){
-    try { return window.supabaseClient || (typeof supabaseClient !== "undefined" ? supabaseClient : null); } catch(e){ return null; }
-  }
-  function isAdmin(){
-    try {
-      return location.pathname.toLowerCase().includes("admin") ||
-        String(state?.user?.role || "").toLowerCase() === "admin" ||
-        !!document.querySelector(".admin-sidebar") ||
-        !!document.getElementById("adminPage") ||
-        !!document.getElementById("adminRoot");
-    } catch(e){ return false; }
-  }
-  function norm(v){ return String(v || "").trim().toLowerCase(); }
+  function c(){ try { return window.supabaseClient || (typeof supabaseClient !== "undefined" ? supabaseClient : null); } catch(e){ return null; } }
+  function norm(v){ return String(v||"").trim().toLowerCase(); }
   function save(){ try { saveState?.(); } catch(e){} }
 
   function rows(){
     state.userPayoutMethods ||= state.payoutMethods || [];
     state.payoutMethods = state.userPayoutMethods;
     return state.userPayoutMethods.map(m => {
-      const type = String(m.type || m.method_type || m.method || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI";
+      const type = String(m.type||m.method_type||m.method||"UPI").toUpperCase()==="BANK" ? "BANK" : "UPI";
       return {
-        id:String(m.id || ""),
-        userId:String(m.userId || m.user_id || ""),
-        userEmail:String(m.userEmail || m.user_email || ""),
-        type,
-        upi:String(m.upi || m.upi_id || ""),
-        holderName:String(m.holderName || m.holder_name || ""),
-        kycName:String(m.kycName || m.kyc_name_snapshot || ""),
-        bankName:String(m.bankName || m.bank_name || ""),
-        accountNumber:String(m.accountNumber || m.account_number || ""),
-        ifsc:String(m.ifsc || ""),
-        status:String(m.status || "PENDING").toUpperCase(),
-        createdAt:String(m.createdAt || m.created_at_text || m.created_at || "")
+        id:String(m.id||""), userId:String(m.userId||m.user_id||""), userEmail:String(m.userEmail||m.user_email||""),
+        type, upi:String(m.upi||m.upi_id||""), holderName:String(m.holderName||m.holder_name||""),
+        kycName:String(m.kycName||m.kyc_name_snapshot||""), bankName:String(m.bankName||m.bank_name||""),
+        accountNumber:String(m.accountNumber||m.account_number||""), ifsc:String(m.ifsc||""),
+        status:String(m.status||"PENDING").toUpperCase(), createdAt:String(m.createdAt||m.created_at_text||m.created_at||"")
       };
     });
   }
   function merge(dbRows){
     const map = new Map();
     rows().forEach(r => map.set(r.id, r));
-    (dbRows || []).forEach(m => {
-      const id = String(m.id || ("pm_" + Date.now() + "_" + Math.random()));
+    (dbRows||[]).forEach(m => {
+      const id = String(m.id||("pm_"+Date.now()+"_"+Math.random()));
       map.set(id, {
-        id,
-        userId:String(m.user_id || m.userId || ""),
-        userEmail:String(m.user_email || m.userEmail || ""),
-        type:String(m.method_type || m.type || "UPI").toUpperCase() === "BANK" ? "BANK" : "UPI",
-        upi:String(m.upi_id || m.upi || ""),
-        holderName:String(m.holder_name || m.holderName || ""),
-        kycName:String(m.kyc_name_snapshot || m.kycName || ""),
-        bankName:String(m.bank_name || m.bankName || ""),
-        accountNumber:String(m.account_number || m.accountNumber || ""),
-        ifsc:String(m.ifsc || ""),
-        status:String(m.status || "PENDING").toUpperCase(),
-        createdAt:String(m.created_at_text || m.created_at || m.createdAt || "")
+        id, userId:String(m.user_id||m.userId||""), userEmail:String(m.user_email||m.userEmail||""),
+        type:String(m.method_type||m.type||"UPI").toUpperCase()==="BANK" ? "BANK" : "UPI",
+        upi:String(m.upi_id||m.upi||""), holderName:String(m.holder_name||m.holderName||""),
+        kycName:String(m.kyc_name_snapshot||m.kycName||""), bankName:String(m.bank_name||m.bankName||""),
+        accountNumber:String(m.account_number||m.accountNumber||""), ifsc:String(m.ifsc||""),
+        status:String(m.status||"PENDING").toUpperCase(), createdAt:String(m.created_at_text||m.created_at||m.createdAt||"")
       });
     });
     state.userPayoutMethods = Array.from(map.values());
@@ -7630,266 +7910,163 @@ function restoreManualHistoryBackup(mode = state.mode) {
     save();
   }
   async function load(){
-    const db = client();
-    if (!db) return;
+    const db=c(); if(!db) return;
     try {
-      let res = await db.from("user_payout_methods").select("*").order("created_at", { ascending:false });
-      if (res.error) res = await db.from("user_payout_methods").select("*");
-      if (!res.error) merge(res.data || []);
-      else console.warn("Payout load failed:", res.error.message);
-    } catch(e){ console.warn("Payout load failed:", e); }
+      let r = await db.from("user_payout_methods").select("*").order("created_at",{ascending:false});
+      if(r.error) r = await db.from("user_payout_methods").select("*");
+      if(!r.error) merge(r.data||[]);
+    } catch(e){ console.warn("Payout stable load failed", e); }
   }
-
-  function root(){
-    return document.querySelector(".admin-main") ||
-      document.querySelector(".admin-content") ||
-      document.getElementById("adminContent") ||
-      document.getElementById("adminPage") ||
-      document.body;
-  }
-  function ensureButton(){
-    if (!isAdmin()) return;
-    const existing = document.querySelector('[data-clean-admin-pay="payout"]');
-    if (existing) return;
-
-    const menu = document.querySelector(".admin-sidebar") ||
-      document.querySelector(".admin-menu") ||
-      document.querySelector(".sidebar") ||
-      document.querySelector("aside");
-
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "clean-admin-pay-btn";
-    btn.dataset.cleanAdminPay = "payout";
-    btn.innerHTML = `<span>💳</span><b>Payout Method Requests</b>`;
-
-    if (menu) menu.appendChild(btn);
-    else {
-      let quick = document.getElementById("cleanAdminPayQuickMenu");
-      if (!quick) {
-        quick = document.createElement("div");
-        quick.id = "cleanAdminPayQuickMenu";
-        quick.className = "clean-admin-pay-quick";
-        root().prepend(quick);
-      }
-      quick.appendChild(btn);
-    }
-  }
-  function ensurePage(){
-    let panel = document.getElementById("cleanAdminPayoutPage");
-    if (panel) return panel;
-
-    panel = document.createElement("div");
-    panel.id = "cleanAdminPayoutPage";
-    panel.className = "clean-admin-payout-page";
-    panel.innerHTML = `
-      <div class="clean-admin-page-head">
-        <button type="button" id="cleanAdminPayoutBack">← Back</button>
-        <div>
-          <span>User Security</span>
-          <h2>Payout Method Requests</h2>
-          <p>Approve only if holder name matches approved KYC name.</p>
-        </div>
-      </div>
-      <div id="cleanAdminPayoutContent"></div>
-    `;
-    root().appendChild(panel);
-
-    panel.querySelector("#cleanAdminPayoutBack")?.addEventListener("click", () => {
-      panel.classList.remove("show");
-      document.body.classList.remove("clean-admin-payout-open");
-    });
-    return panel;
-  }
-  function showPage(){
-    ensureButton();
-    const panel = ensurePage();
-    panel.classList.add("show");
-    document.body.classList.add("clean-admin-payout-open");
-    load().then(render);
-  }
-
-  function badge(s){
-    s = String(s || "PENDING").toUpperCase();
-    return `<span class="clean-pay-status ${s.toLowerCase()}">${s}</span>`;
-  }
-  function mask(m){
-    return m.type === "UPI" ? (m.upi || "-") : `${m.bankName || "Bank"} ${m.accountNumber ? "****" + String(m.accountNumber).slice(-4) : ""}`;
-  }
+  function badge(x){ x=String(x||"PENDING").toUpperCase(); return `<span class="aps-table-status ${x.toLowerCase()}">${x}</span>`; }
+  function mask(m){ return m.type==="UPI" ? (m.upi||"-") : `${m.bankName||"Bank"} ${m.accountNumber ? "****"+String(m.accountNumber).slice(-4) : ""}`; }
   function filtered(){
-    const q = norm(stateLocal.search);
+    const q=norm(ps.search);
     return rows().filter(m => {
-      const stOk = stateLocal.status === "ALL" || m.status === stateLocal.status;
-      const typeOk = stateLocal.type === "ALL" || m.type === stateLocal.type;
+      const stOk = ps.status==="ALL" || m.status===ps.status;
+      const typeOk = ps.type==="ALL" || m.type===ps.type;
       const text = norm([m.userEmail,m.userId,m.type,m.upi,m.holderName,m.kycName,m.bankName,m.accountNumber,m.ifsc].join(" "));
       return stOk && typeOk && (!q || text.includes(q));
     }).sort((a,b)=>(Date.parse(b.createdAt)||Number(String(b.id).replace(/\D/g,""))||0)-(Date.parse(a.createdAt)||Number(String(a.id).replace(/\D/g,""))||0));
   }
   function toolbar(){
-    return `<div class="clean-pay-toolbar">
-      <div><span>User Security</span><b>Payout Method Requests</b></div>
-      <input id="cleanPaySearch" placeholder="Search user, name, UPI, bank..." value="${stateLocal.search.replace(/"/g,"&quot;")}">
-      <select id="cleanPayStatus">
-        <option value="ALL" ${stateLocal.status==="ALL"?"selected":""}>All Status</option>
-        <option value="PENDING" ${stateLocal.status==="PENDING"?"selected":""}>Pending</option>
-        <option value="APPROVED" ${stateLocal.status==="APPROVED"?"selected":""}>Approved</option>
-        <option value="REJECTED" ${stateLocal.status==="REJECTED"?"selected":""}>Rejected</option>
+    return `<div class="aps-table-toolbar">
+      <div><span>User Security</span><b>Payout Method Requests</b><small>Approve only if holder name matches approved KYC name.</small></div>
+      <input id="apsPayoutSearch" placeholder="Search user, name, UPI, bank..." value="${ps.search.replace(/"/g,"&quot;")}">
+      <select id="apsPayoutStatus">
+        <option value="ALL" ${ps.status==="ALL"?"selected":""}>All Status</option>
+        <option value="PENDING" ${ps.status==="PENDING"?"selected":""}>Pending</option>
+        <option value="APPROVED" ${ps.status==="APPROVED"?"selected":""}>Approved</option>
+        <option value="REJECTED" ${ps.status==="REJECTED"?"selected":""}>Rejected</option>
       </select>
-      <select id="cleanPayType">
-        <option value="ALL" ${stateLocal.type==="ALL"?"selected":""}>All Type</option>
-        <option value="UPI" ${stateLocal.type==="UPI"?"selected":""}>UPI</option>
-        <option value="BANK" ${stateLocal.type==="BANK"?"selected":""}>Bank</option>
+      <select id="apsPayoutType">
+        <option value="ALL" ${ps.type==="ALL"?"selected":""}>All Type</option>
+        <option value="UPI" ${ps.type==="UPI"?"selected":""}>UPI</option>
+        <option value="BANK" ${ps.type==="BANK"?"selected":""}>Bank</option>
       </select>
     </div>`;
   }
   function pager(total){
-    const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-    stateLocal.page = Math.min(Math.max(1, stateLocal.page), pages);
-    const start = total ? ((stateLocal.page - 1) * PAGE_SIZE) + 1 : 0;
-    const end = Math.min(total, stateLocal.page * PAGE_SIZE);
-    return `<div class="clean-pay-pager">
+    const pages=Math.max(1,Math.ceil(total/PAGE_SIZE));
+    ps.page=Math.min(Math.max(1,ps.page),pages);
+    const start=total?((ps.page-1)*PAGE_SIZE)+1:0, end=Math.min(total,ps.page*PAGE_SIZE);
+    return `<div class="aps-table-pager">
       <span>Showing ${start}–${end} of ${total}</span>
       <div>
-        <button type="button" data-clean-pay-page="prev" ${stateLocal.page <= 1 ? "disabled" : ""}>Previous</button>
-        <b>Page ${stateLocal.page} of ${pages}</b>
-        <button type="button" data-clean-pay-page="next" ${stateLocal.page >= pages ? "disabled" : ""}>Next</button>
+        <button type="button" data-aps-page="prev" ${ps.page<=1?"disabled":""}>Previous</button>
+        <b>Page ${ps.page} of ${pages}</b>
+        <button type="button" data-aps-page="next" ${ps.page>=pages?"disabled":""}>Next</button>
       </div>
     </div>`;
   }
-  function render(){
-    const page = document.getElementById("cleanAdminPayoutPage");
-    const content = document.getElementById("cleanAdminPayoutContent");
-    if (!page || !content || !page.classList.contains("show")) return;
-
-    const list = filtered();
-    const pageRows = list.slice((stateLocal.page - 1) * PAGE_SIZE, stateLocal.page * PAGE_SIZE);
-    content.innerHTML = `${toolbar()}
-      <div class="clean-pay-table-wrap">
-        <table class="clean-pay-table">
+  function table(){
+    const list=filtered(), pageRows=list.slice((ps.page-1)*PAGE_SIZE, ps.page*PAGE_SIZE);
+    return `${toolbar()}
+      <div class="aps-table-wrap">
+        <table class="aps-payout-table">
           <thead><tr><th>User</th><th>Type</th><th>Method</th><th>Holder</th><th>KYC Name</th><th>Status</th><th>Action</th></tr></thead>
           <tbody>
             ${pageRows.length ? pageRows.map(m => `<tr>
-              <td>${m.userEmail || m.userId || "-"}</td>
+              <td>${m.userEmail||m.userId||"-"}</td>
               <td>${m.type}</td>
               <td>${mask(m)}</td>
-              <td>${m.holderName || "-"}</td>
-              <td>${m.kycName || "-"}</td>
+              <td>${m.holderName||"-"}</td>
+              <td>${m.kycName||"-"}</td>
               <td>${badge(m.status)}</td>
               <td>
-                <button class="clean-pay-view" onclick="viewPayoutDetails('${m.id}')">View</button>
-                ${m.status === "PENDING" ? `<button class="approve-btn" onclick="approvePayoutMethod('${m.id}')">Approve</button><button class="reject-btn" onclick="rejectPayoutMethod('${m.id}')">Reject</button>` : `<span class="clean-pay-locked">Locked</span>`}
-                <button class="clean-pay-delete" onclick="deletePayoutMethod('${m.id}')">Delete</button>
+                <button class="aps-view-btn" onclick="viewPayoutDetails('${m.id}')">View</button>
+                ${m.status==="PENDING" ? `<button class="approve-btn" onclick="approvePayoutMethod('${m.id}')">Approve</button><button class="reject-btn" onclick="rejectPayoutMethod('${m.id}')">Reject</button>` : `<span class="aps-locked">Locked</span>`}
+                <button class="aps-delete-btn" onclick="deletePayoutMethod('${m.id}')">Delete</button>
               </td>
             </tr>`).join("") : `<tr><td colspan="7" class="empty">No payout method requests found.</td></tr>`}
           </tbody>
         </table>
       </div>
       ${pager(list.length)}
-      <div id="cleanPayDetails"></div>`;
-    bindFilters();
-  }
-  function bindFilters(){
-    const search = document.getElementById("cleanPaySearch");
-    const status = document.getElementById("cleanPayStatus");
-    const type = document.getElementById("cleanPayType");
-    if (search && !search.dataset.bound) {
-      search.dataset.bound = 1;
-      search.addEventListener("input", () => { stateLocal.search = search.value; stateLocal.page = 1; render(); });
-    }
-    if (status && !status.dataset.bound) {
-      status.dataset.bound = 1;
-      status.addEventListener("change", () => { stateLocal.status = status.value; stateLocal.page = 1; render(); });
-    }
-    if (type && !type.dataset.bound) {
-      type.dataset.bound = 1;
-      type.addEventListener("change", () => { stateLocal.type = type.value; stateLocal.page = 1; render(); });
-    }
+      <div id="apsPayoutDetails" class="aps-payout-details"></div>`;
   }
   function detail(id){
-    const m = rows().find(x => String(x.id) === String(id));
-    const root = document.getElementById("cleanPayDetails");
-    if (!root || !m) return;
-    root.innerHTML = `<div class="card clean-pay-detail">
-      <div class="clean-pay-detail-head">
-        <div><span>PAYOUT DETAILS</span><h3>${m.type} Method</h3><p>${m.userEmail || m.userId || "-"}</p></div>
-        ${badge(m.status)}
+    const m=rows().find(x=>String(x.id)===String(id));
+    const root=document.getElementById("apsPayoutDetails") || document.getElementById("adminPayoutDetails");
+    if(!root || !m) return;
+    root.innerHTML=`<div class="card aps-detail-card">
+      <div class="aps-detail-head"><div><span>PAYOUT DETAILS</span><h3>${m.type} Method</h3><p>${m.userEmail||m.userId||"-"}</p></div>${badge(m.status)}</div>
+      <div class="aps-detail-grid">
+        <div><span>Type</span><b>${m.type}</b></div><div><span>Method</span><b>${mask(m)}</b></div>
+        <div><span>Holder Name</span><b>${m.holderName||"-"}</b></div><div><span>KYC Name</span><b>${m.kycName||"-"}</b></div>
+        <div><span>Name Match</span><b>${norm(m.holderName)===norm(m.kycName)?"YES":"NO"}</b></div><div><span>Date</span><b>${m.createdAt||"-"}</b></div>
       </div>
-      <div class="clean-pay-detail-grid">
-        <div><span>Type</span><b>${m.type}</b></div>
-        <div><span>Method</span><b>${mask(m)}</b></div>
-        <div><span>Holder Name</span><b>${m.holderName || "-"}</b></div>
-        <div><span>KYC Name</span><b>${m.kycName || "-"}</b></div>
-        <div><span>Name Match</span><b>${norm(m.holderName) === norm(m.kycName) ? "YES" : "NO"}</b></div>
-        <div><span>Date</span><b>${m.createdAt || "-"}</b></div>
-      </div>
-      <div class="clean-pay-detail-actions">
-        ${m.status === "PENDING" ? `<button class="approve-btn" onclick="approvePayoutMethod('${m.id}')">Approve</button><button class="reject-btn" onclick="rejectPayoutMethod('${m.id}')">Reject</button>` : `<span class="clean-pay-locked">Action Locked</span>`}
-        <button class="clean-pay-delete" onclick="deletePayoutMethod('${m.id}')">Delete Method</button>
+      <div class="aps-detail-actions">
+        ${m.status==="PENDING" ? `<button class="approve-btn" onclick="approvePayoutMethod('${m.id}')">Approve</button><button class="reject-btn" onclick="rejectPayoutMethod('${m.id}')">Reject</button>` : `<span class="aps-locked">Action Locked</span>`}
+        <button class="aps-delete-btn" onclick="deletePayoutMethod('${m.id}')">Delete Method</button>
       </div>
     </div>`;
   }
-  async function setStatus(id, status){
-    const m = state.userPayoutMethods?.find(x => String(x.id) === String(id));
-    if (m) m.status = status;
-    const db = client();
-    if (db) {
-      try {
-        let res = await db.from("user_payout_methods").update({ status, reviewed_at:new Date().toISOString() }).eq("id", id);
-        if (res.error) await db.from("user_payout_methods").update({ status }).eq("id", id);
-      } catch(e){}
-    }
-    save();
-    render();
-    setTimeout(() => detail(id), 60);
+  async function setStatus(id,x){
+    const m=state.userPayoutMethods?.find(v=>String(v.id)===String(id)); if(m) m.status=x;
+    const db=c(); if(db){ try{ let r=await db.from("user_payout_methods").update({status:x,reviewed_at:new Date().toISOString()}).eq("id",id); if(r.error) await db.from("user_payout_methods").update({status:x}).eq("id",id); }catch(e){} }
+    save(); render(); setTimeout(()=>detail(id),50);
   }
   async function del(id){
-    if (!confirm("Delete this payout method? User can add a new method again.")) return;
-    state.userPayoutMethods = (state.userPayoutMethods || []).filter(m => String(m.id) !== String(id));
-    state.payoutMethods = state.userPayoutMethods;
-    const db = client();
-    if (db) {
-      try { await db.from("user_payout_methods").delete().eq("id", id); } catch(e){}
+    if(!confirm("Delete this payout method? User can add a new method again.")) return;
+    state.userPayoutMethods=(state.userPayoutMethods||[]).filter(m=>String(m.id)!==String(id));
+    state.payoutMethods=state.userPayoutMethods;
+    const db=c(); if(db){ try{ await db.from("user_payout_methods").delete().eq("id",id); }catch(e){} }
+    save(); render();
+  }
+  function content(){
+    const el=document.getElementById("apsContent");
+    return el;
+  }
+  function render(){
+    const el=content();
+    if(el && document.body.classList.contains("aps-page-open")) {
+      const title=document.getElementById("apsTitle");
+      const label=document.getElementById("apsLabel");
+      if(title && title.textContent.toLowerCase().includes("payout")) {
+        title.textContent="Payout Method Requests";
+        if(label) label.textContent="User Security";
+        el.innerHTML=table();
+        bind();
+      }
     }
-    save();
-    render();
+  }
+  function bind(){
+    const s=document.getElementById("apsPayoutSearch"), stSel=document.getElementById("apsPayoutStatus"), ty=document.getElementById("apsPayoutType");
+    if(s&&!s.dataset.bound){s.dataset.bound=1; s.addEventListener("input",()=>{ps.search=s.value; ps.page=1; render();});}
+    if(stSel&&!stSel.dataset.bound){stSel.dataset.bound=1; stSel.addEventListener("change",()=>{ps.status=stSel.value; ps.page=1; render();});}
+    if(ty&&!ty.dataset.bound){ty.dataset.bound=1; ty.addEventListener("change",()=>{ps.type=ty.value; ps.page=1; render();});}
   }
   function patch(){
-    window.viewPayoutDetails = detail;
-    window.approvePayoutMethod = (id) => setStatus(id, "APPROVED");
-    window.rejectPayoutMethod = (id) => setStatus(id, "REJECTED");
-    window.deletePayoutMethod = del;
-    window.openCleanAdminPayoutPage = showPage;
-    window.renderPayoutStableTable = render;
+    window.viewPayoutDetails=detail;
+    window.approvePayoutMethod=(id)=>setStatus(id,"APPROVED");
+    window.rejectPayoutMethod=(id)=>setStatus(id,"REJECTED");
+    window.deletePayoutMethod=del;
+    window.renderPayoutStableTable=render;
+  }
+  document.addEventListener("click",function(e){
+    const pg=e.target.closest("[data-aps-page]");
+    if(pg){ ps.page += pg.dataset.apsPage==="next" ? 1 : -1; render(); return; }
+    const btn=e.target.closest("[data-admin-stable-pay]");
+    if(btn && btn.dataset.adminStablePay==="payout"){ setTimeout(()=>load().then(render),120); setTimeout(render,700); }
+  },true);
+  function boot(){ patch(); load().then(render); }
+  document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,1000));
+  window.addEventListener("load",()=>{setTimeout(boot,1200);setTimeout(()=>load().then(render),2500);});
+})();
+
+
+/* ===== ADMIN PAYOUT TABLE SAFETY RERENDER ===== */
+(function(){
+  function rerenderPayoutTable(){
+    try { window.renderPayoutStableTable?.(); } catch(e){}
   }
   document.addEventListener("click", function(e){
-    const btn = e.target.closest("[data-clean-admin-pay]");
-    if (btn && btn.dataset.cleanAdminPay === "payout") {
-      e.preventDefault();
-      e.stopPropagation();
-      showPage();
-      return;
-    }
-    const oldBtn = e.target.closest("[data-admin-stable-pay]");
-    if (oldBtn && oldBtn.dataset.adminStablePay === "payout") {
-      e.preventDefault();
-      e.stopPropagation();
-      showPage();
-      return;
-    }
-    const pg = e.target.closest("[data-clean-pay-page]");
-    if (pg) {
-      stateLocal.page += pg.dataset.cleanPayPage === "next" ? 1 : -1;
-      render();
+    const btn = e.target.closest("[data-admin-stable-pay]");
+    if (btn && btn.dataset.adminStablePay === "payout") {
+      setTimeout(rerenderPayoutTable, 180);
+      setTimeout(rerenderPayoutTable, 700);
+      setTimeout(rerenderPayoutTable, 1400);
     }
   }, true);
-
-  function boot(){
-    if (!isAdmin()) return;
-    patch();
-    ensureButton();
-    ensurePage();
-    load();
-  }
-  document.addEventListener("DOMContentLoaded", () => setTimeout(boot, 900));
-  window.addEventListener("load", () => { setTimeout(boot, 900); setTimeout(load, 2500); });
+  window.addEventListener("load", () => setTimeout(rerenderPayoutTable, 1600));
 })();

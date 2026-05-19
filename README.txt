@@ -1196,17 +1196,11 @@ Payout Stable Page Table Override Final:
 - JS syntax check: OK
 
 
-Admin Old Conflict Removed:
-- Removed old conflicting admin payout card renderer:
-  * ADMIN PAYMENT STABLE PAGE FIX
-  * PAYOUT STABLE PAGE TABLE OVERRIDE FINAL
-- Added clean admin payout page shell:
-  * Payout Method Requests button
-  * Search/status/type filters
-  * 5-record pagination
-  * View, Approve, Reject, Delete
-  * Approved/Rejected show Locked + Delete
-- Kept final KYC table/filter/pagination module.
-- Kept user KYC wizard and user payment DB save module.
-- Removed: [{"marker": "ADMIN PAYMENT STABLE PAGE FIX", "js_removed": 1, "css_removed": 1}, {"marker": "ADMIN KYC REQUESTS RENDER FIX", "js_removed": 0, "css_removed": 0}, {"marker": "PAYOUT STABLE PAGE TABLE OVERRIDE FINAL", "js_removed": 1, "css_removed": 1}]
+Admin Restore Stable Payout Table:
+- Restored from stable ZIP before old admin conflict removal.
+- Important: ADMIN PAYMENT STABLE PAGE FIX is kept because it controls the admin payout/payment page shell.
+- Payout table override is kept on top of that shell.
+- Removed bad clean shell if present: [{"marker": "CLEAN ADMIN PAYOUT PAGE SHELL FINAL", "js_removed": 0, "css_removed": 0}]
+- Checks: {"ADMIN PAYMENT STABLE PAGE FIX": true, "PAYOUT STABLE PAGE TABLE OVERRIDE FINAL": true, "ADMIN KYC PAYOUT TABLES FILTER PAGINATION FINAL": true, "KYC STEP WIZARD FINAL": true, "PAYMENT METHOD SINGLE OWNER DB SAVE V2": true}
+- Added safety rerender so payout table overrides old card renderer after opening.
 - JS syntax check: OK
