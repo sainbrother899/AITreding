@@ -1295,3 +1295,11 @@ Professional Wallet Rebuild Final:
 - Keeps existing DB/state data.
 - Removed old wallet patches: [{"marker": "WALLET RESTORE VISIBLE SAFE FIX", "js": 1, "css": 1}, {"marker": "WALLET ONLY BALANCE CARDS SHOW FIX", "js": 1, "css": 1}, {"marker": "WALLET TOP CARDS AND BUTTON TEXT FIX", "js": 1, "css": 1}, {"marker": "WALLET HISTORY CARDS HIDE TOP FIX", "js": 1, "css": 1}, {"marker": "WALLET BUTTONS TOP POSITION FIX", "js": 0, "css": 1}, {"marker": "OLD WALLET REMOVED SINGLE OWNER FINAL", "js": 1, "css": 1}]
 - JS syntax check: OK
+
+
+Wallet Minimum Limits Fix:
+- Minimum deposit changed to ₹500.
+- Minimum withdrawal changed to ₹2,000.
+- Withdrawal still cannot exceed withdrawable balance.
+- Only wallet validation/text changed.
+- JS syntax check: OK

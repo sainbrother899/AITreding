@@ -538,7 +538,7 @@ async function submitDeposit() {
   if (!state.user) return toast("Login required.");
   const amount = Number(String($("depositAmount")?.value || "").replace(/,/g, ""));
   const txn = String($("depositTxn")?.value || "").replace(/\D/g, "").slice(0, 12);
-  if (!amount || amount < 1000) return alert("Minimum deposit ₹1000 है.");
+  if (!amount || amount < 1000) return alert("Minimum deposit ₹5000 है.");
   if (!/^\d{12}$/.test(txn)) return alert("UTR exactly 12 digit होना चाहिए.");
   const dupLocal = (state.depositRequests || []).some(d => String(d.txn) === txn);
   if (dupLocal) return alert("Duplicate UTR");
@@ -1134,7 +1134,7 @@ async function depositSubmitNoIdHard() {
     const txn = depositHardUtr();
 
     if (!amount || amount < 1000) {
-      alert("Minimum deposit ₹1000 hai.");
+      alert("Minimum deposit ₹5000 hai.");
       return false;
     }
 
@@ -8344,7 +8344,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
     const cfg = settings();
     const qr = cfg.upiQr ? `<img class="pro-wallet-qr" src="${cfg.upiQr}" alt="UPI QR">` : `<div class="pro-wallet-qr empty">QR<br>Not Set</div>`;
 
-    if (ui.depStep === 1) return `<div class="pro-wallet-panel">${progress("deposit",1)}<h3>Enter Amount</h3><label>Deposit Amount<input id="proDepAmount" type="number" min="100" value="${ui.depAmount||""}" placeholder="Enter amount"></label><p>Minimum deposit ₹100. Deposit only from your own KYC verified account.</p><button id="proDepNext1">Next</button></div>`;
+    if (ui.depStep === 1) return `<div class="pro-wallet-panel">${progress("deposit",1)}<h3>Enter Amount</h3><label>Deposit Amount<input id="proDepAmount" type="number" min="500" value="${ui.depAmount||""}" placeholder="Enter amount"></label><p>Minimum deposit ₹500. Deposit only from your own KYC verified account.</p><button id="proDepNext1">Next</button></div>`;
     if (ui.depStep === 2) return `<div class="pro-wallet-panel">${progress("deposit",2)}<h3>Select Payment Mode</h3><div class="pro-wallet-mode"><button class="${ui.depMode==="UPI"?"active":""}" data-pro-dep-mode="UPI">UPI / QR</button><button class="${ui.depMode==="BANK"?"active":""}" data-pro-dep-mode="BANK">Bank Transfer</button></div><div class="pro-wallet-actions"><button id="proDepBack2">Back</button><button id="proDepNext2">Next</button></div></div>`;
     if (ui.depStep === 3 && ui.depMode === "UPI") return `<div class="pro-wallet-panel">${progress("deposit",3)}<h3>Pay via UPI</h3><div class="pro-wallet-pay">${qr}<div><span>UPI ID</span><b>${cfg.upiId}</b><button data-pro-copy="${cfg.upiId}">Copy UPI</button><span>Holder Name</span><b>${cfg.upiHolder}</b><span>Amount</span><b>${money(ui.depAmount)}</b></div></div><div class="pro-wallet-actions"><button id="proDepBack3">Back</button><button id="proDepNext3">I Have Paid</button></div></div>`;
     if (ui.depStep === 3) return `<div class="pro-wallet-panel">${progress("deposit",3)}<h3>Pay via Bank Transfer</h3><div class="pro-wallet-bank"><div><span>Bank Name</span><b>${cfg.bankName}</b></div><div><span>Account Holder</span><b>${cfg.bankHolder}</b></div><div><span>Account Number</span><b>${cfg.accountNumber}</b></div><div><span>IFSC</span><b>${cfg.ifsc}</b></div><button data-pro-copy="${cfg.bankName} | ${cfg.bankHolder} | ${cfg.accountNumber} | ${cfg.ifsc}">Copy Bank Details</button></div><div class="pro-wallet-actions"><button id="proDepBack3">Back</button><button id="proDepNext3">I Have Paid</button></div></div>`;
@@ -8359,7 +8359,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
     const selected = methods.find(m => m.id === ui.witMethodId) || methods[0];
     const w = walletData();
 
-    if (ui.witStep === 1) return `<div class="pro-wallet-panel">${progress("withdraw",1)}<h3>Enter Withdrawal Amount</h3><label>Withdrawal Amount<input id="proWitAmount" type="number" min="1" value="${ui.witAmount||""}" placeholder="Enter amount"></label><p>Withdrawable balance: ${money(w.withdrawable)}</p><button id="proWitNext1">Next</button></div>`;
+    if (ui.witStep === 1) return `<div class="pro-wallet-panel">${progress("withdraw",1)}<h3>Enter Withdrawal Amount</h3><label>Withdrawal Amount<input id="proWitAmount" type="number" min="2000" value="${ui.witAmount||""}" placeholder="Enter amount"></label><p>Minimum withdrawal ₹2,000 • Withdrawable balance: ${money(w.withdrawable)}</p><button id="proWitNext1">Next</button></div>`;
     if (ui.witStep === 2) return `<div class="pro-wallet-panel">${progress("withdraw",2)}<h3>Select Payout Method</h3><div class="pro-wallet-methods">${methods.map(m=>`<button class="${m.id===ui.witMethodId?'active':''}" data-pro-wit-method="${m.id}"><b>${m.type}</b><span>${methodLabel(m)}</span><small>${m.holderName||""}</small></button>`).join("")}</div><div class="pro-wallet-actions"><button id="proWitBack2">Back</button><button id="proWitNext2">Next</button></div></div>`;
     if (ui.witStep === 3) return `<div class="pro-wallet-panel">${progress("withdraw",3)}<h3>Review Request</h3><div class="pro-wallet-summary"><div><span>Amount</span><b>${money(ui.witAmount)}</b></div><div><span>Method</span><b>${methodLabel(selected)}</b></div><div><span>Holder</span><b>${selected.holderName||"-"}</b></div></div><div class="pro-wallet-actions"><button id="proWitBack3">Back</button><button id="proWitNext3">Next</button></div></div>`;
     return `<div class="pro-wallet-panel">${progress("withdraw",4)}<h3>Submit Withdrawal</h3><p>Your withdrawal request will be reviewed by admin.</p><div class="pro-wallet-actions"><button id="proWitBack4">Back</button><button id="proWitSubmit">Submit Withdrawal Request</button></div></div>`;
@@ -8381,7 +8381,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
     document.querySelectorAll("[data-pro-wit-method]").forEach(btn => btn.addEventListener("click", () => { ui.witMethodId = btn.dataset.proWitMethod; renderWallet(); }));
 
     const on = (id, fn) => { const el=document.getElementById(id); if(el) el.addEventListener("click", fn); };
-    on("proDepNext1", () => { const v=Number(document.getElementById("proDepAmount")?.value||0); if(v<100) return alert("Minimum deposit amount is ₹100."); ui.depAmount=v; ui.depStep=2; renderWallet(); });
+    on("proDepNext1", () => { const v=Number(document.getElementById("proDepAmount")?.value||0); if(v<500) return alert("Minimum deposit amount is ₹500."); ui.depAmount=v; ui.depStep=2; renderWallet(); });
     on("proDepBack2", () => { ui.depStep=1; renderWallet(); });
     on("proDepNext2", () => { ui.depStep=3; renderWallet(); });
     on("proDepBack3", () => { ui.depStep=2; renderWallet(); });
@@ -8389,7 +8389,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
     on("proDepBack4", () => { ui.depStep=3; renderWallet(); });
     on("proDepSubmit", submitDeposit);
 
-    on("proWitNext1", () => { const v=Number(document.getElementById("proWitAmount")?.value||0); const w=walletData(); if(v<=0) return alert("Enter valid withdrawal amount."); if(v>w.withdrawable) return alert("Amount is greater than withdrawable balance."); ui.witAmount=v; ui.witStep=2; renderWallet(); });
+    on("proWitNext1", () => { const v=Number(document.getElementById("proWitAmount")?.value||0); const w=walletData(); if(v<2000) return alert("Minimum withdrawal amount is ₹2,000."); if(v>w.withdrawable) return alert("Amount is greater than withdrawable balance."); ui.witAmount=v; ui.witStep=2; renderWallet(); });
     on("proWitBack2", () => { ui.witStep=1; renderWallet(); });
     on("proWitNext2", () => { if(!ui.witMethodId) return alert("Select payout method."); ui.witStep=3; renderWallet(); });
     on("proWitBack3", () => { ui.witStep=2; renderWallet(); });
@@ -8537,4 +8537,11 @@ function restoreManualHistoryBackup(mode = state.mode) {
   }
   document.addEventListener("DOMContentLoaded", () => setTimeout(boot,900));
   window.addEventListener("load", () => { setTimeout(boot,900); setTimeout(boot,2500); });
+})();
+
+
+/* ===== WALLET MIN DEPOSIT WITHDRAWAL LIMITS FINAL ===== */
+(function(){
+  window.WALLET_MIN_DEPOSIT = 500;
+  window.WALLET_MIN_WITHDRAWAL = 2000;
 })();
