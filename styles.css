@@ -6517,3 +6517,104 @@ body.app-mode .menu-owned-page.active-page {
 .wallet-tabs-final{
   margin-top:0!important;
 }
+
+
+/* ===== WALLET TOP CARDS AND BUTTON TEXT FIX ===== */
+
+/* Keep wallet top balance cards visible */
+#wallet .card:has(#walletPageBalance),
+#wallet .card:has(#withdrawableAmountText),
+#wallet .card:has(#approvedDepositText),
+#wallet .card:has(#pendingWithdrawalText),
+#walletPage .card:has(#walletPageBalance),
+#walletPage .card:has(#withdrawableAmountText),
+#walletPage .card:has(#approvedDepositText),
+#walletPage .card:has(#pendingWithdrawalText){
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  height:auto!important;
+  min-height:unset!important;
+  max-height:none!important;
+  margin:initial;
+  padding:initial;
+  pointer-events:auto!important;
+}
+
+/* Button contrast fix */
+.wallet-tabs-final button,
+.wallet-flow-final button,
+.wallet-actions-final button,
+.wallet-mode-final button,
+.wallet-methods-final button,
+.wallet-pay-final button,
+.wallet-bank-final button{
+  color:#f4f7ff!important;
+  background:rgba(255,255,255,.08)!important;
+  border:1px solid rgba(255,255,255,.14)!important;
+  text-shadow:none!important;
+  opacity:1!important;
+  font-weight:950!important;
+}
+
+.wallet-tabs-final button.active,
+.wallet-mode-final button.active,
+.wallet-methods-final button.active{
+  background:linear-gradient(135deg,#f8bd7a,#ffd89c)!important;
+  color:#07111f!important;
+  border-color:rgba(248,189,122,.55)!important;
+}
+
+.wallet-flow-final > button,
+.wallet-actions-final button:last-child,
+#depNext1Final,
+#depNext2Final,
+#depNext3Final,
+#depSubmitFinal,
+#witNext1Final,
+#witNext2Final,
+#witNext3Final,
+#witSubmitFinal{
+  background:linear-gradient(135deg,#f8bd7a,#ffd89c)!important;
+  color:#07111f!important;
+  border:1px solid rgba(248,189,122,.55)!important;
+  box-shadow:0 10px 24px rgba(248,189,122,.16)!important;
+}
+
+.wallet-actions-final button:first-child,
+#depBack2Final,
+#depBack3Final,
+#depBack4Final,
+#witBack2Final,
+#witBack3Final,
+#witBack4Final{
+  background:rgba(255,255,255,.09)!important;
+  color:#f4f7ff!important;
+  border:1px solid rgba(255,255,255,.14)!important;
+}
+
+.wallet-flow-final button[disabled],
+.wallet-actions-final button[disabled]{
+  background:rgba(255,255,255,.12)!important;
+  color:#9fb2d0!important;
+  opacity:.7!important;
+  box-shadow:none!important;
+}
+
+/* Input text readability */
+.wallet-flow-final input,
+.wallet-flow-final select,
+.wallet-flow-final textarea{
+  color:#f4f7ff!important;
+  background:rgba(5,12,24,.72)!important;
+  border:1px solid rgba(255,255,255,.14)!important;
+}
+
+.wallet-flow-final input::placeholder{
+  color:#7f90ad!important;
+}
+
+/* Keep history hidden only for legacy top cards */
+.wallet-old-history-hidden{
+  display:none!important;
+}

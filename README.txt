@@ -1256,3 +1256,11 @@ Wallet History Cards Hide Top Fix:
 - History appears only inside the new History tab.
 - Wallet logic/admin/KYC/payout untouched.
 - JS syntax check: OK
+
+
+Wallet Top Cards and Button Text Fix:
+- Force shows Available Balance / Withdrawable / Approved Deposit / Pending Withdrawal cards.
+- Keeps old history cards hidden.
+- Fixes Deposit/Withdrawal wizard button contrast and readable text.
+- Only CSS/position safety changed; wallet logic/admin/KYC untouched.
+- JS syntax check: OK
