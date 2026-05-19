@@ -1248,3 +1248,11 @@ Wallet Buttons Top Position Fix:
 - Wallet logic untouched.
 - Admin/KYC/Payout untouched.
 - JS syntax check: OK
+
+
+Wallet History Cards Hide Top Fix:
+- Old top Deposit History / Withdrawal History cards are hidden from main wallet page.
+- Deposit / Withdrawal / History tabs stay directly below wallet overview cards.
+- History appears only inside the new History tab.
+- Wallet logic/admin/KYC/payout untouched.
+- JS syntax check: OK

@@ -8073,6 +8073,19 @@ function restoreManualHistoryBackup(mode = state.mode) {
 
 
 /* ===== OLD WALLET REMOVED SINGLE OWNER FINAL ===== */
+
+function hideLegacyWalletHistoryCardsFinal(){
+  const page = document.getElementById("wallet") || document.getElementById("walletPage");
+  if (!page) return;
+  page.querySelectorAll(".card").forEach(card => {
+    const txt = (card.textContent || "").toLowerCase();
+    if ((txt.includes("your deposit history") || txt.includes("your withdrawal history")) && !card.closest("#walletSingleOwner")) {
+      card.classList.add("wallet-old-hidden", "wallet-old-history-hidden");
+      card.style.display = "none";
+    }
+  });
+}
+
 (function(){
   const DEP_TABLE = "deposit_requests";
   const WIT_TABLE = "withdrawal_requests";
@@ -8265,6 +8278,7 @@ function restoreManualHistoryBackup(mode = state.mode) {
       updateTopCards();
       ["depositModal","withdrawModal"].forEach(id => { const el=document.getElementById(id); if(el) el.remove(); });
 
+      hideLegacyWalletHistoryCardsFinal?.();
       let container = document.getElementById("walletSingleOwner");
       if (!container) {
         container = document.createElement("div");
@@ -8556,4 +8570,89 @@ function restoreManualHistoryBackup(mode = state.mode) {
   }
   document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,900));
   window.addEventListener("load",()=>{setTimeout(boot,900);setTimeout(boot,2500);});
+})();
+
+
+/* ===== WALLET HISTORY CARDS HIDE TOP FIX ===== */
+(function(){
+  function walletPage(){
+    return document.getElementById("wallet") || document.getElementById("walletPage");
+  }
+
+  function isHistoryCard(card){
+    const txt = (card?.textContent || "").toLowerCase();
+    return (
+      txt.includes("your deposit history") ||
+      txt.includes("your withdrawal history") ||
+      (txt.includes("deposit requests") && txt.includes("no records")) ||
+      (txt.includes("withdrawal requests") && txt.includes("no records"))
+    );
+  }
+
+  function hideOldHistoryCards(){
+    const page = walletPage();
+    if (!page) return;
+    page.querySelectorAll(".card").forEach(card => {
+      if (isHistoryCard(card) && !card.closest("#walletSingleOwner")) {
+        card.classList.add("wallet-old-hidden", "wallet-old-history-hidden");
+        card.style.display = "none";
+      }
+    });
+  }
+
+  function moveWalletOwnerTop(){
+    const page = walletPage();
+    const box = document.getElementById("walletSingleOwner");
+    if (!page || !box) return;
+
+    hideOldHistoryCards();
+
+    // Find the last real top balance/overview card before old histories.
+    const cardById = [
+      document.getElementById("pendingWithdrawalText")?.closest(".card"),
+      document.getElementById("approvedDepositText")?.closest(".card"),
+      document.getElementById("withdrawableAmountText")?.closest(".card"),
+      document.getElementById("walletPageBalance")?.closest(".card")
+    ].filter(Boolean);
+
+    let anchor = cardById[0] || null;
+
+    if (!anchor) {
+      const visibleCards = Array.from(page.querySelectorAll(".card"))
+        .filter(card => !card.classList.contains("wallet-old-hidden") && !isHistoryCard(card));
+      anchor = visibleCards[Math.min(visibleCards.length - 1, 3)] || visibleCards[0] || null;
+    }
+
+    if (anchor && anchor.nextElementSibling !== box) {
+      anchor.insertAdjacentElement("afterend", box);
+    } else if (!anchor && page.firstElementChild !== box) {
+      page.insertAdjacentElement("afterbegin", box);
+    }
+
+    box.style.marginTop = "14px";
+  }
+
+  function fix(){
+    hideOldHistoryCards();
+    moveWalletOwnerTop();
+  }
+
+  document.addEventListener("click", function(e){
+    const text = (e.target?.textContent || "").toLowerCase();
+    const page = e.target.closest("[data-page]")?.dataset?.page || "";
+    if (page === "wallet" || text.includes("wallet") || text.includes("deposit") || text.includes("withdraw") || text.includes("history")) {
+      setTimeout(fix, 80);
+      setTimeout(fix, 500);
+      setTimeout(fix, 1200);
+    }
+  }, true);
+
+  document.addEventListener("DOMContentLoaded", () => setTimeout(fix, 1200));
+  window.addEventListener("load", () => {
+    setTimeout(fix, 1000);
+    setTimeout(fix, 2500);
+    setTimeout(fix, 4500);
+  });
+
+  window.fixWalletTopLayout = fix;
 })();

@@ -6492,3 +6492,28 @@ body.app-mode .menu-owned-page.active-page {
   padding: 0!important;
   overflow: hidden!important;
 }
+
+
+/* ===== WALLET HISTORY CARDS HIDE TOP FIX ===== */
+.wallet-old-history-hidden,
+.wallet-old-hidden.wallet-old-history-hidden{
+  display:none!important;
+  height:0!important;
+  min-height:0!important;
+  max-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  overflow:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+#walletSingleOwner{
+  margin-top:14px!important;
+  margin-bottom:18px!important;
+}
+
+.wallet-tabs-final{
+  margin-top:0!important;
+}
