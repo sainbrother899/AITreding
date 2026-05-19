@@ -1194,3 +1194,19 @@ Payout Stable Page Table Override Final:
 - Approved/Rejected: Locked/Delete.
 - Delete removes user_payout_methods row and user can add a new method again.
 - JS syntax check: OK
+
+
+Admin Old Conflict Removed:
+- Removed old conflicting admin payout card renderer:
+  * ADMIN PAYMENT STABLE PAGE FIX
+  * PAYOUT STABLE PAGE TABLE OVERRIDE FINAL
+- Added clean admin payout page shell:
+  * Payout Method Requests button
+  * Search/status/type filters
+  * 5-record pagination
+  * View, Approve, Reject, Delete
+  * Approved/Rejected show Locked + Delete
+- Kept final KYC table/filter/pagination module.
+- Kept user KYC wizard and user payment DB save module.
+- Removed: [{"marker": "ADMIN PAYMENT STABLE PAGE FIX", "js_removed": 1, "css_removed": 1}, {"marker": "ADMIN KYC REQUESTS RENDER FIX", "js_removed": 0, "css_removed": 0}, {"marker": "PAYOUT STABLE PAGE TABLE OVERRIDE FINAL", "js_removed": 1, "css_removed": 1}]
+- JS syntax check: OK
