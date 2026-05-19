@@ -6731,3 +6731,68 @@ body.app-mode .menu-owned-page.active-page {
   .pro-wallet-pay{grid-template-columns:1fr!important;}
   .pro-wallet-qr{width:100%!important;height:220px!important;}
 }
+
+
+/* ===== USER SIDE BLANK SCROLL FIX ===== */
+html,
+body{
+  min-height:100%!important;
+  height:auto!important;
+  overscroll-behavior-y:none!important;
+  overflow-x:hidden!important;
+}
+
+body{
+  margin:0!important;
+}
+
+#app{
+  min-height:100vh!important;
+  overflow-x:hidden!important;
+}
+
+/* Prevent full-page rubber/blank overscroll on user pages */
+.page,
+.app-shell,
+.main{
+  overscroll-behavior-y:none!important;
+}
+
+/* User dashboard/app should not create extra blank height below content */
+.app-shell{
+  min-height:100vh!important;
+  align-items:start!important;
+}
+
+.main{
+  min-height:100vh!important;
+  padding-bottom:24px!important;
+}
+
+/* Desktop sidebar stays full height without pushing page longer */
+.sidebar{
+  min-height:100vh!important;
+}
+
+/* Remove large empty margins created by last sections/cards */
+.main > *:last-child,
+.page > *:last-child,
+.container > *:last-child{
+  margin-bottom:0!important;
+}
+
+/* Mobile: sidebar should not force extra document height */
+@media(max-width:900px){
+  .app-shell{
+    min-height:auto!important;
+  }
+  .sidebar{
+    min-height:auto!important;
+    height:auto!important;
+    position:relative!important;
+  }
+  .main{
+    min-height:auto!important;
+    padding-bottom:18px!important;
+  }
+}
