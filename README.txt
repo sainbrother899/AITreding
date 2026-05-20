@@ -1,1352 +1,213 @@
-AI Trading Clean Core Rebuild
-
-UI/design same rakha gaya hai.
-app.js clean rebuild hai, duplicate/old patch logic remove kiya gaya hai.
-
-Core tested logic:
-- Login/Register
-- Demo/Real mode
-- Deposit submit with 12 digit UTR + duplicate check
-- Admin deposit approve/reject
-- Real wallet ledger
-- Withdrawal request + approve
-- Manual trade unlimited
-- Admin managed trade
-- Mass trade
-- Closed trade history
-- AI/Admin daily plan limit
-- First approved deposit referral bonus = 10%
-- KYC basic submit
-- Plan editor
-
-SQL:
-Run supabase-schema.sql once in Supabase SQL Editor.
-
-
-DB Compatibility Fix:
-- Fixed bigint id error by not sending string IDs to deposit_requests/withdrawal_requests when inserting.
-- Added fallback for other tables: if bigint id error happens, insert is retried without id.
-- Added SQL compatibility patch for missing metadata columns.
-- Keep UI/design same.
-- JS syntax check: OK
-
-
-Deposit Bigint Hard Fix:
-- Deposit submit now captures click before old handlers.
-- Supabase insert never sends id to deposit_requests.
-- Old submitDeposit/submitDepositFinal/createDepositRequest aliases overridden.
-- 12 digit UTR validation and duplicate check kept.
-- If same error appears, browser is still serving old cached app.js.
-- JS syntax check: OK
-
-
-No dep_ ID + Cache Fix:
-- Removed remaining dep_ ID generation from app.js.
-- Added Supabase deposit_requests insert monkey patch: it strips id before insert even if old handler runs.
-- index/admin now load app.js?v=clean20260518a to avoid old cache.
-- Added no-cache meta tags.
-- JS syntax check: OK
-
-
-Stable Restore:
-- Removed chart/withdrawal patch that caused blank balance/history/live rates.
-- Restored last stable working core.
-- Added cache-bust app.js?v=stableRestore20260518.
-- No SQL required.
-- JS syntax check: OK
-
-
-Targeted Fix:
-- Added internal live chart renderer for crypto_live_chart/tradingViewChart/chartContainer.
-- Added orderBook renderer.
-- Added recentFills/tradeFeed renderer.
-- Added missing openHistoryPageFinal function.
-- Deposit/wallet/trade core logic untouched.
-- No SQL required.
-- JS syntax check: OK
-
-
-Real Chart + Fast PnL Fix:
-- Removed fallback chart.
-- Chart area now loads real TradingView iframe immediately.
-- Pair change reloads TradingView symbol.
-- Price/PnL/wallet/history refresh runs every 1 second.
-- Order book and trade feed still populate, but chart is real TradingView.
-- No SQL required.
-- JS syntax check: OK
-
-
-Leverage 2000x Update:
-- Leverage dropdown now includes 1x, 5x, 10x, 25x, 50x, 100x, 250x, 500x, 1000x, 1500x, 2000x.
-- Trade PnL calculation uses selected leverage.
-- Safety max leverage set to 2000x.
-- No SQL required.
-- JS syntax check: OK
-
-
-Auto Liquidation Update:
-- Open manual trades are checked every 1 second.
-- If loss reaches trade amount, trade auto closes as LIQUIDATED.
-- Final PnL is capped at -trade amount.
-- Extra negative wallet balance is prevented.
-- REAL liquidation loss is saved into wallet_ledger as TRADE_PNL.
-- DEMO liquidation also moves trade to history.
-- No SQL required.
-- JS syntax check: OK
-
-
-Admin Trade Advanced Options Update:
-- Admin managed trade now has Order Type: Market / Limit.
-- Market order auto-fills live market price.
-- Limit order allows custom entry price.
-- Admin managed trade now has leverage 1x to 2000x.
-- Selected user's wallet/available amount is shown before trade.
-- Trade amount cannot exceed selected user's wallet.
-- Admin managed PnL calculation now supports leverage.
-- No SQL required.
-- JS syntax check: OK
-
-
-Plan Buy From Wallet Update:
-- User plan purchase now deducts plan price from Real Wallet.
-- If wallet balance is insufficient, plan purchase is blocked.
-- Plan becomes active immediately after wallet deduction.
-- wallet_ledger entry type = PLAN_PURCHASE with negative amount.
-- payment_requests history is saved as PAID/WALLET.
-- User profile plan is updated in Supabase.
-- SQL patch included for missing columns.
-- JS syntax check: OK
-
-
-Admin Stability Fix:
-- Admin page body marked as data-admin-page.
-- Admin tabs/panels stable render.
-- Deposit/withdrawal logs render safely.
-- Managed/mass trade logs and selectors render safely.
-- User wallet preview renders safely.
-- Plan, referral, payment, KYC logs render safely if their table bodies exist.
-- Admin desktop layout fixed to prevent shifting.
-- SQL optional columns added for admin tables if missing.
-- JS syntax check: OK
-
-
-User Wallet Percent AI Trade Update:
-- User side AI Trade Settings added: 25%, 50%, 75%, 100%.
-- User can turn Auto Admin Trade ON/OFF.
-- Admin Bulk/Mass trade can use each user's selected wallet percentage.
-- Default bulk mode: Use user selected wallet %.
-- Each user's trade amount = user's Real Wallet * selected percentage.
-- Users are skipped if auto OFF, AI daily limit complete, wallet low, or amount below ₹100.
-- SQL patch adds profiles.ai_trade_percent and profiles.auto_trade_permission.
-- JS syntax check: OK
-
-
-Admin Refresh Session Fix:
-- admin.html is hard-marked with window.FORCE_ADMIN_PAGE = true.
-- Admin page refresh now restores ai_admin_session_v1.
-- Admin page will not open user/demo dashboard after refresh.
-- Guest/demo login blocked on admin page.
-- User session is separated from admin session.
-- No SQL required.
-- JS syntax check: OK
-
-
-AI Trade Text + Placement Fix:
-- User-facing Admin Trade wording changed to AI Trade.
-- Auto Admin Trade changed to Auto AI Trade.
-- AI percentage settings card is placed only inside Trade page.
-- Dashboard/landing visibility is hidden for AI percentage card if duplicated by old HTML.
-- Logic untouched.
-- JS syntax check: OK
-
-
-Admin Bulk/Open Only Update:
-- Admin trade area simplified to only two options:
-  1) Bulk AI Trade
-  2) Open AI Trades
-- Generic Trades tab hidden.
-- Old Single/Managed trade form hidden.
-- Bulk panel close block hidden; close/cancel is handled in Open AI Trades.
-- User side untouched.
-- No SQL required.
-- JS syntax check: OK
-
-
-Bulk Leverage + Close All AI Trades Update:
-- Bulk AI Trade panel now shows Order Type and Leverage 1x to 2000x.
-- Open AI Trades panel now has Close All Open AI Trades.
-- Open AI Trades panel now has Cancel All Open AI Trades.
-- Close All uses typed close price, or live market price if blank.
-- PnL calculation includes leverage.
-- No SQL required.
-- JS syntax check: OK
-
-
-Admin Leverage Force Fix:
-- Leverage field is now force-injected into Bulk AI Trade panel by JavaScript.
-- Order Type and Leverage are visible even if HTML placement fails.
-- Open Bulk AI Trade bridges selected leverage/order type into existing trade logic.
-- No SQL required.
-- JS syntax check: OK
-
-
-Direct Admin Leverage Fix:
-- Leverage and Order Type are now directly written inside admin.html Bulk AI Trade form.
-- Removed unreliable force-injection block.
-- Bulk trade click stores selected leverage/order type before opening trade.
-- No SQL required.
-- JS syntax check: OK
-
-
-Admin Users Panel Update:
-- Added Users tab to admin panel.
-- User list includes name/email, plan, wallet, deposits, P/L+bonus, AI %, AI used/limit, status.
-- User detail card with wallet summary.
-- Admin can change plan, AI trade percent, AI ON/OFF, Active/Blocked.
-- Admin can Add/Deduct wallet balance with ledger note.
-- SQL patch included for optional columns.
-- JS syntax check: OK
-
-
-Admin Users Force Visible Fix:
-- Users tab and panel are now created by JavaScript if missing from admin.html.
-- This fixes issue where Users option did not appear on admin panel.
-- User list, wallet, plan, AI %, status, AI ON/OFF, and wallet adjustment included.
-- Cache-busted admin app.js.
-- SQL patch included for optional columns.
-- JS syntax check: OK
-
-
-Admin Users Hard Insert:
-- Users tab is directly inserted into admin.html inside the existing admin tabs.
-- Users panel is directly inserted before existing admin panels and active by default.
-- Previous force panel JS removed.
-- Includes user list, wallet, plan, AI %, AI ON/OFF, active/block, wallet adjustment.
-- Cache bust added.
-- SQL optional patch included.
-- JS syntax check: OK
-
-
-Admin Users Menu Exact Fix:
-- Fixed previous mistake: Users tab was inserted above login page, not inside real admin controls.
-- Users tab is now inserted inside .admin-menu before Overview.
-- Wrong top-level Users tab removed.
-- Users panel exists inside admin-content.
-- Alias bridge supports old/new Users panel element IDs.
-- Verification: has_in_menu=True, has_top_wrong=False, has_panel=True
-- JS syntax check: OK
-
-
-Premium Mobile UI Polish:
-- Home ticker converted to clean coin cards.
-- Account mode redesigned: clickable Demo/Real cards, duplicate old switch hidden.
-- AI trades today gets progress bar.
-- Wallet/history tables get mobile card layout to remove horizontal scrollbars.
-- Wallet note shortened.
-- PnL page gets performance overview card and mini trend chart.
-- Bottom navigation safe padding/overlap fix.
-- Global premium dark card polish.
-- Logic/Supabase/Admin functionality untouched.
-- No SQL required.
-- JS syntax check: OK
-
-
-Premium UI Stable Layout Fix:
-- Removed previous dynamic UI insertion that caused layout jumping/shifting.
-- Added stable CSS-only polish.
-- Fixed page width and overflow-x.
-- Bottom nav fixed safely without overlap.
-- Tables scroll only inside their own container.
-- Cards have stable spacing and no layout animation.
-- Ticker grid stable.
-- No logic/Supabase changes.
-- No SQL required.
-- JS syntax check: OK
-
-
-Home Header + Account Cleanup:
-- Logout button is forced visible in user header.
-- Hello/Welcome card moves to top of dashboard.
-- Duplicate Demo/Real switch buttons and Switch Account text hidden.
-- Demo/Real balance cards become clickable.
-- AI/AI Trades Today card hidden.
-- Ticker cards get readable line spacing.
-- Wallet long note shortened.
-- No logic/Supabase changes.
-- No SQL required.
-- JS syntax check: OK
-
-
-User UI Structure Clean Rebuild:
-- Removed previous dynamic patch blocks that caused duplicate/moving layout.
-- User home now gets a fixed clean shell:
-  Header + direct Logout, Hello/Account Mode, clean ticker cards, stat cards, AI signal card.
-- Original home clutter is hidden only in dashboard area.
-- Demo/Real duplicate buttons removed from visible UI; account cards are clickable.
-- AI/AI Trades Today card removed from home view.
-- Wallet note shortened.
-- Tables converted to mobile card lists for history/deposit/withdrawal while keeping desktop tables.
-- Admin/Supabase/trade/deposit logic untouched.
-- No SQL required.
-- JS syntax check: OK
-
-
-Trade Page Positions + Chart Fix:
-- Manual/user live trades now render in Trade page under Open Positions.
-- Each open manual trade card shows coin, side, leverage, amount, entry, live price, live PnL, and Close Trade button.
-- AI Trade Settings/percentage control is moved to bottom of Home page.
-- Trade page chart is enlarged.
-- AI/Bulk trades remain admin-managed; manual trades remain user-closeable.
-- No SQL required.
-- JS syntax check: OK
-
-
-Home AI Control Visible Fix:
-- AI Trade Control card is force-rendered at bottom of Home/cleanHomeShell.
-- Old trade-page AI control card remains hidden.
-- Percent buttons 25/50/75/100 update user setting.
-- Auto AI Trade toggle updates user setting.
-- No SQL required.
-- JS syntax check: OK
-
-
-Home AI Control No-Blink + Modern Toggle:
-- Removed blinking force-render block.
-- AI Control card is created/mounted once only.
-- Updates are value-only every 3 seconds, no DOM rebuild.
-- Auto AI Trade checkbox replaced with modern toggle switch UI.
-- 25/50/75/100 buttons remain functional.
-- No SQL required.
-- JS syntax check: OK
-
-
-AI Control Permanent Fix:
-- Removed old Trade Page Positions + Home AI Settings block that was repeatedly moving/hiding AI Control.
-- Re-added only manual open positions and big chart logic, without touching AI Control.
-- Added visibility guard so Home AI Control cannot be hidden by old classes.
-- Fixes AI Control appearing/disappearing repeatedly.
-- Previous old block removed: True
-- No SQL required.
-- JS syntax check: OK
-
-
-AI Control Home Only Final Fix:
-- Removed previous AI control moving/visibility blocks.
-- Original Trade page AI percentage card is force-hidden.
-- Only one Home AI Control card is created and kept visible.
-- Duplicate Home AI Control cards are removed automatically.
-- Modern toggle retained.
-- No SQL required.
-- JS syntax check: OK
-
-
-AI Control Old Code Removed:
-- Removed old AI Control HTML card from index.html.
-- Removed old AI Control JS blocks and CSS blocks.
-- Added one clean Home-only AI Control implementation.
-- Old aiTradePercentGrid in index: False
-- app aiTradePercentGrid references: 1 (only defensive cleanup expected)
-- app homeAiTradeControlCard refs: 4
-- Removed HTML blocks count: 1
-- No SQL required.
-- JS syntax check: OK
-
-
-Old UI Code Cleaned:
-- Removed old useless UI patch blocks from app.js.
-- Removed old AI Control HTML/card from index.html if present.
-- Removed obsolete CSS patch blocks.
-- Kept core logic, Supabase, trade, wallet, deposit, admin features untouched.
-- Kept one clean Home-only AI Control implementation.
-- Verification: {'index_has_old_ai_grid': False, 'app_old_ai_grid_refs': 1, 'app_old_ui_markers_left': [], 'css_old_markers_left': [], 'removed_js_blocks': ['Admin mass trade advanced field bridge', 'Admin page guest/demo guard'], 'removed_css_blocks': ['ADMIN BULK LEVERAGE FORCE VISIBLE UI'], 'removed_func_count': 0, 'removed_html_count': 0}
-- No SQL required.
-- JS syntax check: OK
-
-
-AI Control Blink Root Fix:
-- Root cause found: cleanHomeShell was being rebuilt every 1.5s using innerHTML.
-- That rebuild was deleting the AI Control card and recreating it, causing blinking.
-- Stopped repeated home shell rebuild interval.
-- AI Control card is now appended outside cleanHomeShell, so it remains stable.
-- Added guard to move card out if cached/old render puts it inside rebuilt shell.
-- interval_replaced=True
-- ctarget_replaced=True
-- No SQL required.
-- JS syntax check: OK
-
-
-Home Rate Live + Static Shell Fix:
-- Home shell now builds once and does not rebuild with innerHTML repeatedly.
-- Home rate cards update values every 1 second.
-- Old ticker/rate strip outside cleanHomeShell is hidden, including rate strip between AI Signal and Live Position.
-- Demo/Real balances, Today PnL, Signal fields update without rebuilding cards.
-- AI Control remains stable outside rebuilt shell.
-- No SQL required.
-- JS syntax check: OK
-
-
-Floating Live Position Bar:
-- One-line floating manual position bar added above bottom nav.
-- Shows only when user has open manual/live trade.
-- Shows coin, BUY/SELL, leverage, total live PnL, and Close button.
-- Profit is green everywhere; loss is red everywhere.
-- Multiple open trades show Positions count and total PnL.
-- AI/admin trades are not user-closeable from this bar.
-- No SQL required.
-- JS syntax check: OK
-
-
-Global Profit/Loss Color Fix:
-- Profit / positive PnL is green across the app.
-- Loss / negative PnL is red across the app.
-- Applies to Home, PnL page, History, Wallet/ledger records, Open Positions, Floating live position bar, and admin/user tables.
-- Runs after render so dynamic values also update color.
-- No SQL required.
-- JS syntax check: OK
-
-
-Floating Bar Size Polish:
-- Floating live position bar width/height increased slightly.
-- Text, PnL amount, and Close button are larger and more readable.
-- Still remains one-line compact bar above bottom navigation.
-- No logic changes.
-- No SQL required.
-- JS syntax check: OK
-
-
-Manual History Stability Fix:
-- Manual closed trade PnL is now frozen at close time.
-- updateTradePnl() no longer recalculates CLOSED trade PnL.
-- closeTrade() now stores close price/current price and pnlFrozen=true.
-- Manual closed trades are backed up separately in localStorage per user + mode.
-- render()/saveState()/history restore from backup if state gets overwritten.
-- Manual history should no longer disappear after a short time/render refresh.
-- Patched updateTradePnl: True
-- Patched closeTrade: True
-- Patched renderHistory: True
-- No SQL required.
-- JS syntax check: OK
-
-
-Safe Old Code Cleanup:
-- Removed obsolete UI-only patch blocks and old duplicate AI-control code.
-- Kept active stable user UI, live rates, home-only AI control, floating bar, manual positions, global P/L color, and manual history stability.
-- Core logic, Supabase, trade, wallet, deposit, admin users, and bulk trade functions are untouched.
-- Cleanup summary: {"app_js_removed_chars": 10194, "css_removed_chars": 3303, "removed_js_blocks": ["ADMIN USERS HARD INSERT LOGIC"], "removed_css_blocks": ["ADMIN USERS FORCE VISIBLE PANEL UI", "ADMIN USERS HARD INSERT UI"], "removed_old_ai_html": 0, "removed_orphan_functions": 0, "required_active_blocks": {"USER UI STRUCTURE CLEAN REBUILD": true, "HOME RATE LIVE + STATIC SHELL FIX": true, "CLEAN HOME AI CONTROL ONLY": true, "TRADE PAGE OPEN POSITIONS + BIG CHART ONLY": true, "FLOATING LIVE POSITION BAR": true, "GLOBAL PROFIT LOSS COLOR FIX": true, "MANUAL TRADE HISTORY PERMANENT BACKUP": true}, "syntax": "OK"}
-
-
-Final Stability Pack:
-- Manual trade history now has local backup + optional Supabase manual_trades permanent save/load.
-- Closed manual trade PnL remains frozen; it will not keep changing with live price.
-- closeTrade wrapper saves closed REAL manual trades to Supabase manual_trades when table exists.
-- Demo manual history stays local only.
-- Global P/L color scanner throttled to reduce load.
-- Floating bar refresh reduced slightly to reduce mobile lag while staying live.
-- Current UI and admin features kept.
-- SQL patch included for manual_trades table. Run it once in Supabase for permanent cross-device manual history.
-- setInterval count after pack: 21
-- Markers: {"final_pack": true, "manual_table_sql": true, "global_color": true, "floating_bar": true, "home_static": true}
-- JS syntax check: OK
-
-
-Old UI Flash Safe Fix:
-- Non-destructive fix: old Home HTML was NOT removed.
-- App is hidden briefly during refresh until Clean Home UI is ready, preventing old UI flash.
-- Clean UI renderer is triggered early after load.
-- Safety fallback shows app after 2.5 seconds even if clean UI fails, so no blank page.
-- Existing logic/UI/features untouched.
-- No SQL required.
-- Summary: {"boot_script_added": true, "boot_style_added": true, "runtime_guard_added": true, "syntax": "OK"}
-
-
-Duplicate Home Header Removed:
-- Removed the duplicate clean Home header from the generated Home shell.
-- Top/original app header remains visible.
-- Only red-circled duplicate "AI Trading Assistant + Logout" inside Home content is removed.
-- Home cards, account cards, rate cards, AI Control, floating bar, trade/wallet/admin logic untouched.
-- No SQL required.
-- Summary: {"removed_exact_header_blocks": 0, "removed_fallback_header_blocks": 2, "syntax": "OK"}
-
-
-Clean Top Header Menu:
-- Top header changed to: ☰  AI Trading Assistant  Sain Brother.
-- Confusing 3-dot button removed/replaced by clear menu icon.
-- Menu opens Home, Trade, Wallet, PnL, History, Logout.
-- Duplicate Home header remains removed.
-- No SQL required.
-- JS syntax check: OK
-
-
-Trade Chart Bigger Fix:
-- Trade chart height increased.
-- Mobile chart height around 495-510px.
-- Desktop/tablet chart height around 540px.
-- Chart card spacing optimized.
-- No trade logic changes.
-- No SQL required.
-- JS syntax check: OK
-
-
-Trade Cards Wider Fix:
-- Trade page cards widened by reducing side padding.
-- Chart card and order ticket use more screen width.
-- Inputs/selects/buttons remain full-width and balanced.
-- Home/Wallet/Admin unchanged.
-- No SQL required.
-- JS syntax check: OK
-
-
-Trade Page Clean Chart + Order:
-- Removed/hid duplicate custom timeframe row above chart.
-- Removed/hid duplicate outer live price/rate above chart.
-- Chart uses freed space and is larger.
-- "Place Simulation Order" changed to "Place Buy/Sell Order".
-- SIM badge hidden.
-- Removed "Simulation only. Real exchange order/API is not connected." warning.
-- Order ticket spacing compacted.
-- No SQL required.
-- JS syntax check: /mnt/data/AI-Trading-Trade-Page-Clean-Chart-Order/app.js:4399
-        if (/^Place Buy/Sell Order$/i.test(txt)) {
-            ^
-
-SyntaxError: Invalid regular expression flags
-[90m    at wrapSafe (node:internal/modules/cjs/loader:1662:18)[39m
-[90m    at checkSyntax (node:internal/main/check_syntax:
-
-
-Syntax Fix:
-- Fixed regex escape for Buy/Sell order title.
-- JS syntax check: OK
-
-
-Order Book + Trade Feed Restore Fix:
-- Restored Order Book and Trade Feed sections if previous cleanup hid them.
-- Removed overly broad CSS that hid generic chart card rows.
-- Only exact duplicate timeframe buttons stay hidden.
-- Chart cleanup, order title, SIM warning removal remain.
-- No SQL required.
-- JS syntax check: OK
-
-
-Trade Page Visibility Fix:
-- Fixes issue where full Trade page appears on Home/Wallet/PnL/History.
-- Trade page is now visible only when Trade tab/page is active.
-- Home, Wallet, PnL, History, Plans, More remain separate pages.
-- Floating live position bar still works across pages.
-- No SQL required.
-- JS syntax check: OK
-
-
-Trade Exact Structure Fix:
-- Read actual Trade page structure before patching.
-- Removed duplicate pro-pair-line live price row from index.
-- Removed duplicate pro-time-tabs timeframe row from index.
-- Replaced TradingView renderer to remove extra chart header/price above iframe.
-- Runtime moves Order Ticket and Order Book/Trade Feed outside chart card as separate cards.
-- Chart card now contains only compact title + actual chart.
-- Order Book and Trade Feed forced visible.
-- Place Buy/Sell Order remains.
-- No SQL required.
-- Removed blocks: {"pro_pair_line": 1, "pro_time_tabs": 1}
-- Replaced chart function: True
-- JS syntax check: OK
-
-
-TradingView Chart Height Responsive Fix:
-- Fixes chart bottom getting cut off.
-- Chart parent/card and iframe now use the same responsive viewport-based height.
-- Uses visualViewport where available to handle mobile browser address bars.
-- Removes max-height/clipping and sets overflow visible on chart card/host.
-- Overrides older fixed height CSS that could crop the bottom toolbar/price scale.
-- Order Ticket, Order Book, Trade Feed untouched.
-- No SQL required.
-- JS syntax check: OK
-
-
-TradingView Chart Bigger Box Fix:
-- Reverted the previous viewport-shrink height logic that made the chart box smaller.
-- Chart box is now bigger: mobile 620px, tablet 660px, desktop 700px.
-- Parent card, chart host, and iframe all use the same height to prevent bottom cut-off.
-- Order Ticket, Order Book, Trade Feed untouched.
-- No SQL required.
-- JS syntax check: OK
-
-
-TradingView Responsive Chart Fix:
-- Removed fixed px chart box logic that made the box too big.
-- Added responsive chart height using clamp() + dvh/vh.
-- Chart host and iframe use matched responsive height.
-- Mobile height is balanced around 410-540px depending on screen.
-- Desktop/tablet can grow to 680px.
-- Order Ticket, Order Book, Trade Feed untouched.
-- No SQL required.
-- JS syntax check: OK
-
-
-TradingView Full Fit Final:
-- Removed conflicting previous chart sizing blocks: ['TRADINGVIEW RESPONSIVE CHART FIX', 'TRADE PAGE CLEAN CHART + ORDER TEXT']
-- Final hierarchy fixed: card auto height, chart host responsive height, iframe 100% height.
-- Chart height is responsive via visualViewport/window size, not fixed px.
-- Prevents giant empty box while keeping TradingView bottom axis/controls visible.
-- Duplicate outer rate/timeframe/header hidden.
-- Order Ticket, Order Book, Trade Feed untouched.
-- No SQL required.
-- JS syntax check: OK
-
-
-Chart CSS Conflict Cleanup Final:
-- Removed old conflicting chart sizing blocks: ['TRADINGVIEW FULL FIT FINAL']
-- Added one final chart sizing system that controls card/host/iframe together.
-- Neutralizes old 330/360/520/fixed-height chart rules with final selectors.
-- Chart card: auto height + overflow visible.
-- Chart host: responsive height + no max-height clipping.
-- iframe: exact same height as host.
-- Duplicate outer chart controls hidden; TradingView internal controls remain visible.
-- Order Ticket / Order Book / Trade Feed untouched.
-- No SQL required.
-- Diagnostics: {"removed_blocks": ["TRADINGVIEW FULL FIT FINAL"], "remaining_crypto_live_chart_mentions": 21, "remaining_520px_mentions": 21, "remaining_330px_mentions": 10, "remaining_360px_mentions": 7, "syntax": "OK"}
-
-
-Chart Important Override Fix:
-- Previous fix did not apply because older !important chart heights were still winning.
-- Removed earlier chart sizing blocks and added a stronger final override.
-- Final CSS no longer depends on body[data-active-page="trade"].
-- JS uses style.setProperty(..., "important") to override old CSS !important.
-- #crypto_live_chart, its iframe, and parent card now receive the same final responsive height.
-- Duplicate outer timeframe/live price rows remain hidden.
-- Order Ticket / Order Book / Trade Feed untouched.
-- No SQL required.
-- Diagnostics: {"syntax": "OK", "styles_crypto_mentions": 23, "app_has_important_fix": true, "css_has_important_fix": true}
-
-
-PC Same As Mobile Layout:
-- Uses the uploaded mobile-working base.
-- PC/Desktop no longer uses separate desktop grid layout.
-- On screens 900px+, the app is shown in a centered mobile-width shell.
-- Mobile below 900px is untouched.
-- This keeps the same layout that works on mobile and prevents PC desktop grid issues.
-- Chart logic untouched.
-- Wallet/Trade/Home/History all use same mobile-style structure on PC.
-- No SQL required.
-- JS syntax check: OK
-
-
-Wallet Safe Minimal Fix:
-- Built from the last stable mobile/PC same-as-mobile base, not the broken Wallet Clean Update.
-- No duplicate Wallet Overview card added.
-- Existing wallet card remains.
-- walletPageBalance now shows Real Wallet + Open PnL.
-- Withdrawal history colspan fixed to 5 columns and account/UPI column included.
-- Adds only a small Available for Withdrawal note in existing wallet card.
-- Adds withdrawal modal available amount note if modal exists.
-- Adds deposit screenshot note only.
-- Existing deposit/withdrawal history tables remain working.
-- No SQL required.
-- Patched balance line: True
-- Patched withdrawal log: True
-- JS syntax check: OK
-
-
-Wallet History Big Cards:
-- Deposit and Withdrawal history now render as full-width big mobile cards.
-- Uses correct app sources: state.depositRequests / state.withdrawalRequests, with fallback to state.deposits / state.withdrawals.
-- Old tiny table/mobile cards are hidden on mobile and PC-same-mobile shell.
-- Card layout matches Trade history style: large amount, status badge, details rows.
-- Existing wallet balance/withdrawable minimal fix remains untouched.
-- No SQL required.
-- JS syntax check: OK
-
-
-Wallet History Only New Cards:
-- Keeps the new big Deposit/Withdrawal history cards visible.
-- Hides old wallet history tables and old generated small cards.
-- Existing wallet balance/withdrawable logic untouched.
-- Mobile layout untouched except old duplicate history hidden.
-- No SQL required.
-- JS syntax check: OK
-
-
-Menu KYC Profile Referral Fix:
-- Top header menu no longer repeats bottom nav options.
-- Menu options are now: Profile, KYC Verification, Referral, My Payment Methods, Support, Logout.
-- Added lightweight menu detail panels for these items.
-- Bottom nav remains for Home, Trade, Wallet, PnL, History.
-- No SQL required.
-- JS syntax check: OK
-- Replaced existing menu HTML: True
-
-
-Menu Full Pages Fix:
-- Menu options now open full-page views, not small popups.
-- Added full pages for Profile, KYC, Referral, My Payment Methods, and Support.
-- My Payment Methods includes Add Method form with UPI/Bank fields and Pending status.
-- KYC page has basic submit form and pending status handling.
-- Referral page has copy link button.
-- Back button closes the full page.
-- Bottom nav remains separate for Home/Trade/Wallet/PnL/History.
-- No SQL required for this UI/local-state version.
-- JS syntax check: OK
-
-
-Menu Real Pages Final:
-- Removed temporary injected full-page panel behavior.
-- Added real HTML sections in index.html:
-  profilePage, kycPage, referralPage, paymentMethodsPage, supportPage.
-- Menu click now opens actual page sections, similar to bottom nav pages.
-- Pages are mobile-friendly and match app card style.
-- Profile/KYC/Referral/Payment Methods/Support each has proper page content.
-- My Payment Methods supports UPI/Bank add form with Pending status in local state.
-- Bottom nav pages remain Home/Trade/Wallet/PnL/History.
-- No SQL required for this local/UI version.
-- JS syntax check: OK
-
-
-Menu Pages Stay + Header Flash Fix:
-- Fixes menu real pages closing immediately and returning to Home.
-- Page visibility logic now respects Profile/KYC/Referral/Payment Methods/Support pages.
-- Menu pages stay open until Back or bottom nav is clicked.
-- Added early header boot hide so old top header does not flash on refresh.
-- Clean header becomes visible after JS applies the clean header.
-- No SQL required.
-- JS syntax check: OK
-
-
-Payment KYC Admin Approval Final:
-- Payment method add now requires KYC Approved.
-- Account holder name is auto-filled from KYC/name and locked.
-- User-added payout method saves as PENDING.
-- Withdrawal UI is blocked unless user has an APPROVED payout method.
-- Withdrawal form shows only approved payout methods where possible.
-- Admin section added: Payout Method Requests.
-- Admin can Approve/Reject payout methods.
-- Admin request card shows Holder Name, KYC Name, and Name Match warning.
-- Admin section added: Payment Settings for deposit UPI/Bank details.
-- User wallet shows admin deposit payment settings where possible.
-- Data is local-state/localStorage for now; no SQL required in this UI version.
-- JS syntax check: OK
-
-
-Admin PC Layout Restore:
-- Fixes admin panel being affected by user PC same-as-mobile layout.
-- User side PC/mobile layout remains unchanged.
-- Admin page on PC uses full-width dashboard layout again.
-- Admin sidebar/content grid restored where available.
-- Admin cards/tables no longer forced to 430px mobile width.
-- Admin Payment Settings and Payout Method Requests layout improved for desktop.
-- Bottom nav/floating user bar hidden on admin PC.
-- No SQL required.
-- JS syntax check: OK
-
-
-Admin Payment Tabs Fix:
-- Payment Settings and Payout Method Requests no longer stay appended at bottom.
-- Added admin menu/sidebar buttons:
-  - Payout Method Requests
-  - Payment Settings
-- Clicking these buttons opens their section like other admin options.
-- New payment sections stay hidden until clicked.
-- Clicking any normal admin option hides payment sections again.
-- Existing admin layout restore remains included.
-- No SQL required.
-- JS syntax check: OK
-
-
-Admin Payment Menu Force Fix:
-- Stronger injection for admin menu/sidebar buttons.
-- Adds buttons:
-  - Payout Method Requests
-  - Payment Settings
-- If sidebar selector fails, creates Admin Payment Quick Menu at top as fallback.
-- Payment sections remain hidden until button click.
-- Normal admin menu click hides payment sections again.
-- Existing admin/payment logic retained.
-- No SQL required.
-- JS syntax check: OK
-
-
-Admin Payment Sections Stay Fix:
-- Fixes Payment Settings / Payout Method Requests opening then disappearing after a few seconds.
-- Keeps the selected payment admin section locked open until another normal admin option is clicked.
-- Uses localStorage/adminActiveSection to survive old admin render intervals.
-- Payment panels stay hidden by default until clicked.
-- Payout Method Requests and Payment Settings inner content remains visible.
-- No SQL required.
-- JS syntax check: OK
-
-
-Admin Payment No Flicker Fix:
-- Removed previous Admin Payment Sections Stay interval block that caused hide/unhide flicker.
-- Payment sections now open once and remain stable.
-- No fast 500ms show/hide interval.
-- Normal admin option click closes payment section.
-- Payout Method Requests / Payment Settings content should no longer blink every second.
-- Removed JS stay block count: 1
-- Removed CSS stay block count: 1
-- No SQL required.
-- JS syntax check: OK
-
-
-Admin Payment Stable Page Fix:
-- Removed conflicting admin payment tab/menu/flicker scripts: ['ADMIN PAYMENT NO FLICKER FIX', 'ADMIN PAYMENT MENU FORCE FIX', 'ADMIN PAYMENT TABS FIX']
-- Payment Settings and Payout Method Requests now open in a stable full-page admin panel.
-- Admin sidebar/menu buttons remain, and quick-menu fallback remains.
-- Older inline panels are hidden permanently to prevent 2-second disappear/flicker issue.
-- Payout approvals and payment settings save in local state/localStorage.
-- User-side design untouched.
-- No SQL required.
-- JS syntax check: OK
-
-
-KYC Document Upload Fix:
-- Added document upload fields to KYC page:
-  - ID/PAN/Aadhaar front
-  - ID/Aadhaar back
-  - Selfie verification
-  - Address proof optional
-- KYC submit now saves text details + selected documents in local/browser state.
-- Uploaded document status shows as Uploaded / Not uploaded.
-- KYC status becomes PENDING after submission.
-- This is local UI/browser storage for testing. Production needs Supabase Storage/DB or secure backend storage.
-- User/admin design untouched except KYC upload block.
-- No SQL required for this local test version.
-- JS syntax check: OK
-
-
-DB Connected KYC + Payout Update:
-- KYC form now uploads document files to Supabase Storage bucket: kyc-documents.
-- KYC text/details save to public.kyc_requests.
-- Uploaded document metadata saves to public.kyc_documents.
-- User payout methods save to public.user_payout_methods.
-- Admin approve/reject updates user_payout_methods in DB.
-- Admin Payment Settings save/load from public.payment_settings.
-- User Wallet deposit details load from DB payment_settings.
-- Added SQL patch file: supabase-db-connected-kyc-payout.sql
-- Also appended same SQL patch to supabase-schema.sql.
-- Important: Run SQL in Supabase SQL Editor before testing DB upload.
-- Policies are permissive for testing; production should use Supabase Auth + stricter RLS.
-- JS syntax check: OK
-
-
-KYC Bigint ID Fix:
-- Fixed error: invalid input syntax for type bigint: "kyc_<timestamp>".
-- KYC request id now uses numeric Date.now() instead of text id.
-- This matches existing kyc_requests.id bigint column.
-- No new SQL required for this fix.
-- JS syntax check: OK
-
-
-KYC RLS + Storage Upload Fix:
-- Storage upload no longer uses upsert:true. It now uses upsert:false.
-- This avoids needing broad SELECT/UPDATE policies on storage.objects.
-- KYC document file_url no longer depends on public URL; file_path is saved for later signed URL admin view.
-- Included SQL: supabase-rls-temporary-testing-fix.sql
-- That SQL temporarily disables RLS on app tables for testing and keeps Storage insert-only.
-- JS syntax check: OK
-
-
-Admin KYC Existing Table Bind Fix:
-- Design locked: no new admin page, no overlay, no quick menu, no sidebar/header/layout changes.
-- Binds Supabase kyc_requests data into the existing KYC Management table shown in admin.
-- Uses existing columns: User, Name, Doc Type, Doc No., Files, Status, Action.
-- Approve/Reject buttons update kyc_requests.status in DB.
-- Includes fallback if table is div/grid based instead of tbody.
-- JS syntax check: OK
-
-
-Admin KYC Stable Renderer Fix:
-- Root cause fixed: old adminRenderAllSafe interval called adminRenderKycSafe every 1.2s and emptied/re-rendered the table.
-- Now adminRenderKycSafe is overridden to render DB-cache rows.
-- Same HTML is not rewritten every second, so blinking should stop.
-- No new page, no overlay, no sidebar/header/layout design changes.
-- KYC rows still load from Supabase DB and approve/reject updates DB.
-- JS syntax check: OK
-
-
-Admin KYC Duplicate Rows Fix:
-- Same user/email KYC rows are de-duplicated in admin KYC table.
-- If any request for that user is APPROVED, the approved row is shown.
-- If none are approved, the latest row is shown.
-- Prevents multiple repeated rows from previous test submissions.
-- Existing admin KYC design/layout unchanged.
-- Approve button becomes disabled text when row is already approved.
-- JS syntax check: OK
-
-
-KYC Approve Reject Lock Fix:
-- Admin KYC row action buttons are hidden/locked after APPROVED or REJECTED.
-- This prevents repeatedly changing KYC status from the same row.
-- User KYC page behavior:
-  - APPROVED: form hidden, shows "Your KYC Approved" card only.
-  - PENDING: form hidden, shows under-review card.
-  - REJECTED: form remains available for resubmission.
-- Submit is blocked if user is already APPROVED or PENDING.
-- Design/layout/sidebar/header untouched; only KYC state logic and small status cards added.
-- JS syntax check: OK
-
-
-Payment Method Select Stable Fix:
-- Fixes My Payment Methods method type resetting from Bank Account back to UPI.
-- Selected type is preserved while user edits the form.
-- Bank fields stay visible when Bank Account is selected.
-- UPI field hides when Bank Account is selected.
-- Design/layout/sidebar/header untouched.
-- JS syntax check: OK
-
-
-Payment Method Limit + Warning Fix:
-- User can add maximum 2 UPI IDs and 2 Bank Accounts.
-- Add button is disabled when selected method type limit is reached.
-- Warning text changed to: YOUR PAYMENT METHOD NAME SHOULD MATCH KYC NAME. DON'T USE OTHER ACCOUNT. IF YOU USE OTHER ACCOUNT, YOUR ACCOUNT MAY BE SUSPENDED.
-- Existing design/layout/sidebar/header untouched.
-- JS syntax check: OK
-
-
-Payment Method Combined Strong Fix:
-- Removed earlier weaker payment select/limit scripts to avoid conflicts.
-- Fixes Bank Account selection resetting back to UPI.
-- Preserves selected payment type with localStorage + mutation observer + renderer patch.
-- Adds max limit: 2 UPI IDs and 2 Bank Accounts.
-- Blocks submit when selected type limit is reached.
-- Replaces/adds warning text:
-  YOUR PAYMENT METHOD NAME SHOULD MATCH KYC NAME. DON'T USE OTHER ACCOUNT. IF YOU USE OTHER ACCOUNT, YOUR ACCOUNT MAY BE SUSPENDED.
-- Design/layout/sidebar/header untouched.
-- JS syntax check: OK
-
-
-Payment Method No Blink + One Warning Fix:
-- Removed previous payment method scripts that caused blinking/repeated DOM rewrites.
-- No MutationObserver and no fast interval.
-- Warning appears only once above the form.
-- Old duplicate warning/note texts are removed/hidden.
-- Bank/UPI selection remains stable.
-- Max 2 UPI IDs and max 2 Bank Accounts limit remains.
-- Design/layout/sidebar/header untouched.
-- JS syntax check: OK
-
-
-Clean Logic Locked Base:
-- Cleaned only conflicting KYC/Admin-KYC/Payment-Methods patch blocks.
-- Did NOT touch chart, trade page, home page, wallet history, P&L, history, bottom nav, header/sidebar layout.
-- Added one consolidated KYC + Payment Methods logic block.
-- KYC admin table: DB cache render, de-duplicate rows, no blinking, approve/reject locked after final status.
-- User KYC page: Approved/Pending hides form, Rejected allows resubmit.
-- Payment Methods: stable UPI/BANK selection, one warning only, max 2 UPI + 2 Bank.
-- Removed old patch markers: [{"marker": "ADMIN KYC STABLE RENDERER FIX", "js": 1, "css": 1}, {"marker": "KYC APPROVE REJECT LOCK FIX", "js": 1, "css": 1}, {"marker": "PAYMENT METHOD NO BLINK ONE WARNING FIX", "js": 1, "css": 1}]
-- JS syntax check: OK
-
-
-My Payment Methods Final Stable Fix:
-- Checked ZIP and added a standalone stable renderer for My Payment Methods only.
-- Does not touch chart/trade/home/wallet/P&L/history.
-- Payment Methods page is rendered once as stable form, preventing old renderer from resetting UPI/BANK.
-- Bank/UPI selection stays stable.
-- Warning appears once.
-- Max 2 UPI IDs and max 2 Bank Accounts.
-- KYC-approved name is locked as holder name.
-- Saves method locally and attempts DB upsert into user_payout_methods.
-- JS syntax check: OK
-
-
-User My Payment Methods Clean Final:
-- User-side My Payment Methods page now has its own clean stable renderer.
-- This directly replaces the old user payment method content when that page opens.
-- Admin code is not the focus here; Trade/Chart/Home/Wallet/P&L/History untouched.
-- Bank/UPI select stable.
-- Warning only once.
-- Max 2 UPI IDs and max 2 Bank Accounts.
-- KYC name locked in holder field.
-- Saves locally and tries DB upsert into user_payout_methods.
-- JS syntax check: OK
-
-
-User Payment Methods Old Code Removed Final:
-- Removed previous user-side payment method patch blocks.
-- Renamed old payment form IDs/select IDs so old event handlers don't catch them.
-- Neutralized only old paymentMethodsPage renderer path; chart/trade/home/wallet/P&L/history untouched.
-- One final clean payment renderer now controls My Payment Methods.
-- UPI/Bank selection stable.
-- Warning only once.
-- Max 2 UPI IDs + max 2 Bank Accounts.
-- KYC name locked as account holder.
-- Saves local + upserts to user_payout_methods.
-- Removed payment markers: [{"marker": "USER MY PAYMENT METHODS CLEAN FINAL", "js": 1, "css": 1}]
-- JS syntax check: OK
-
-
-KYC + Payment Route Lock Final:
-- Route-level lock added for user-side KYC and My Payment Methods.
-- When paymentMethodsPage is active, old payment renderer is prevented from overwriting final UI.
-- When kycPage is active, final KYC status card/form state is reapplied if old UI appears.
-- MutationObserver watches only for route overwrite and restores KYC/Payment pages.
-- Design/header/sidebar/trade/chart/home/wallet/P&L/history untouched.
-- Payment Methods: stable UPI/BANK, one warning, 2 UPI + 2 Bank limit, DB upsert.
-- KYC: approved/pending hides form, rejected allows resubmit.
-- Removed previous user payment patch blocks: [{"marker": "USER PAYMENT METHODS OLD CODE REMOVED FINAL", "js": 1, "css": 1}]
-- JS syntax check: OK
-
-
-Mobile Payment Input Preserve Fix:
-- Fixes mobile Payment Methods form clearing while typing.
-- Cause: route-lock/observer re-rendered page on mobile keyboard/input DOM changes.
-- Preserves input/select values while user is typing.
-- Blocks payment page re-render during active input editing.
-- Restores values if old renderer clears fields.
-- Submit still works and clears after successful submit.
-- Chart/trade/home/wallet/P&L/history untouched.
-- JS syntax check: OK
-
-
-KYC + Payment + Referral Clean Module Final:
-- Stable ZIP design kept.
-- Original app.js backed up as app-design-base-backup.js.
-- Removed only previously added KYC/payment patch blocks by markers, not design/chart/trade/wallet render functions.
-- Added one clean module that owns:
-  * User KYC page
-  * My Payment Methods page
-  * Referral page
-  * Admin KYC approve/reject handlers
-  * Admin payout method approve/reject handlers
-- Old full app.js was NOT replaced.
-- Home/Trade/Chart/Wallet/P&L/History/card/menu design untouched.
-- Removed markers: [{"marker": "CLEAN KYC + PAYMENT LOGIC LOCKED BASE", "js": 1, "css": 1}, {"marker": "KYC + PAYMENT ROUTE LOCK FINAL", "js": 1, "css": 1}, {"marker": "MOBILE PAYMENT INPUT PRESERVE FIX", "js": 1, "css": 0}]
-- JS syntax check: OK
-
-
-KPR Old Conflict Removed:
-- Removed old user KYC/payment/referral conflicting blocks:
-  * MENU PROFILE KYC REFERRAL FIX
-  * PAYMENT KYC ADMIN APPROVAL FINAL
-  * DB CONNECTED KYC + PAYOUT FINAL
-- Kept design/trade/chart/wallet modules untouched.
-- Kept KYC PAYMENT REFERRAL CLEAN MODULE FINAL as the only owner for:
-  * KYC page
-  * My Payment Methods page
-  * Referral page
-- Added a light route guard; no fast 1–2 sec payment re-render.
-- Removal result: [{"marker": "MENU PROFILE KYC REFERRAL FIX", "js_removed": 1, "css_removed": 1}, {"marker": "PAYMENT KYC ADMIN APPROVAL FINAL", "js_removed": 1, "css_removed": 1}, {"marker": "DB CONNECTED KYC + PAYOUT FINAL", "js_removed": 1, "css_removed": 1}]
-- Scan result: {"PAYMENT KYC ADMIN APPROVAL FINAL": false, "DB CONNECTED KYC + PAYOUT FINAL": false, "MENU PROFILE KYC REFERRAL FIX": false, "KPR clean module present": true, "applyPaymentKycAdminApproval_count": 0, "securePaymentMethodForm_count": 0, "realPaymentMethodForm_count": 1, "kprPaymentForm_count": 3}
-- JS syntax check: OK
-
-
-Payment Submit Feedback + Admin Visibility Fix:
-- Payment method submit button now shows "Sending request..." then "Request Sent ✓".
-- Double-click duplicate submit is blocked with submitLock.
-- Same UPI / same bank account+IFSC pending/approved duplicate request is blocked.
-- Request is added locally immediately and DB upsert is attempted.
-- Admin payment/payout requests table is rendered from userPayoutMethods.
-- Admin approve/reject handlers update local state and DB.
-- Design/chart/trade/wallet untouched.
-- JS syntax check: OK
-
-
-Payment Method Persist Refresh Fix:
-- Fixes payment details disappearing after page refresh.
-- Saves payment methods into a dedicated localStorage key: ai_trading_payment_methods_persist_v1.
-- On load/refresh, merges local saved methods + DB user_payout_methods rows.
-- Keeps userPayoutMethods and payoutMethods synced.
-- Persists when saveState is called.
-- Admin payment requests renderer is refreshed after hydration.
-- JS syntax check: OK
-
-
-Payment Final Submit Lock + Admin Push Fix:
-- Final capture-level click+submit handler controls payment form.
-- Method is saved into state + localStorage BEFORE render/DB call, so it should not disappear.
-- Blocks duplicates by same UPI or same bank account+IFSC.
-- Admin request table renders immediately from synced local/state data.
-- DB upsert still attempted; warning logged if Supabase RLS/table blocks it.
-- Approve/reject update local + DB and re-render admin/user.
-- JS syntax check: OK
-
-
-Payment Request Table Name Compatibility Fix:
-- User said Supabase table is named payment request, not user_payout_methods.
-- Added helper that tries DB table names in this order:
-  1. payment_requests
-  2. payment_request
-  3. user_payout_methods
-- Save/select/update for payment methods will now try the existing payment request table first.
-- If your exact table name is different, rename it to payment_requests or payment_request, or update PAYMENT_METHOD_TABLE_CANDIDATES in app.js.
-- JS syntax check: OK
-
-
-User Payment Methods Table Fix:
-- User said DB has a table named user_payment_methods and one old record was saved there.
-- Payment methods now prioritize table names in this order:
-  1. user_payment_methods
-  2. user_payout_methods
-  3. payment_requests
-  4. payment_request
-- For payment method DB operations, user_payment_methods is now the primary table.
-- Use payment_requests only for separate payment/deposit/plan requests, not payout methods.
-- JS syntax check: OK
-
-
-User Payout Methods Table Fix:
-- User clarified the correct table is user_payout_methods.
-- Payment methods now prioritize table names in this order:
-  1. user_payout_methods
-  2. user_payment_methods
-  3. payment_requests
-  4. payment_request
-- Direct payment method table calls now point to user_payout_methods first.
-- JS syntax check: OK
-
-
-ONLY USER PAYOUT METHODS FINAL:
-- Final decision: Payment Methods / Payout Methods use only one table:
-  public.user_payout_methods
-- Removed confusing fallback table logic for:
-  user_payment_methods, payment_requests, payment_request
-- payment_requests should NOT be used for payout/payment method saving.
-- payment_requests can remain in Supabase only if your site needs separate plan/manual payment requests.
-- For this feature, save/load/approve/reject point to user_payout_methods only.
-- JS syntax check: OK
-
-
-Clean ZIP Note:
-- Removed extra backup JS files from the ZIP.
-- Active app.js is the only JS logic file for the site.
-- Payment Methods / Payout Methods use only public.user_payout_methods.
-- No app-before-* backup files are included in this clean package.
-
-
-Payment Method Single Owner Final:
-- Removed previous payment-only patch modules:
-  [{"marker": "PAYMENT SUBMIT FEEDBACK + ADMIN VISIBILITY FIX", "js": 1, "css": 1}, {"marker": "PAYMENT METHOD PERSIST REFRESH FIX", "js": 1, "css": 0}, {"marker": "PAYMENT FINAL SUBMIT LOCK + ADMIN PUSH FIX", "js": 1, "css": 1}, {"marker": "ONLY USER PAYOUT METHODS TABLE FINAL", "js": 1, "css": 0}]
-- Added one payment method owner module.
-- Payment Methods save/load/approve/reject use only Supabase table: user_payout_methods.
-- New method is saved to local/state before DB call so it should not disappear.
-- Admin request list rendered by the single owner module.
-- KYC/referral/design/trade/chart/wallet untouched.
-- JS syntax check: OK
-
-
-Payment DB Save + Admin Load Fix:
-- Root cause found: app was sending user_email but SQL schema did not create user_email in user_payout_methods.
-- New payment owner V2 retries DB save with minimal schema if user_email column is missing.
-- Admin now loads all rows from user_payout_methods; users load only their own rows.
-- Added SQL file: user-payout-methods-db-save-fix.sql
-- Run that SQL in Supabase to add missing columns and RLS policies.
-- JS syntax check: OK
-
-
-KYC Step Wizard Final:
-- User confirmed one-by-one KYC step wizard.
-- Old KYC page replacement triggers were neutralized to use wizard.
-- KYC flow:
-  1. Personal Details
-  2. PAN Details
-  3. Address Proof
-  4. Selfie + Submit
-- Status rules:
-  Not Submitted/Rejected => wizard open
-  Pending => under review card
-  Approved => approved card
-- Payment DB Save/Admin Load fix remains active.
-- Added SQL file: kyc-step-wizard-db-fix.sql
-- JS syntax check: OK
-
-
-Menu Pages Auth Visibility Fix:
-- KYC / Payment Methods / Referral / Profile pages are moved into appPage at runtime if they are outside it.
-- Login/register screen will never show these menu pages.
-- Menu pages open only after login and only through menu/direct/page buttons.
-- Logout/auth mode hides all menu-owned pages.
-- KYC step wizard and payment DB fixes untouched.
-- JS syntax check: OK
-
-
-KYC Wizard Button Visibility Fix:
-- Back / Next buttons made larger.
-- Next button color changed for high contrast.
-- Button text made bold and centered.
-- Only CSS styling changed; KYC logic/payment/admin untouched.
-- JS syntax check: OK
-
-
-Admin KYC Requests Render Fix:
-- Admin KYC table now loads rows from kyc_requests.
-- Supports table body IDs: adminKycLog, kycRequestsLog, adminKycPanel tbody, kycManagement tbody.
-- Adds View Details button.
-- Approve/Reject update local state + Supabase kyc_requests.
-- Buttons lock after approved/rejected.
-- KYC wizard/payment/trade/chart/wallet untouched.
-- Admin KYC IDs found: ["adminKyc", "adminKycLog", "kyc", "kycDocNumber", "kycDocType", "kycFrontFile", "kycMobile", "kycName", "kycSelfieFile", "kycStatusBox", "kycStatusTitle", "submitKycBtn"]
-- JS syntax check: OK
-
-
-Admin KYC + Payout Table Filter Pagination Final:
-- KYC and payout method requests now have search, status filter, and 5-record pagination.
-- Payout has All/UPI/Bank type filter.
-- Payout has Delete button so admin can remove a method and user can add again.
-- Approved/Rejected rows show Locked instead of approve/reject buttons.
-- Removed old admin KYC render fix blocks: JS 1, CSS 1.
-- User KYC wizard/payment form/trade/chart/wallet untouched.
-- JS syntax check: OK
-
-
-Payout Stable Page Table Override Final:
-- Root cause: ADMIN PAYMENT STABLE PAGE FIX was rendering Payout Method Requests with apsRenderPayout() card layout.
-- This patch overrides the stable payout page content itself.
-- Adds search, status filter, UPI/Bank filter, 5-record pagination.
-- Pending: Approve/Reject/Delete.
-- Approved/Rejected: Locked/Delete.
-- Delete removes user_payout_methods row and user can add a new method again.
-- JS syntax check: OK
-
-
-Admin Restore Stable Payout Table:
-- Restored from stable ZIP before old admin conflict removal.
-- Important: ADMIN PAYMENT STABLE PAGE FIX is kept because it controls the admin payout/payment page shell.
-- Payout table override is kept on top of that shell.
-- Removed bad clean shell if present: [{"marker": "CLEAN ADMIN PAYOUT PAGE SHELL FINAL", "js_removed": 0, "css_removed": 0}]
-- Checks: {"ADMIN PAYMENT STABLE PAGE FIX": true, "PAYOUT STABLE PAGE TABLE OVERRIDE FINAL": true, "ADMIN KYC PAYOUT TABLES FILTER PAGINATION FINAL": true, "KYC STEP WIZARD FINAL": true, "PAYMENT METHOD SINGLE OWNER DB SAVE V2": true}
-- Added safety rerender so payout table overrides old card renderer after opening.
-- JS syntax check: OK
-
-
-Admin Users Section Render Fix:
-- Loads users from Supabase profiles table and merges with local state.users.
-- Renders adminUsersLog/adminHardUsersLog users table.
-- Adds search, status/KYC filter, 8-record pagination.
-- Adds View and Block/Unblock buttons.
-- Updates admin total users counters.
-- Touches only Admin Users section.
-- JS syntax check: OK
-
-
-Wallet Deposit/Withdraw Clean Replace:
-- Top wallet balance cards preserved.
-- Old screenshot deposit flow is hidden/replaced.
-- Deposit wizard: Amount -> Mode -> Pay details -> 12-digit UTR.
-- UTR must be exactly 12 digits and duplicate UTR is blocked locally + DB check.
-- Withdrawal wizard: Amount -> Approved payout method -> Review -> Submit.
-- Admin deposit/withdraw logs replaced with filter + pagination table.
-- Admin approve/reject locks actions after status change.
-- Added SQL: wallet-deposit-withdraw-db-fix.sql
-- Previous module removed: JS 0, CSS 0
-- JS syntax check: OK
-
-
-Old Wallet Removed Single Owner Final:
-- Previous old wallet modules removed: [{"marker": "WALLET SAFE MINIMAL FIX", "js": 1, "css": 1}, {"marker": "WALLET HISTORY BIG CARDS", "js": 1, "css": 1}, {"marker": "WALLET HISTORY ONLY NEW CARDS", "js": 1, "css": 1}]
-- Previous wallet clean module removed: JS 1, CSS 1
-- Adds a final single wallet owner that takes over wallet page after old render/navigation.
-- Preserves top wallet balance cards.
-- Removes/hides old deposit/withdraw modals/buttons.
-- Deposit wizard: Amount -> Mode -> Pay details -> 12-digit UTR.
-- Duplicate UTR blocked locally + DB check.
-- Withdrawal wizard: Amount -> Approved payout method -> Review -> Submit.
-- Admin deposit/withdraw approve/reject functions preserved/replaced.
-- JS syntax check: OK
-
-
-Wallet Buttons Top Position Fix:
-- Deposit / Withdrawal / History tabs now insert directly after wallet overview cards.
-- Old hidden wallet action cards take no space.
-- Wallet logic untouched.
-- Admin/KYC/Payout untouched.
-- JS syntax check: OK
-
-
-Wallet History Cards Hide Top Fix:
-- Old top Deposit History / Withdrawal History cards are hidden from main wallet page.
-- Deposit / Withdrawal / History tabs stay directly below wallet overview cards.
-- History appears only inside the new History tab.
-- Wallet logic/admin/KYC/payout untouched.
-- JS syntax check: OK
-
-
-Wallet Top Cards and Button Text Fix:
-- Force shows Available Balance / Withdrawable / Approved Deposit / Pending Withdrawal cards.
-- Keeps old history cards hidden.
-- Fixes Deposit/Withdrawal wizard button contrast and readable text.
-- Only CSS/position safety changed; wallet logic/admin/KYC untouched.
-- JS syntax check: OK
-
-
-Wallet Only Balance Cards Show Fix:
-- Shows only real wallet balance cards.
-- Hides old Deposit/Withdrawal action cards.
-- Keeps old history cards hidden.
-- Keeps new Deposit / Withdrawal / History tabs and wizard.
-- Only wallet visibility/style changed.
-- JS syntax check: OK
-
-
-Wallet Restore Visible Safe:
-- Restored from stable wallet ZIP before aggressive hide.
-- Removed aggressive wallet button/card hide module if present: [{"marker": "WALLET OLD BUTTONS INSIDE BALANCE CARD HIDE FIX", "js_removed": 0, "css_removed": 0}]
-- Restores wallet cards visibility.
-- Hides only legacy button elements by ID, not card containers.
-- Keeps new Deposit/Withdrawal/History tabs.
-- Use this instead of AI-Trading-Wallet-Old-Buttons-In-Card-Hide-Fix.zip.
-- JS syntax check: OK
-
-
-Professional Wallet Rebuild Final:
-- Old wallet visible UI is hidden completely.
-- New professional wallet UI is rebuilt from data.
-- New cards: Available Balance, Withdrawable Balance, Approved Deposit, Pending Withdrawal.
-- Deposit / Withdrawal / History tabs.
-- Deposit wizard with 12 digit UTR and duplicate UTR block.
-- Withdrawal wizard with approved payout method selection.
-- Keeps existing DB/state data.
-- Removed old wallet patches: [{"marker": "WALLET RESTORE VISIBLE SAFE FIX", "js": 1, "css": 1}, {"marker": "WALLET ONLY BALANCE CARDS SHOW FIX", "js": 1, "css": 1}, {"marker": "WALLET TOP CARDS AND BUTTON TEXT FIX", "js": 1, "css": 1}, {"marker": "WALLET HISTORY CARDS HIDE TOP FIX", "js": 1, "css": 1}, {"marker": "WALLET BUTTONS TOP POSITION FIX", "js": 0, "css": 1}, {"marker": "OLD WALLET REMOVED SINGLE OWNER FINAL", "js": 1, "css": 1}]
-- JS syntax check: OK
-
-
-Wallet Minimum Limits Fix:
-- Minimum deposit changed to ₹500.
-- Minimum withdrawal changed to ₹2,000.
-- Withdrawal still cannot exceed withdrawable balance.
-- Only wallet validation/text changed.
-- JS syntax check: OK
-
-
-Wallet Balance + Trade Logic Fix:
-- Approved Deposit card changed to Pending Deposit.
-- Deposit pending does not add balance.
-- Deposit approve adds amount once using balanceApplied flag.
-- Withdrawal submit deducts/holds amount immediately.
-- Withdrawal approve does not double deduct.
-- Withdrawal reject refunds held amount.
-- Trade open deducts trade amount once.
-- Trade close profit returns amount + profit.
-- Trade close loss returns amount - loss.
-- Referral logic intentionally NOT included.
-- Added SQL: wallet-balance-trade-logic-db-fix.sql
-- JS syntax check: OK
-
-
-Permanent Wallet Cleanup from stop.zip:
-- Removed risky duplicate wallet/balance patch blocks permanently from app.js/styles.css.
-- Kept existing UI/design and professional wallet owner if present.
-- Kept minimum deposit/withdrawal limit patch if present.
-- Removed blocks:
-  - WALLET BALANCE TRADE LOGIC FINAL (app 1, css 0)
-
-
-Scroll Restore Normal:
-- Reverted the aggressive user-side blank scroll CSS.
-- Restored natural vertical page scrolling.
-- Kept only safe horizontal overflow protection.
-- Use this instead of stop-user-scroll-blank-space-fix.zip.
-
-
-Old Deposit/Wallet Patch Removal:
-- SUPABASE DEPOSIT ID STRIP MONKEY PATCH removed: app 1, css 0
-- DEPOSIT BIGINT HARD OVERRIDE FIX removed: app 1, css 0
-- PLAN BUY FROM WALLET FIX removed: app 1, css 0
-- UI/design untouched.
-- Professional wallet rebuild kept.
-- Minimum deposit/withdrawal limits kept.
-
-
-Session Refresh Login Persist Fix:
-- Fixes user/admin logout after page refresh.
-- Saves session in localStorage after login.
-- Restores saved session on DOMContentLoaded/load.
-- Clears session only on real logout.
-- Only app.js session persistence changed.
+AITradeX Phase 1 Base
+
+Brand: AITradeX
+
+User side:
+index.html + js/user-app.js
+
+Control center:
+admin.html + js/admin-app.js
+
+User panel rule:
+Do not use Admin wording in user panel. Use AI / Control-neutral wording only.
+
+Default control center login:
+Email: control@aitradex.com
+Password: admin123
+
+Phase 1 includes:
+- Professional landing page
+- User login/register
+- User dashboard shell
+- Separate control center login
+- Separate control center dashboard shell
+- Clean files, no old code, no patches
+
+Next phases:
+Phase 2: KYC + payment methods
+Phase 3: wallet deposit/withdrawal
+Phase 4: trading page with TradingView + buy/sell + real/demo
+Phase 5: subscriptions + referral first deposit 10%
+
+
+Root Files Version:
+- Removed js/ folder.
+- core.js, auth.js, user-app.js, admin-app.js are now in root.
+- index.html and admin.html script paths updated.
+
+Phase 1.1: user-app.js and styles.css fully replaced. Leverage up to 2000x. Responsive full-height chart area. No old-code patching.
+
+
+Phase 1.2 Premium User Polish:
+- user-app.js fully replaced.
+- styles.css fully replaced.
+- Real/Demo switch changed to clear segmented switch.
+- Real account selection fixed and visible.
+- User dashboard polished with premium trading app style.
+- Chart remains responsive with viewport-based height.
+- Admin files untouched.
+
+
+Phase 1.3 Real App User Polish:
+- user-app.js fully replaced.
+- styles.css fully replaced.
+- No patch blocks added.
+- Header now shows selected account and balance.
+- Home is more compact and trading-app-like.
+- Market cards use swipe ticker style on mobile.
+- Wallet shell includes professional deposit step preview.
+- Trade page made more exchange-style.
+- P/L and History pages no longer feel empty.
+- Admin side untouched.
+
+
+Phase 1.4 Selected Account + Compact Polish:
+- user-app.js updated by replacing the relevant full UI blocks.
+- styles.css updated for compact premium real-app feel.
+- Home now shows only selected account balance.
+- If Demo is selected, Real balance is not shown on Home selected account card.
+- If Real is selected, Demo balance is not shown on Home selected account card.
+- Trade page account switch removed from order ticket to avoid confusion.
+- Account switch remains in the top header/Home account card.
+- UI spacing/cards reduced for less bulky feel.
+- Admin side untouched.
+
+
+Phase 1.5 Nav + History + Profit/Loss Color:
+- user-app.js fully replaced.
+- styles.css fully replaced.
+- Header now has only menu, AITradeX brand and avatar.
+- Header account switch/balance removed.
+- Wallet page account switch removed.
+- History page now contains AI Trade History and Manual Trade History only.
+- Wallet history is not shown in History page.
+- Profit values use green styling.
+- Loss values use red styling.
+- Bottom nav and top header made compact.
+- Admin side untouched.
+
+
+Phase 1.6 Avatar + Profile Edit:
+- user-app.js updated for header avatar/name and profile editor.
+- styles.css updated for avatar/profile UI.
+- Header shows round avatar and user name on right side.
+- Profile page includes avatar upload and display name edit.
+- Avatar and display name currently save in browser localStorage.
+- Supabase Storage can be connected later for production avatar upload.
+- Admin side untouched.
+
+
+Phase 1.7 Crypto + Forex Markets:
+- user-app.js fully updated for market support.
+- styles.css updated for market selector and history layout.
+- Trade page now has Crypto / Forex market selector.
+- Pair list changes based on selected market.
+- TradingView symbol mapping is prepared for crypto and forex.
+- Home trending markets include crypto and forex cards.
+- History tables include Market column.
+- User balance and P/L remain INR-based.
+- Admin side untouched.
+
+
+Phase 1.8 Professional Trade Section:
+- user-app.js fully updated for trade page improvements.
+- styles.css updated for trade page layout.
+- Market + pair selector moved into compact top bar.
+- Real/Demo mode notice added.
+- Available balance shown on trade page.
+- Position size preview added: amount x leverage.
+- Market Feed replaces static crypto-only order book.
+- TradingView symbol area improved.
+- Buy/Sell confirmation summary shell added.
+- Admin side untouched.
+
+
+Phase 1.9 All Popular Market Rates:
+- user-app.js updated with final popular crypto and forex pairs.
+- Home now shows all selected popular crypto + forex rates in market ticker.
+- Trade page shows selected market pair-rate list.
+- Positive percentage values are green.
+- Negative percentage values are red.
+- Pair-rate list changes with Crypto / Forex market selector.
+- Admin side untouched.
+
+
+Phase 2.0 App-Style Selectors:
+- user-app.js updated for app-style pair/leverage selectors.
+- styles.css updated for selector bottom sheets.
+- Native large pair dropdown removed.
+- Native large leverage dropdown removed.
+- Pair opens in compact app-style bottom sheet.
+- Leverage opens in compact chips bottom sheet.
+- Rate percentage on top selected pair card/header uses green for plus and red for minus.
+- Trade section made cleaner and less browser-default.
+- Admin side untouched.
+
+
+Phase 2.1 TradingView Chart:
+- index.html now loads TradingView tv.js for user side chart.
+- user-app.js renders actual TradingView widget in Trade page.
+- Selected crypto/forex pair maps to TradingView symbol.
+- Pair or market change reloads the chart automatically.
+- Chart is dark theme and responsive.
+- Chart uses viewport-based height and is not cut into a small fixed box.
+- Admin side untouched.
+
+
+Phase 2.2 Chart Controls:
+- user-app.js updated with working timeframe controls.
+- styles.css updated for bigger chart and settings UI.
+- 1m, 5m, 15m, 30m, 1h, 4h, 1D buttons reload TradingView chart.
+- Selected timeframe gets active highlight.
+- Settings button opens chart settings bottom sheet.
+- Settings support Candles / Line / Area chart style.
+- Settings support Dark / Light theme.
+- Settings support TradingView toolbar Show / Hide.
+- Chart area is larger with reduced side padding.
+- Admin side untouched.
+
+
+Phase 2.3 TradingView Loader/Flicker Fix:
+- user-app.js updated so TradingView chart shows a dark loading state before widget mount.
+- styles.css updated to disable old fake chart pseudo background on TradingView container.
+- White loading flash reduced by forcing dark chart container background.
+- Old placeholder chart effect no longer appears on TradingView chart frame.
+- Admin side untouched.
+
+
+Phase 2.4 Black Chart Loading:
+- user-app.js updated to hide TradingView iframe until it is mounted.
+- styles.css updated to keep chart area black/dark during loading.
+- White flash is covered by dark loader overlay.
+- iframe fades in after TradingView loads.
+- Admin side untouched.
+
+
+Phase 2.5 Trade Header Cleanup:
+- user-app.js updated to remove developer-facing TradingView symbol text from top trade card.
+- Top pair card now has Change Pair button.
+- Scrollable pair-rate cards remain visible.
+- Real/Demo notice removed from above chart.
+- Account mode and available balance moved inside Order Ticket.
+- Market switch remains compact.
+- Admin side untouched.
+
+
+Phase 2.6 Dynamic Trade Feed:
+- user-app.js updated with dynamic Trade Feed.
+- Trade Feed changes automatically when user switches Crypto / Forex market.
+- Selected pair is highlighted in Trade Feed if present.
+- No separate user action is needed for Trade Feed.
+- styles.css updated for Trade Feed cards.
+- Admin side untouched.
+
+
+Phase 2.7 Pair-Based Feeds:
+- user-app.js updated so Market Feed changes by selected pair.
+- Trade Feed now generates rows based on selected pair, not just market.
+- Crypto pairs show crypto-specific feed text.
+- Forex pairs show forex-specific feed text.
+- XAU/USD and XAG/USD show metals-specific feed text.
+- Selected pair is highlighted in Trade Feed.
+- styles.css updated for pair-based feed polish.
+- Admin side untouched.

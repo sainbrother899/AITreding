@@ -1,0 +1,8 @@
+(()=>{
+const App=window.AITradeX;
+const byEmail=e=>App.state.users.find(u=>String(u.email||"").toLowerCase()===String(e||"").toLowerCase());
+function registerUser({name,email,mobile,password,referralCode}){email=String(email||"").trim().toLowerCase();if(!name||!email||!password)throw new Error("Please fill all required fields.");if(byEmail(email))throw new Error("This email is already registered.");const referredBy=referralCode?App.state.users.find(u=>u.referralCode===referralCode)?.id||null:null;const user={id:App.uid("user"),name:name.trim(),email,mobile:String(mobile||"").trim(),password,role:"user",status:"ACTIVE",referralCode:"AITX"+Math.random().toString(36).slice(2,8).toUpperCase(),referredBy,createdAt:App.now()};App.state.users.push(user);App.state.profiles.push({id:App.uid("profile"),userId:user.id,name:user.name,email:user.email,mobile:user.mobile,createdAt:App.now()});if(referredBy)App.state.referrals.push({id:App.uid("ref"),referrerUserId:referredBy,referredUserId:user.id,status:"REGISTERED",commissionPaid:false,createdAt:App.now()});App.saveState();App.setSession(user.id,"user");return user}
+function loginUser({email,password}){const u=byEmail(email);if(!u||u.password!==password||u.role!=="user")throw new Error("Invalid user login details.");if(u.status==="BLOCKED")throw new Error("Your account is blocked.");App.setSession(u.id,"user");return u}
+function loginControl({email,password}){const u=byEmail(email);if(!u||u.password!==password||u.role!=="admin")throw new Error("Invalid control center login.");App.setSession(u.id,"admin");return u}
+window.AITradeXAuth={registerUser,loginUser,loginControl};
+})();
