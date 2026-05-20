@@ -211,3 +211,20 @@ Phase 2.7 Pair-Based Feeds:
 - Selected pair is highlighted in Trade Feed.
 - styles.css updated for pair-based feed polish.
 - Admin side untouched.
+
+
+Phase 2.8 User KYC + Payment Methods:
+- User side KYC 4-step working UI added.
+- Step 1 Personal Details.
+- Step 2 ID Details.
+- Step 3 ID front/back + selfie upload UI.
+- Step 4 Review & Submit.
+- KYC status: NOT_SUBMITTED / PENDING / APPROVED / REJECTED.
+- Payment Methods page added.
+- Holder name auto-fills from KYC name.
+- Add UPI form.
+- Add Bank form.
+- Max 2 UPI and 2 Bank methods.
+- Method status: PENDING / APPROVED / REJECTED.
+- Data currently saves in localStorage for user-side testing.
+- Admin approval will be built in next phase.

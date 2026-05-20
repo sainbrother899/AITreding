@@ -1188,3 +1188,230 @@
 .trade-feed-card h2{
   word-break:break-word;
 }
+
+
+/* AITradeX Phase 2.8 user KYC + payment methods */
+.status-pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.055);
+  color:#dfe8f7;
+  border-radius:999px;
+  padding:8px 10px;
+  font-size:11px;
+  font-weight:1000;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+.status-pill.pending{
+  color:#ffd89c;
+  border-color:rgba(248,189,122,.28);
+  background:rgba(248,189,122,.08);
+}
+.status-pill.approved{
+  color:var(--green);
+  border-color:rgba(0,231,168,.30);
+  background:rgba(0,231,168,.10);
+}
+.status-pill.rejected{
+  color:var(--red);
+  border-color:rgba(255,69,107,.30);
+  background:rgba(255,69,107,.10);
+}
+.status-pill.not-submitted{
+  color:var(--muted);
+}
+.kyc-stepper{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:8px;
+  margin-bottom:10px;
+}
+.kyc-stepper button{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.045);
+  color:#fff;
+  border-radius:16px;
+  padding:10px 8px;
+  display:grid;
+  place-items:center;
+  gap:4px;
+}
+.kyc-stepper button.active{
+  border-color:rgba(21,229,211,.50);
+  background:rgba(21,229,211,.10);
+}
+.kyc-stepper b{
+  width:26px;
+  height:26px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:rgba(255,255,255,.08);
+}
+.kyc-stepper button.active b{
+  background:linear-gradient(135deg,var(--cyan),#1bd0ee);
+  color:#07111f;
+}
+.kyc-stepper span{
+  color:var(--muted);
+  font-size:11px;
+  font-weight:900;
+}
+.kyc-grid{
+  grid-template-columns:1fr 1fr;
+}
+.upload-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:10px;
+}
+.upload-box{
+  border:1px dashed rgba(21,229,211,.35);
+  background:rgba(21,229,211,.06);
+  border-radius:18px;
+  padding:14px;
+  display:grid;
+  gap:8px;
+  color:#fff;
+}
+.upload-box span{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:1000;
+}
+.upload-box input{
+  width:100%;
+  font-size:12px;
+}
+.upload-box b{
+  font-size:12px;
+  word-break:break-word;
+}
+.review-grid,
+.profile-info-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.review-grid article,
+.profile-info-grid article{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.045);
+  border-radius:16px;
+  padding:12px;
+}
+.review-grid span,
+.profile-info-grid span{
+  display:block;
+  color:var(--muted);
+  font-size:12px;
+  margin-bottom:6px;
+}
+.review-grid b,
+.profile-info-grid b{
+  word-break:break-word;
+}
+.wizard-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:14px;
+}
+.wizard-actions button:disabled,
+.save-profile-btn:disabled,
+.kyc-stepper button:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+.reject-box,
+.kyc-required-box{
+  margin-top:12px;
+  border:1px solid rgba(255,69,107,.28);
+  background:rgba(255,69,107,.08);
+  color:#ffb6c4;
+  border-radius:16px;
+  padding:12px;
+  font-size:13px;
+}
+.verified-name-box{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin-top:12px;
+  border:1px solid rgba(0,231,168,.24);
+  background:rgba(0,231,168,.08);
+  border-radius:16px;
+  padding:12px;
+}
+.verified-name-box span{
+  color:var(--muted);
+  font-size:12px;
+}
+.verified-name-box b{
+  color:#fff;
+}
+.payment-type-tabs{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-bottom:10px;
+}
+.payment-type-tabs button{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.045);
+  color:#fff;
+  border-radius:16px;
+  min-height:48px;
+  font-weight:1000;
+}
+.payment-type-tabs button.active{
+  border-color:rgba(21,229,211,.48);
+  background:rgba(21,229,211,.12);
+  color:var(--cyan);
+}
+.payment-method-list{
+  display:grid;
+  gap:10px;
+}
+.payment-method-list article{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.045);
+  border-radius:18px;
+  padding:12px;
+}
+.payment-method-list b{
+  display:block;
+}
+.payment-method-list span,
+.payment-method-list small{
+  display:block;
+  color:var(--muted);
+  font-size:12px;
+  margin-top:3px;
+}
+@media(max-width:620px){
+  .kyc-grid,
+  .upload-grid,
+  .review-grid,
+  .profile-info-grid{
+    grid-template-columns:1fr;
+  }
+  .kyc-stepper{
+    grid-template-columns:1fr 1fr;
+  }
+  .wizard-actions,
+  .payment-type-tabs{
+    grid-template-columns:1fr;
+  }
+  .payment-method-list article{
+    align-items:flex-start;
+  }
+}

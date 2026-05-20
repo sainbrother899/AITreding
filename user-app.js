@@ -18,6 +18,8 @@
   let chartStyle = localStorage.getItem("AITradeX_CHART_STYLE") || "1";
   let chartTheme = localStorage.getItem("AITradeX_CHART_THEME") || "dark";
   let chartToolbar = localStorage.getItem("AITradeX_CHART_TOOLBAR") !== "false";
+  let kycStep = Number(localStorage.getItem("AITradeX_KYC_STEP") || 1);
+  let paymentType = localStorage.getItem("AITradeX_PAYMENT_TYPE") || "UPI";
 
   const marketPairs = {
     CRYPTO: [
@@ -337,6 +339,79 @@
 
   function profileNameChip() {
     return `<button class="profile-chip visible-profile" onclick="AITradeXUser.go('profile')"><b>${App.escapeHtml(displayName())}</b>${avatar(displayName())}</button>`;
+  }
+
+  function userKey(name) {
+    const u = user();
+    return u ? `AITradeX_${name}_${u.id}` : "";
+  }
+
+  function readJson(key, fallback) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "") || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function writeJson(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function currentKyc() {
+    const u = user();
+    if (!u) return null;
+    return readJson(userKey("KYC"), {
+      status: "NOT_SUBMITTED",
+      personal: {
+        fullName: displayName(),
+        mobile: u.mobile || "",
+        email: u.email || "",
+        dob: ""
+      },
+      id: {
+        type: "PAN Card",
+        number: ""
+      },
+      uploads: {
+        frontName: "",
+        backName: "",
+        selfieName: ""
+      },
+      submittedAt: "",
+      rejectReason: ""
+    });
+  }
+
+  function saveKycData(data) {
+    writeJson(userKey("KYC"), data);
+  }
+
+  function verifiedKycName() {
+    const kyc = currentKyc();
+    return kyc?.personal?.fullName || displayName();
+  }
+
+  function paymentMethods() {
+    return readJson(userKey("PAYMENT_METHODS"), []);
+  }
+
+  function savePaymentMethods(methods) {
+    writeJson(userKey("PAYMENT_METHODS"), methods);
+  }
+
+  function paymentCounts() {
+    const methods = paymentMethods();
+    return {
+      UPI: methods.filter(m => m.type === "UPI").length,
+      BANK: methods.filter(m => m.type === "BANK").length
+    };
+  }
+
+  function statusPill(status) {
+    const clean = String(status || "NOT_SUBMITTED").replaceAll("_", " ");
+    const cls = String(status || "").toLowerCase().replaceAll("_", "-");
+    return `<span class="status-pill ${cls}">${clean}</span>`;
   }
 
   function accountSwitch(compact = false) {
@@ -765,11 +840,173 @@
   }
 
   function kycPage() {
-    shell(`<section class="premium-card"><p>KYC VERIFICATION</p><h2>4 Step Verification</h2><div class="step-preview vertical"><div><span>01</span><b>Personal Details</b></div><div><span>02</span><b>ID Details</b></div><div><span>03</span><b>ID Card + Selfie Upload</b></div><div><span>04</span><b>Review & Submit</b></div></div></section>`);
+    const kyc = currentKyc();
+    const locked = kyc.status === "PENDING" || kyc.status === "APPROVED";
+
+    shell(`
+      <section class="premium-card kyc-status-card">
+        <div class="card-row">
+          <div>
+            <p>KYC VERIFICATION</p>
+            <h2>Identity Verification</h2>
+            <span class="ticket-mode">Complete KYC before verified withdrawals.</span>
+          </div>
+          ${statusPill(kyc.status)}
+        </div>
+        ${kyc.status === "REJECTED" && kyc.rejectReason ? `<div class="reject-box">${App.escapeHtml(kyc.rejectReason)}</div>` : ""}
+      </section>
+
+      <section class="kyc-stepper">
+        ${[1, 2, 3, 4].map(step => `
+          <button class="${kycStep === step ? "active" : ""} ${kycStep > step ? "done" : ""}" onclick="AITradeXUser.setKycStep(${step})">
+            <b>${step}</b>
+            <span>${["Personal", "ID", "Uploads", "Review"][step - 1]}</span>
+          </button>
+        `).join("")}
+      </section>
+
+      <section class="premium-card kyc-form-card">
+        ${kycStep === 1 ? `
+          <p>STEP 1</p>
+          <h2>Personal Details</h2>
+          <div class="form-grid kyc-grid">
+            <label>Full Name<input id="kycFullName" ${locked ? "disabled" : ""} value="${App.escapeHtml(kyc.personal.fullName || "")}" placeholder="As per document"/></label>
+            <label>Mobile<input id="kycMobile" ${locked ? "disabled" : ""} value="${App.escapeHtml(kyc.personal.mobile || "")}" placeholder="10 digit mobile"/></label>
+            <label>Email<input id="kycEmail" disabled value="${App.escapeHtml(kyc.personal.email || "")}"/></label>
+            <label>Date of Birth<input id="kycDob" ${locked ? "disabled" : ""} type="date" value="${App.escapeHtml(kyc.personal.dob || "")}"/></label>
+          </div>
+        ` : ""}
+
+        ${kycStep === 2 ? `
+          <p>STEP 2</p>
+          <h2>ID Details</h2>
+          <div class="form-grid kyc-grid">
+            <label>Document Type
+              <select id="kycDocType" ${locked ? "disabled" : ""}>
+                ${["PAN Card", "Aadhaar Card", "Passport", "Driving License"].map(t => `<option ${kyc.id.type === t ? "selected" : ""}>${t}</option>`).join("")}
+              </select>
+            </label>
+            <label>Document Number<input id="kycDocNumber" ${locked ? "disabled" : ""} value="${App.escapeHtml(kyc.id.number || "")}" placeholder="Enter document number"/></label>
+          </div>
+        ` : ""}
+
+        ${kycStep === 3 ? `
+          <p>STEP 3</p>
+          <h2>Upload Documents</h2>
+          <div class="upload-grid">
+            <label class="upload-box">
+              <span>ID Front</span>
+              <input id="kycFront" ${locked ? "disabled" : ""} type="file" accept="image/*,.pdf"/>
+              <b>${App.escapeHtml(kyc.uploads.frontName || "Upload front side")}</b>
+            </label>
+            <label class="upload-box">
+              <span>ID Back</span>
+              <input id="kycBack" ${locked ? "disabled" : ""} type="file" accept="image/*,.pdf"/>
+              <b>${App.escapeHtml(kyc.uploads.backName || "Upload back side")}</b>
+            </label>
+            <label class="upload-box">
+              <span>Selfie</span>
+              <input id="kycSelfie" ${locked ? "disabled" : ""} type="file" accept="image/*"/>
+              <b>${App.escapeHtml(kyc.uploads.selfieName || "Upload selfie")}</b>
+            </label>
+          </div>
+          <div class="profile-note">अभी files का नाम save होगा. Production में इन्हें Supabase Storage में upload करेंगे.</div>
+        ` : ""}
+
+        ${kycStep === 4 ? `
+          <p>STEP 4</p>
+          <h2>Review & Submit</h2>
+          <div class="review-grid">
+            <article><span>Full Name</span><b>${App.escapeHtml(kyc.personal.fullName || "-")}</b></article>
+            <article><span>Mobile</span><b>${App.escapeHtml(kyc.personal.mobile || "-")}</b></article>
+            <article><span>Email</span><b>${App.escapeHtml(kyc.personal.email || "-")}</b></article>
+            <article><span>DOB</span><b>${App.escapeHtml(kyc.personal.dob || "-")}</b></article>
+            <article><span>Document</span><b>${App.escapeHtml(kyc.id.type || "-")}</b></article>
+            <article><span>Document No.</span><b>${App.escapeHtml(kyc.id.number || "-")}</b></article>
+            <article><span>ID Front</span><b>${App.escapeHtml(kyc.uploads.frontName || "-")}</b></article>
+            <article><span>ID Back</span><b>${App.escapeHtml(kyc.uploads.backName || "-")}</b></article>
+            <article><span>Selfie</span><b>${App.escapeHtml(kyc.uploads.selfieName || "-")}</b></article>
+          </div>
+        ` : ""}
+
+        <div class="wizard-actions">
+          <button class="btn ghost" onclick="AITradeXUser.prevKycStep()" ${kycStep === 1 ? "disabled" : ""}>Back</button>
+          ${kycStep < 4 ? `<button class="btn" onclick="AITradeXUser.saveKycStep()">Save & Next</button>` : `<button class="btn" onclick="AITradeXUser.submitKyc()" ${locked ? "disabled" : ""}>Submit KYC</button>`}
+        </div>
+      </section>
+    `);
   }
 
   function paymentPage() {
-    shell(`<section class="premium-card"><p>PAYMENT METHODS</p><h2>My Payment Methods</h2><div class="empty-state">Holder name will auto-fill from approved KYC. Max 2 UPI and 2 Bank accounts.</div></section>`);
+    const kyc = currentKyc();
+    const methods = paymentMethods();
+    const counts = paymentCounts();
+    const kycReady = kyc.status === "APPROVED";
+    const holder = verifiedKycName();
+    const canAddUpi = counts.UPI < 2;
+    const canAddBank = counts.BANK < 2;
+
+    shell(`
+      <section class="premium-card payment-head-card">
+        <div class="card-row">
+          <div>
+            <p>PAYMENT METHODS</p>
+            <h2>Withdrawal Accounts</h2>
+            <span class="ticket-mode">Holder name auto-fills from approved KYC.</span>
+          </div>
+          ${statusPill(kyc.status)}
+        </div>
+        ${!kycReady ? `<div class="kyc-required-box">Complete and approve KYC first to add payment methods.</div>` : `<div class="verified-name-box"><span>Verified Name</span><b>${App.escapeHtml(holder)}</b></div>`}
+      </section>
+
+      <section class="payment-type-tabs">
+        <button class="${paymentType === "UPI" ? "active" : ""}" onclick="AITradeXUser.setPaymentType('UPI')">UPI (${counts.UPI}/2)</button>
+        <button class="${paymentType === "BANK" ? "active" : ""}" onclick="AITradeXUser.setPaymentType('BANK')">Bank (${counts.BANK}/2)</button>
+      </section>
+
+      <section class="premium-card payment-form-card">
+        ${paymentType === "UPI" ? `
+          <p>ADD UPI</p>
+          <h2>UPI Verification</h2>
+          <div class="form-grid">
+            <label>Holder Name<input value="${App.escapeHtml(holder)}" disabled/></label>
+            <label>UPI ID<input id="upiIdInput" ${!kycReady || !canAddUpi ? "disabled" : ""} placeholder="yourname@upi"/></label>
+          </div>
+          <button class="save-profile-btn" onclick="AITradeXUser.addUpiMethod()" ${!kycReady || !canAddUpi ? "disabled" : ""}>Submit UPI for Verification</button>
+          ${!canAddUpi ? `<div class="profile-note">Maximum 2 UPI methods allowed.</div>` : ""}
+        ` : `
+          <p>ADD BANK</p>
+          <h2>Bank Verification</h2>
+          <div class="form-grid kyc-grid">
+            <label>Holder Name<input value="${App.escapeHtml(holder)}" disabled/></label>
+            <label>Bank Name<input id="bankNameInput" ${!kycReady || !canAddBank ? "disabled" : ""} placeholder="Bank name"/></label>
+            <label>Account Number<input id="bankAccInput" ${!kycReady || !canAddBank ? "disabled" : ""} placeholder="Account number"/></label>
+            <label>Confirm Account Number<input id="bankAccConfirmInput" ${!kycReady || !canAddBank ? "disabled" : ""} placeholder="Confirm account number"/></label>
+            <label>IFSC Code<input id="bankIfscInput" ${!kycReady || !canAddBank ? "disabled" : ""} placeholder="IFSC code"/></label>
+            <label>Account Type<select id="bankTypeInput" ${!kycReady || !canAddBank ? "disabled" : ""}><option>Savings</option><option>Current</option></select></label>
+          </div>
+          <button class="save-profile-btn" onclick="AITradeXUser.addBankMethod()" ${!kycReady || !canAddBank ? "disabled" : ""}>Submit Bank for Verification</button>
+          ${!canAddBank ? `<div class="profile-note">Maximum 2 bank accounts allowed.</div>` : ""}
+        `}
+      </section>
+
+      <section class="premium-card">
+        <p>SAVED METHODS</p>
+        <h2>Your Methods</h2>
+        <div class="payment-method-list">
+          ${methods.length ? methods.map(m => `
+            <article>
+              <div>
+                <b>${m.type === "UPI" ? "UPI" : "Bank Account"}</b>
+                <span>${m.type === "UPI" ? App.escapeHtml(m.upiId) : `${App.escapeHtml(m.bankName)} · ****${String(m.accountNumber || "").slice(-4)}`}</span>
+                <small>Holder: ${App.escapeHtml(m.holderName)}</small>
+              </div>
+              ${statusPill(m.status)}
+            </article>
+          `).join("") : `<div class="empty-state">No payment methods added yet.</div>`}
+        </div>
+      </section>
+    `);
   }
 
   function referralPage() {
@@ -893,6 +1130,155 @@
     setAccountMode(mode) {
       accountMode = mode === "DEMO" ? "DEMO" : "REAL";
       localStorage.setItem("AITradeX_ACCOUNT_MODE", accountMode);
+      render();
+    },
+    setKycStep(step) {
+      kycStep = Math.min(4, Math.max(1, Number(step || 1)));
+      localStorage.setItem("AITradeX_KYC_STEP", String(kycStep));
+      render();
+    },
+    prevKycStep() {
+      kycStep = Math.max(1, kycStep - 1);
+      localStorage.setItem("AITradeX_KYC_STEP", String(kycStep));
+      render();
+    },
+    saveKycStep() {
+      const kyc = currentKyc();
+      if (kyc.status === "PENDING" || kyc.status === "APPROVED") {
+        App.toast("KYC already submitted.");
+        return;
+      }
+
+      if (kycStep === 1) {
+        kyc.personal.fullName = document.getElementById("kycFullName")?.value?.trim() || "";
+        kyc.personal.mobile = document.getElementById("kycMobile")?.value?.trim() || "";
+        kyc.personal.email = document.getElementById("kycEmail")?.value?.trim() || kyc.personal.email;
+        kyc.personal.dob = document.getElementById("kycDob")?.value || "";
+        if (!kyc.personal.fullName || !kyc.personal.mobile) {
+          App.toast("Full name and mobile required.");
+          return;
+        }
+      }
+
+      if (kycStep === 2) {
+        kyc.id.type = document.getElementById("kycDocType")?.value || "PAN Card";
+        kyc.id.number = document.getElementById("kycDocNumber")?.value?.trim() || "";
+        if (!kyc.id.number) {
+          App.toast("Document number required.");
+          return;
+        }
+      }
+
+      if (kycStep === 3) {
+        const front = document.getElementById("kycFront")?.files?.[0];
+        const back = document.getElementById("kycBack")?.files?.[0];
+        const selfie = document.getElementById("kycSelfie")?.files?.[0];
+        if (front) kyc.uploads.frontName = front.name;
+        if (back) kyc.uploads.backName = back.name;
+        if (selfie) kyc.uploads.selfieName = selfie.name;
+        if (!kyc.uploads.frontName || !kyc.uploads.backName || !kyc.uploads.selfieName) {
+          App.toast("Front, back and selfie required.");
+          return;
+        }
+      }
+
+      saveKycData(kyc);
+      kycStep = Math.min(4, kycStep + 1);
+      localStorage.setItem("AITradeX_KYC_STEP", String(kycStep));
+      render();
+    },
+    submitKyc() {
+      const kyc = currentKyc();
+      if (!kyc.personal.fullName || !kyc.personal.mobile || !kyc.id.number || !kyc.uploads.frontName || !kyc.uploads.backName || !kyc.uploads.selfieName) {
+        App.toast("Complete all KYC steps first.");
+        return;
+      }
+
+      kyc.status = "PENDING";
+      kyc.submittedAt = new Date().toISOString();
+      kyc.rejectReason = "";
+      saveKycData(kyc);
+      App.toast("KYC submitted for verification.");
+      render();
+    },
+    setPaymentType(type) {
+      paymentType = type === "BANK" ? "BANK" : "UPI";
+      localStorage.setItem("AITradeX_PAYMENT_TYPE", paymentType);
+      render();
+    },
+    addUpiMethod() {
+      const kyc = currentKyc();
+      if (kyc.status !== "APPROVED") {
+        App.toast("KYC approval required.");
+        return;
+      }
+
+      const methods = paymentMethods();
+      if (methods.filter(m => m.type === "UPI").length >= 2) {
+        App.toast("Maximum 2 UPI methods allowed.");
+        return;
+      }
+
+      const upiId = document.getElementById("upiIdInput")?.value?.trim() || "";
+      if (!upiId || !upiId.includes("@")) {
+        App.toast("Valid UPI ID required.");
+        return;
+      }
+
+      methods.unshift({
+        id: `PM-${Date.now()}`,
+        type: "UPI",
+        holderName: verifiedKycName(),
+        upiId,
+        status: "PENDING",
+        createdAt: new Date().toISOString()
+      });
+      savePaymentMethods(methods);
+      App.toast("UPI submitted for verification.");
+      render();
+    },
+    addBankMethod() {
+      const kyc = currentKyc();
+      if (kyc.status !== "APPROVED") {
+        App.toast("KYC approval required.");
+        return;
+      }
+
+      const methods = paymentMethods();
+      if (methods.filter(m => m.type === "BANK").length >= 2) {
+        App.toast("Maximum 2 bank accounts allowed.");
+        return;
+      }
+
+      const bankName = document.getElementById("bankNameInput")?.value?.trim() || "";
+      const accountNumber = document.getElementById("bankAccInput")?.value?.trim() || "";
+      const confirmAccount = document.getElementById("bankAccConfirmInput")?.value?.trim() || "";
+      const ifsc = document.getElementById("bankIfscInput")?.value?.trim() || "";
+      const accountType = document.getElementById("bankTypeInput")?.value || "Savings";
+
+      if (!bankName || !accountNumber || !ifsc) {
+        App.toast("Bank name, account number and IFSC required.");
+        return;
+      }
+
+      if (accountNumber !== confirmAccount) {
+        App.toast("Account number does not match.");
+        return;
+      }
+
+      methods.unshift({
+        id: `PM-${Date.now()}`,
+        type: "BANK",
+        holderName: verifiedKycName(),
+        bankName,
+        accountNumber,
+        ifsc,
+        accountType,
+        status: "PENDING",
+        createdAt: new Date().toISOString()
+      });
+      savePaymentMethods(methods);
+      App.toast("Bank account submitted for verification.");
       render();
     },
     setChartInterval(value) {
