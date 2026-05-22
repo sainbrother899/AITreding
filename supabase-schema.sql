@@ -1,4 +1,4 @@
--- AITradeX Phase 1 Clean Schema
+-- AITradeX Clean Schema
 create table if not exists public.users (id text primary key,name text,email text unique,mobile text,role text default 'user',status text default 'ACTIVE',referral_code text,referred_by text,created_at timestamptz default now());
 create table if not exists public.wallet_ledger (id text primary key,user_id text not null,account_type text default 'REAL',type text not null,amount numeric not null,reference_id text not null,note text,balance_after numeric,created_at timestamptz default now(),unique(type,reference_id));
 create table if not exists public.kyc_requests (id text primary key,user_id text,user_email text,full_name text,mobile text,id_number text,address text,status text default 'PENDING',reviewed_at timestamptz,created_at timestamptz default now());
