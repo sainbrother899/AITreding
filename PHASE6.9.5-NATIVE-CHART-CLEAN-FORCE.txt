@@ -1,0 +1,14 @@
+AITradeX Phase 6.9.5 - Native Chart Clean Force
+
+Purpose:
+- Previous optional chart polish could be hidden by old localStorage toolbar settings.
+- This update forces TradingView into clean embedded mode by default.
+
+Changes:
+- Ignores old AITradeX_CHART_TOOLBAR=true cache.
+- Forces hide_top_toolbar, hide_side_toolbar, hide_legend and withdateranges=false.
+- Adds disabled_features for TradingView header/left/timeframe widgets where supported.
+- Strengthens CSS frame so chart fills the card and looks more native.
+- Cache version updated.
+
+No SQL required.

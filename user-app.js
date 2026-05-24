@@ -22,7 +22,7 @@
   let chartInterval = localStorage.getItem("AITradeX_CHART_INTERVAL") || "15";
   let chartStyle = localStorage.getItem("AITradeX_CHART_STYLE") || "1";
   let chartTheme = localStorage.getItem("AITradeX_CHART_THEME") || "dark";
-  let chartToolbar = localStorage.getItem("AITradeX_CHART_TOOLBAR") === "true";
+  let chartToolbar = false; // Force native clean chart by default; ignore old cached toolbar preference.
   let kycStep = Number(localStorage.getItem("AITradeX_KYC_STEP") || 1);
     let walletMode = localStorage.getItem("AITradeX_WALLET_MODE") || "DEPOSIT";
   let walletRequestPage = Number(localStorage.getItem("AITradeX_WALLET_REQUEST_PAGE") || 0);
@@ -1239,8 +1239,8 @@
           <div class="settings-block">
             <span>TradingView Toolbar</span>
             <div class="settings-chips">
-              <button class="${chartToolbar ? "active" : ""}" onclick="AITradeXUser.setChartToolbar(true)">Show</button>
-              <button class="${!chartToolbar ? "active" : ""}" onclick="AITradeXUser.setChartToolbar(false)">Hide</button>
+              <button class="disabled" disabled>App Clean</button>
+              <button class="active" onclick="AITradeXUser.setChartToolbar(false)">Active</button>
             </div>
           </div>
         </section>`;
@@ -1286,13 +1286,28 @@
         locale: "en",
         toolbar_bg: chartTheme === "dark" ? "#050814" : "#ffffff",
         enable_publishing: false,
-        hide_top_toolbar: !chartToolbar,
-        hide_side_toolbar: !chartToolbar,
-        hide_legend: !chartToolbar,
+        hide_top_toolbar: true,
+        hide_side_toolbar: true,
+        hide_legend: true,
         allow_symbol_change: false,
         save_image: false,
-        withdateranges: chartToolbar,
+        withdateranges: false,
+        details: false,
+        hotlist: false,
         calendar: false,
+        disabled_features: [
+          "header_widget",
+          "left_toolbar",
+          "timeframes_toolbar",
+          "legend_widget",
+          "header_symbol_search",
+          "header_compare",
+          "header_saveload",
+          "header_fullscreen_button",
+          "header_screenshot",
+          "use_localstorage_for_settings"
+        ],
+        enabled_features: ["hide_left_toolbar_by_default"],
         support_host: "https://www.tradingview.com",
         container_id: "tradingview_chart_container"
       });
@@ -5051,11 +5066,12 @@
 
   async function bootUserApp(){
     try{
-      if(localStorage.getItem("AITradeX_NATIVE_CHART_POLISH") !== "1"){
+      if(localStorage.getItem("AITradeX_NATIVE_CHART_CLEAN_FORCE") !== "2"){
         localStorage.setItem("AITradeX_CHART_TOOLBAR", "false");
         localStorage.setItem("AITradeX_CHART_THEME", "dark");
-        localStorage.setItem("AITradeX_NATIVE_CHART_POLISH", "1");
+        localStorage.setItem("AITradeX_NATIVE_CHART_CLEAN_FORCE", "2");
       }
+      chartToolbar = false;
       App.clearOldUiCache?.();
       if(App.session?.userId && window.AITradeXDB?.ready){
         await window.AITradeXDB.loadAll();

@@ -7979,3 +7979,49 @@ input:focus,select:focus,textarea:focus{
   .native-chart-frame{height:50vh!important;min-height:330px!important;}
   .native-timeframe-row{grid-template-columns:repeat(4,minmax(0,1fr));}
 }
+
+
+/* Phase 6.9.5 - Force clean native chart frame */
+.premium-native-chart-shell{
+  padding:12px!important;
+  border-radius:28px!important;
+  background:linear-gradient(180deg,rgba(9,18,34,.96),rgba(6,11,22,.98))!important;
+  border:1px solid rgba(45,230,255,.16)!important;
+  box-shadow:0 18px 46px rgba(0,0,0,.42), inset 0 0 0 1px rgba(255,255,255,.03)!important;
+  overflow:hidden!important;
+}
+.native-chart-frame{
+  height:58vh!important;
+  min-height:430px!important;
+  max-height:620px!important;
+  padding:0!important;
+  border-radius:24px!important;
+  overflow:hidden!important;
+  background:#050814!important;
+  border:1px solid rgba(255,255,255,.08)!important;
+}
+.native-chart-frame .tradingview-chart-container{
+  height:100%!important;
+  min-height:100%!important;
+  width:100%!important;
+  border-radius:24px!important;
+  overflow:hidden!important;
+  background:#050814!important;
+}
+.native-chart-frame iframe{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:100%!important;
+  border:0!important;
+  border-radius:24px!important;
+  background:#050814!important;
+}
+.native-chart-foot{display:none!important;}
+.chart-settings-sheet .disabled{opacity:.55;pointer-events:none;}
+@media(max-width:620px){
+  .premium-native-chart-shell{padding:10px!important;border-radius:24px!important;}
+  .native-chart-frame{height:55vh!important;min-height:420px!important;max-height:560px!important;border-radius:20px!important;}
+  .native-chart-frame .tradingview-chart-container,
+  .native-chart-frame iframe{border-radius:20px!important;}
+}
