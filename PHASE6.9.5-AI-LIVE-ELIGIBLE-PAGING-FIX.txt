@@ -1,0 +1,13 @@
+AITradeX Phase 6.9.5 - AI Live Eligible Users Paging Fix
+
+Base: AITradeX-Phase6.9.5-AIPlanLimitEnforcedFix.zip
+
+Changes:
+1. Admin Live Position Trade page now shows eligible live users with pagination.
+2. Default page size: 12 eligible users per page.
+3. Users are sorted automatically by remaining AI daily limit first.
+   - Higher remaining AI limit users appear first.
+   - Then higher AI pool, higher wallet balance, then name.
+4. Eligible user list no longer creates very long scrolling when hundreds/thousands of users exist.
+5. No database/SQL change required.
+6. No UI redesign, no trade/chart/user-side logic changes.

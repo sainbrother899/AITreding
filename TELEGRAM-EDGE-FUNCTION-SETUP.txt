@@ -1,0 +1,20 @@
+AITradeX Telegram Edge Function Setup
+
+1) Supabase Dashboard -> Edge Functions -> Create function: telegram-alert
+2) Paste code from: supabase/functions/telegram-alert/index.ts
+3) Set secrets:
+   TELEGRAM_BOT_TOKEN = your bot token from BotFather
+   TELEGRAM_DEFAULT_CHAT_ID = your personal/group/channel chat id
+   Optional: TELEGRAM_SHARED_SECRET = any long random secret
+4) Deploy function.
+5) Copy function URL, for example:
+   https://YOUR_PROJECT.functions.supabase.co/telegram-alert
+6) Admin Panel -> Telegram Alerts:
+   - Enable Telegram Alerts
+   - Paste Edge Function URL
+   - Add Chat ID if you did not set TELEGRAM_DEFAULT_CHAT_ID
+   - Send Test Telegram Alert
+
+Important:
+- Do not put bot token in frontend settings.
+- Direct frontend bot-token fallback is disabled in this ZIP for safety.

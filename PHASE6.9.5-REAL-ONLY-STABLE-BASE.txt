@@ -1,0 +1,18 @@
+AITradeX Phase 6.9.5 Real-Only Stable Base Update
+
+Base used: AITradeX-Phase6.9.5-StrictSeparatedAITradePages.
+
+Scope: Only demo account UI/selection sections removed. All other layout, trade chart, admin separated AI pages, routes and dashboard design kept from 6.9.5 baseline.
+
+Changes:
+- Forced user account mode to REAL.
+- Removed Demo option from Real/Demo switch; user sees Real only.
+- Wallet demo-mode screen removed from reachable flow.
+- User balances now use real wallet only.
+- New user manual trades are saved as REAL only.
+- Demo rows are hidden from user open/history filters.
+- Profile Account Mode row removed.
+- Admin user card no longer shows Demo Balance.
+
+No SQL required.
+Deploy this ZIP and hard refresh browser cache.

@@ -1,0 +1,21 @@
+AITradeX Phase 6.9.5 - Trade Page Final Mobile Polish
+
+Base used: AITradeX-Phase6.9.5-UserNavPositionsPolish.zip
+
+Scope: Trade page only. No SQL required.
+
+Changes:
+1. Removed user-facing REAL Account wording from trade hero/order ticket.
+2. Updated insufficient balance warning to cleaner wording.
+3. Compact order ticket summary now shows Margin, Position and Leverage instead of Mode.
+4. Market Feed changed to a shorter mobile-friendly Market Depth summary.
+5. Trade Feed now shows latest two entries with a View More button.
+6. Trade feed pair label now uses display label such as BTC/INR for consistency.
+7. Added small CSS polish for compact market insight and feed cards.
+
+Not touched:
+- TradingView chart logic/layout baseline
+- Bottom nav
+- Home dashboard
+- Admin side
+- Supabase SQL/RLS

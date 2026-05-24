@@ -1,0 +1,11 @@
+AITradeX Phase 6.9.5 Native Chart Polish Optional Pack
+
+Scope:
+- Trade page chart shell visual polish only.
+- Added native-style chart header, compact timeframe row, clipped rounded chart frame, small footer.
+- TradingView toolbar defaults to clean hidden mode to reduce embedded-widget feel.
+- Existing chart settings can still show tools if needed.
+- No SQL, no admin logic, no wallet/trade/AI/referral logic changes.
+
+Rollback:
+- If this chart style is not preferred, go back to the previous stable ZIP.

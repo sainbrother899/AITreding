@@ -1,0 +1,21 @@
+AITradeX Phase6 Edge Function Templates
+
+These are implementation targets for the next phase. Do not paste these directly as working production code yet.
+
+Required Edge Functions:
+- admin-approve-deposit
+- admin-reject-deposit
+- admin-approve-withdrawal
+- admin-reject-withdrawal
+- admin-open-ai-live-batch
+- admin-close-ai-live-batch
+- send-telegram-alert
+
+Every function must:
+1. Read Supabase Auth JWT from Authorization header.
+2. Verify the caller is admin from admin_roles.
+3. Use service role key only inside Edge Function environment.
+4. Validate request status before mutation.
+5. Write immutable ledger entries.
+6. Return clear JSON: { ok, message, data }.
+7. Never expose service role key or Telegram bot token to frontend.

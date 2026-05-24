@@ -1,0 +1,14 @@
+Phase 6.9.5 - AI Live 24/7 Auto-Close Cron Fix
+
+Added:
+- supabase/functions/ai-live-auto-close/index.ts
+- AI-LIVE-AUTOCLOSE-CRON-SETUP.txt
+- supabase-ai-live-autoclose-cron-schedule-template.sql
+
+What it solves:
+- AI Live target/max-loss close no longer depends only on admin browser being open.
+- Scheduled Edge Function can check open AI Live positions every minute and call backend close RPC.
+
+No UI changes.
+No existing data deletion.
+SQL schedule template is optional; do not run it without replacing PROJECT_REF and YOUR_SECRET.

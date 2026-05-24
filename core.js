@@ -1,13 +1,17 @@
 (()=>{
 const C=window.AITRADEX_CONFIG||{},has=!!(C.SUPABASE_URL&&C.SUPABASE_ANON_KEY&&window.supabase);
 const db=has?window.supabase.createClient(C.SUPABASE_URL,C.SUPABASE_ANON_KEY):null;
+const DB_ONLY=has;
 const SK="AITradeX_STATE_V1",SS="AITradeX_SESSION_V1";
 const now=()=>new Date().toLocaleString("en-IN");
 const uid=(p="id")=>`${p}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 const money=n=>"₹"+Number(n||0).toLocaleString("en-IN");
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
-function initial(){return{users:[{id:"control_root",name:"AITradeX Control",email:"control@aitradex.com",password:"admin123",role:"admin",status:"ACTIVE",createdAt:now()}],profiles:[],kycRequests:[],paymentMethods:[],depositRequests:[],withdrawalRequests:[],supportTickets:[],notifications:[],walletLedger:[],demoLedger:[],trades:[],aiTradeBatches:[],plans:[{id:"free",name:"Free Trial",price:0,signals:5,aiAccess:"Trial AI",durationDays:7,status:"ACTIVE",benefits:["5 AI auto trades per day for 7 days","1 AI auto trade per day after trial","Manual trading access","Live price cards"]},{id:"starter",name:"Standard",price:999,signals:15,aiAccess:"Standard AI",durationDays:30,status:"ACTIVE",benefits:["15 AI auto trades per day","Higher AI trading access","Priority dashboard visibility"]},{id:"pro",name:"Premium",price:2999,signals:50,aiAccess:"Premium AI",durationDays:30,status:"ACTIVE",benefits:["50 AI auto trades per day","Premium AI access","Faster plan priority"]},{id:"premium",name:"VIP",price:9999,signals:999999,aiAccess:"VIP Advanced AI",durationDays:30,status:"ACTIVE",benefits:["Unlimited AI auto trades per day","VIP advanced AI priority","Highest daily AI trades"]}],subscriptions:[],referrals:[],settings:{minDeposit:Number(C.MIN_DEPOSIT||500),minWithdrawal:Number(C.MIN_WITHDRAWAL||1000),referralFirstDepositPercent:Number(C.REFERRAL_FIRST_DEPOSIT_PERCENT||10),referralDepositPercent:Number(C.REFERRAL_DEPOSIT_PERCENT||10),referralSubscriptionPercent:Number(C.REFERRAL_SUBSCRIPTION_PERCENT||10),referralDepositEnabled:true,referralSubscriptionEnabled:true,demoBalance:Number(C.DEMO_BALANCE||100000),platformName:"AITradeX",depositUpiId:"aitradex@upi",depositQrImage:"",depositUpiEnabled:true,depositBankEnabled:true,depositBankName:"AITradeX Bank",depositAccountName:"AITradeX Private Wallet",depositAccountNumber:"123456789012",depositIfsc:"AITX0001234",freeAiTradesPerDay:5,postTrialFreeAiTradesPerDay:1,freeTrialDays:7,supportWhatsAppNumber:"919999999999",usdtInrRate:Number(C.USDT_INR_RATE||95)}}}
-const load=()=>{try{return JSON.parse(localStorage.getItem(SK)||"null")||initial()}catch{return initial()}};
+function initial(){return{users:[{id:"control_root",name:"AITradeX Control",email:"control@aitradex.com",password:"admin123",role:"admin",status:"ACTIVE",createdAt:now()}],profiles:[],kycRequests:[],paymentMethods:[],depositRequests:[],withdrawalRequests:[],supportTickets:[],notifications:[],adminActionLogs:[],walletLedger:[],demoLedger:[],trades:[],aiTradeBatches:[],plans:[{id:"free",name:"Free Trial",price:0,signals:5,aiAccess:"Trial AI",durationDays:7,status:"ACTIVE",benefits:["5 AI auto trades per day for 7 days","1 AI auto trade per day after trial","Manual trading access","Live price cards"]},{id:"starter",name:"Standard",price:999,signals:15,aiAccess:"Standard AI",durationDays:30,status:"ACTIVE",benefits:["15 AI auto trades per day","Higher AI trading access","Priority dashboard visibility"]},{id:"pro",name:"Premium",price:2999,signals:50,aiAccess:"Premium AI",durationDays:30,status:"ACTIVE",benefits:["50 AI auto trades per day","Premium AI access","Faster plan priority"]},{id:"premium",name:"VIP",price:9999,signals:999999,aiAccess:"VIP Advanced AI",durationDays:30,status:"ACTIVE",benefits:["Unlimited AI auto trades per day","VIP advanced AI priority","Highest daily AI trades"]}],subscriptions:[],referrals:[],settings:{minDeposit:Number(C.MIN_DEPOSIT||500),minWithdrawal:Number(C.MIN_WITHDRAWAL||1000),referralFirstDepositPercent:Number(C.REFERRAL_FIRST_DEPOSIT_PERCENT||10),referralDepositPercent:Number(C.REFERRAL_DEPOSIT_PERCENT||10),referralSubscriptionPercent:Number(C.REFERRAL_SUBSCRIPTION_PERCENT||10),referralDepositEnabled:true,referralSubscriptionEnabled:true,demoBalance:Number(C.DEMO_BALANCE||100000),platformName:"AITradeX",depositUpiId:"aitradex@upi",depositQrImage:"",depositUpiEnabled:true,depositBankEnabled:true,depositBankName:"AITradeX Bank",depositAccountName:"AITradeX Private Wallet",depositAccountNumber:"123456789012",depositIfsc:"AITX0001234",depositEnabled:true,withdrawalEnabled:true,manualTradingEnabled:true,aiTradingEnabled:true,maintenanceMode:false,maxDeposit:1000000,maxWithdrawal:500000,minManualTrade:100,maxManualTrade:250000,minAiTrade:100,maxAiTrade:250000,maxLeverage:2000,maxOpenPositionsPerUser:10,freeAiTradesPerDay:5,postTrialFreeAiTradesPerDay:1,freeTrialDays:7,supportWhatsAppNumber:"919999999999",usdtInrRate:Number(C.USDT_INR_RATE||95),telegramEnabled:false,telegramBotToken:"",telegramEdgeFunctionUrl:"",telegramChatId:"",telegramAdminAlerts:true,telegramUserAlerts:false,phase6AuthMode:"legacy-testing",phase6BackendMode:"deposit-withdrawal-ai-manual-kyc-payment-subscription-wallet-rpc-rls-ready",phase6Build:"6.9.5-plan-catalog-safe"}}}
+const load=()=>{
+  if(DB_ONLY) return initial();
+  try{return JSON.parse(localStorage.getItem(SK)||"null")||initial()}catch{return initial()}
+};
 const loadSession=()=>{try{return JSON.parse(localStorage.getItem(SS)||"null")}catch{return null}};
 
 const MARKET_PAIRS={
@@ -120,15 +124,119 @@ const App={config:C,db,state:load(),session:loadSession(),now,uid,money,escapeHt
 App.reloadState=()=>{App.state=load();App.session=loadSession();return App.state;};
 App.hasLedgerEntry=({accountType="REAL",type,referenceId,userId})=>{const list=accountType==="DEMO"?App.state.demoLedger:App.state.walletLedger;return (list||[]).some(x=>(!type||x.type===type)&&(!referenceId||x.referenceId===referenceId)&&(!userId||x.userId===userId));};
 App.ensureNotifications=()=>{if(!Array.isArray(App.state.notifications))App.state.notifications=[];return App.state.notifications;};
-App.addNotification=({audience="USER",userId="",title="Notification",message="",type="INFO",linkPage="",referenceId=""}={})=>{
+App.addNotification=(payload={})=>{
   App.ensureNotifications();
-  const cleanAudience=String(audience||"USER").toUpperCase();
-  const id=referenceId?`notif_${cleanAudience}_${userId||"all"}_${type}_${referenceId}`:uid("notif");
+  const cleanAudience=String(payload.audience||"USER").toUpperCase();
+  const type=String(payload.type||"INFO").toUpperCase();
+  const referenceId=payload.referenceId||"";
+  const id=referenceId?`notif_${cleanAudience}_${payload.userId||"all"}_${type}_${referenceId}`:uid("notif");
   if(referenceId&&App.state.notifications.some(n=>n.id===id))return false;
-  App.state.notifications.unshift({id,audience:cleanAudience,userId:userId||"",title:String(title||"Notification"),message:String(message||""),type:String(type||"INFO").toUpperCase(),linkPage:String(linkPage||""),referenceId:referenceId||"",read:false,createdAt:now()});
+  const row={id,audience:cleanAudience,userId:payload.userId||"",title:String(payload.title||"Notification"),message:String(payload.message||""),type,linkPage:String(payload.linkPage||""),referenceId,read:false,createdAt:now()};
+  App.state.notifications.unshift(row);
+  if(DB_ONLY&&window.AITradeXDB?.writeNotification){window.AITradeXDB.writeNotification(row).catch(err=>console.warn("notification write failed",err));}
+  if(App.sendTelegramForNotification){App.sendTelegramForNotification(row).catch(err=>console.warn("telegram notification failed",err));}
   App.saveState();
-  return true;
+  return row;
 };
+
+App.addNotificationAsync=async (payload={})=>{
+  App.ensureNotifications();
+  const cleanAudience=String(payload.audience||"USER").toUpperCase();
+  const type=String(payload.type||"INFO").toUpperCase();
+  const referenceId=payload.referenceId||"";
+  const id=referenceId?`notif_${cleanAudience}_${payload.userId||"all"}_${type}_${referenceId}`:uid("notif");
+  if(referenceId&&App.state.notifications.some(n=>n.id===id))return false;
+  const row={id,audience:cleanAudience,userId:payload.userId||"",title:String(payload.title||"Notification"),message:String(payload.message||""),type,linkPage:String(payload.linkPage||""),referenceId,read:false,createdAt:now()};
+  if(DB_ONLY&&window.AITradeXDB?.writeNotification) await window.AITradeXDB.writeNotification(row);
+  App.state.notifications.unshift(row);
+  App.saveState();
+  if(App.sendTelegramForNotification) await App.sendTelegramForNotification(row);
+  return row;
+};
+
+App.telegramSettings=()=>{
+  App.state.settings=App.state.settings||{};
+  return {
+    enabled:App.state.settings.telegramEnabled===true,
+    botToken:String(App.state.settings.telegramBotToken||"").trim(),
+    chatId:String(App.state.settings.telegramChatId||"").trim(),
+    adminAlerts:App.state.settings.telegramAdminAlerts!==false,
+    userAlerts:App.state.settings.telegramUserAlerts===true
+  };
+};
+App.telegramReady=()=>{const t=App.telegramSettings();return !!(t.enabled&&t.botToken&&t.chatId);};
+App.telegramEscape=(value)=>String(value||"").replace(/[&<>]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[ch]));
+App.sendTelegramMessage=async(message)=>{
+  const t=App.telegramSettings();
+  const text=String(message||"").slice(0,3900);
+  if(!t.enabled)return {ok:false,skipped:true,reason:"Telegram disabled"};
+  if(DB_ONLY&&window.AITradeXDB?.sendTelegramMessage){
+    try{return await window.AITradeXDB.sendTelegramMessage(text);}catch(error){console.warn("Telegram backend/fallback send failed",error);return {ok:false,error:String(error?.message||error)};}
+  }
+  return {ok:false,skipped:true,reason:"Telegram Edge Function is required. Direct frontend bot-token sending is disabled for safety."};
+};
+App.telegramNotificationText=({audience="USER",title="Notification",message="",type="INFO",linkPage=""}={})=>{
+  const tag=String(type||"INFO").toUpperCase();
+  const aud=String(audience||"USER").toUpperCase();
+  const lines=[
+    `🚨 <b>AITradeX ${App.telegramEscape(tag)} Alert</b>`,
+    `<b>${App.telegramEscape(title)}</b>`,
+    App.telegramEscape(message),
+    `Audience: ${App.telegramEscape(aud)}`,
+    linkPage?`Page: ${App.telegramEscape(linkPage)}`:"",
+    `Time: ${new Date().toLocaleString("en-IN",{timeZone:"Asia/Kolkata"})}`
+  ].filter(Boolean);
+  return lines.join("\n");
+};
+App.telegramAllowedTypes=()=>new Set(["KYC","DEPOSIT","WITHDRAWAL","PAYMENT_METHOD"]);
+App.sendTelegramForNotification=async (payload)=>{
+  const t=App.telegramSettings();
+  const aud=String(payload?.audience||"USER").toUpperCase();
+  const type=String(payload?.type||"INFO").toUpperCase();
+  if(!t.enabled)return;
+  // Telegram is intentionally limited to KYC, Deposit, Withdrawal and Payment Method alerts only.
+  // Other app notifications still stay inside the website notification center.
+  if(!App.telegramAllowedTypes().has(type))return;
+  if(aud==="ADMIN"&&!t.adminAlerts)return;
+  if(aud==="USER"&&!t.userAlerts)return;
+  await App.sendTelegramMessage(App.telegramNotificationText(payload));
+};
+
+App.notifyAsync=async (payload={}, { required=false } = {})=>{
+  if(!App.addNotificationAsync){
+    const row=App.addNotification?.(payload);
+    if(required && !row) throw new Error("Notification could not be created.");
+    return row;
+  }
+  try{
+    return await App.addNotificationAsync(payload);
+  }catch(err){
+    console.warn("Notification/Telegram side alert failed", err?.message||err);
+    if(required) throw err;
+    return false;
+  }
+};
+
+App.ensureAdminActionLogs=()=>{if(!Array.isArray(App.state.adminActionLogs))App.state.adminActionLogs=[];return App.state.adminActionLogs;};
+App.addAdminAction=(payload={})=>{
+  App.ensureAdminActionLogs();
+  const admin=App.currentUser?.()||{};
+  const row={id:uid("adminlog"),adminUserId:admin.id||App.session?.userId||"admin",adminName:admin.name||admin.email||"Admin",action:String(payload.action||"ADMIN_ACTION").toUpperCase(),targetType:String(payload.targetType||"SYSTEM").toUpperCase(),targetId:String(payload.targetId||""),meta:payload.meta&&typeof payload.meta==="object"?payload.meta:{note:String(payload.meta||"")},createdAt:new Date().toISOString()};
+  App.state.adminActionLogs.unshift(row);
+  if(DB_ONLY&&window.AITradeXDB?.writeAdminAction){window.AITradeXDB.writeAdminAction(row).catch(err=>console.warn("admin action write failed",err));}
+  App.saveState();
+  return row;
+};
+App.addAdminActionAsync=async (payload={})=>{
+  App.ensureAdminActionLogs();
+  const admin=App.currentUser?.()||{};
+  const row={id:uid("adminlog"),adminUserId:admin.id||App.session?.userId||"admin",adminName:admin.name||admin.email||"Admin",action:String(payload.action||"ADMIN_ACTION").toUpperCase(),targetType:String(payload.targetType||"SYSTEM").toUpperCase(),targetId:String(payload.targetId||""),meta:payload.meta&&typeof payload.meta==="object"?payload.meta:{note:String(payload.meta||"")},createdAt:new Date().toISOString()};
+  if(DB_ONLY&&window.AITradeXDB?.writeAdminAction) await window.AITradeXDB.writeAdminAction(row);
+  App.state.adminActionLogs.unshift(row);
+  App.saveState();
+  return row;
+};
+
 App.notificationsFor=({audience="USER",userId=""}={})=>{
   App.ensureNotifications();
   const cleanAudience=String(audience||"USER").toUpperCase();
@@ -137,11 +245,25 @@ App.notificationsFor=({audience="USER",userId=""}={})=>{
 App.unreadNotificationCount=({audience="USER",userId=""}={})=>App.notificationsFor({audience,userId}).filter(n=>!n.read).length;
 App.markNotificationsRead=({audience="USER",userId=""}={})=>{
   const rows=App.notificationsFor({audience,userId});
-  rows.forEach(n=>n.read=true);
+  rows.forEach(n=>{
+    n.read=true;
+    if(DB_ONLY&&window.AITradeXDB?.writeNotification){window.AITradeXDB.writeNotification(n).catch(err=>console.warn("notification read sync failed",err));}
+  });
   App.saveState();
   return rows.length;
 };
-App.deleteNotification=(id)=>{App.ensureNotifications();const before=App.state.notifications.length;App.state.notifications=App.state.notifications.filter(n=>n.id!==id);if(App.state.notifications.length!==before){App.saveState();return true;}return false;};
+App.deleteNotification=(id)=>{
+  App.ensureNotifications();
+  const cleanId=String(id||"");
+  const before=App.state.notifications.length;
+  App.state.notifications=App.state.notifications.filter(n=>n.id!==cleanId);
+  if(App.state.notifications.length!==before){
+    if(DB_ONLY&&window.AITradeXDB?.deleteNotification){window.AITradeXDB.deleteNotification(cleanId).catch(err=>console.warn("notification delete sync failed",err));}
+    App.saveState();
+    return true;
+  }
+  return false;
+};
 App.logoHtml=(variant="full",className="")=>{
   const mode=String(variant||"full").toLowerCase();
   const cls=esc(className||"");
@@ -165,9 +287,20 @@ App.logoHtml=(variant="full",className="")=>{
   if(mode==="icon")return `<span class="aitx-logo-wrap aitx-logo-icon-wrap ${cls}" aria-label="AITradeX logo"><svg class="aitx-logo-svg" viewBox="0 0 64 64" role="img" aria-hidden="true">${defs}${icon}</svg></span>`;
   return `<span class="aitx-logo-wrap aitx-logo-full-wrap ${cls}" aria-label="AITradeX logo"><svg class="aitx-logo-svg" viewBox="0 0 286 64" role="img" aria-hidden="true">${defs}${icon}<text x="72" y="43" font-family="Inter,Arial Black,system-ui,-apple-system,Segoe UI,Arial,sans-serif" font-size="35" font-weight="1000" letter-spacing="-2.15" paint-order="stroke fill" stroke="rgba(5,8,20,.42)" stroke-width="1.05" stroke-linejoin="round"><tspan fill="url(#${blue})">AI</tspan><tspan fill="#ffffff">Trade</tspan><tspan fill="url(#${green})">X</tspan></text></svg></span>`;
 };
+if(!Array.isArray(App.state.adminActionLogs))App.state.adminActionLogs=[];
 App.state.settings={freeAiTradesPerDay:5,postTrialFreeAiTradesPerDay:1,freeTrialDays:7,usdtInrRate:Number(C.USDT_INR_RATE||95),...(App.state.settings||{})};
 App.state.settings.usdtInrRate=Math.max(1,Number(App.state.settings.usdtInrRate||95));
+App.state.settings.telegramEnabled=App.state.settings.telegramEnabled===true;
+App.state.settings.telegramBotToken=String(App.state.settings.telegramBotToken||"");
+App.state.settings.telegramChatId=String(App.state.settings.telegramChatId||"");
+App.state.settings.telegramAdminAlerts=App.state.settings.telegramAdminAlerts!==false;
+App.state.settings.telegramUserAlerts=App.state.settings.telegramUserAlerts===true;
 if(!Array.isArray(App.state.plans))App.state.plans=initial().plans;
+else{
+  const defaultPlans=initial().plans||[];
+  const existingIds=new Set((App.state.plans||[]).map(p=>String(p?.id||"")));
+  defaultPlans.forEach(plan=>{ if(!existingIds.has(String(plan.id))) App.state.plans.push({...plan, restoredFromDefault:true}); });
+}
 const freePlan=App.state.plans.find(p=>p.id==="free");
 if(freePlan){
   if(!freePlan.durationDays)freePlan.durationDays=Number(App.state.settings.freeTrialDays||7);
@@ -187,6 +320,34 @@ App.usdtInrRate=usdtInrRate;
 App.cryptoInrDisplay=cryptoInrDisplay;
 App.cryptoRawToInr=value=>cryptoUsdValue(value)*usdtInrRate();
 App.cryptoInrToRaw=value=>{const rate=usdtInrRate();const n=Number(value||0);return rate>0?n/rate:n;};
+App.cryptoRawUnitCeiling=pair=>{
+  const {base}=baseQuote(pair);
+  const map={BTC:200000,ETH:20000,BNB:5000,SOL:3000,AVAX:1000,LINK:1000,XRP:1000,DOGE:1000,ADA:1000,TRX:1000};
+  return map[base]||1000;
+};
+App.tradeRawPrice=(pair,value,{display="",reference=0,raw=false}={})=>{
+  let n=Number(value||0);
+  if(!Number.isFinite(n)||n<=0)return 0;
+  if(!isCryptoPair(pair))return n;
+  if(raw===true)return n;
+  const text=String(display||"");
+  const ref=Number(reference||0);
+  const ceiling=App.cryptoRawUnitCeiling(pair);
+  const looksInr=text.includes("₹")||/INR/i.test(text);
+  // Important: many live rows carry raw USDT price plus INR display text.
+  // Do NOT convert again when the numeric value is already in a normal raw range.
+  if(looksInr){
+    if(n>ceiling)return App.cryptoInrToRaw(n);
+    return n;
+  }
+  if(ref>0){
+    const ratio=n/ref;
+    if(ratio>20)return App.cryptoInrToRaw(n);
+  }
+  if(n>ceiling)return App.cryptoInrToRaw(n);
+  return n;
+};
+App.tradePriceDisplay=(pair,value)=>App.priceDisplayFor?App.priceDisplayFor(pair,App.tradeRawPrice(pair,value)):String(value||"--");
 App.displayPairLabel=pair=>isCryptoPair(pair)?cryptoPairLabel(pair):normPair(pair);
 App.priceDisplayFor=(pair,value)=>isCryptoPair(pair)?cryptoInrDisplay(value):fmtPrice(value,isMetalPair(pair)?"METAL":isForexPair(pair)?"FOREX":"");
 App.pairLiveView=item=>{
@@ -202,6 +363,28 @@ App.getLivePairPrice=async(pair,manualPrice)=>{
   const clean=normPair(pair);
   const manual=Number(manualPrice||0);
   const cached=cachedLive(clean);if(cached&&!manual)return cached;
+  if(isCryptoPair(clean)){
+    const row=await fetchCryptoPrice(clean);
+    liveCache[clean]=row;saveLiveCache();return row;
+  }
+  if(isForexPair(clean)){
+    try{const row=await fetchChartFeedPrice(clean);liveCache[clean]=row;saveLiveCache();return row;}catch(error){
+      if(isMetalPair(clean)){
+        if(manual&&manual>0){const row={ok:true,pair:clean,price:manual,display:fmtPrice(manual,"METAL"),change:"Manual",mood:"up",source:"Manual Rate",sourceType:"MANUAL",fetchedAt:new Date().toISOString(),fetchedMs:Date.now()};liveCache[clean]=row;saveLiveCache();return row;}
+        throw new Error(`${clean} chart feed unavailable. Add manual fallback price.`);
+      }
+      const row=await fetchForexPrice(clean);
+      row.source="ExchangeRate-API Fallback";
+      row.sourceType="LIVE_API_FALLBACK";
+      liveCache[clean]=row;saveLiveCache();return row;
+    }
+  }
+  const row=await fetchForexPrice(clean);
+  liveCache[clean]=row;saveLiveCache();return row;
+};
+App.getFreshLivePairPrice=async(pair,manualPrice)=>{
+  const clean=normPair(pair);
+  const manual=Number(manualPrice||0);
   if(isCryptoPair(clean)){
     const row=await fetchCryptoPrice(clean);
     liveCache[clean]=row;saveLiveCache();return row;
@@ -336,12 +519,97 @@ App.startCryptoLiveTicker=(pairs,onEach)=>{
   return true;
 };
 
-App.saveState=()=>localStorage.setItem(SK,JSON.stringify(App.state));
-App.setSession=(userId,role)=>{App.session={userId,role,savedAt:Date.now()};localStorage.setItem(SS,JSON.stringify(App.session))};
+App.isDatabaseMode=()=>DB_ONLY;
+
+// Phase 5.34 Live Sync Lite: realtime database events update app state silently.
+// This never reloads the browser page. It waits while the user is typing or a local write is in progress.
+App.liveSync={enabled:localStorage.getItem("AITradeX_LIVE_SYNC")!=="off",started:false,role:"",timer:null,retryTimer:null,busyUntil:0,lastAt:0,lastReason:"",channel:null,status:"idle"};
+App.pauseLiveSync=(ms=1800)=>{App.liveSync.busyUntil=Math.max(Number(App.liveSync.busyUntil||0),Date.now()+Number(ms||1800));};
+App.isUserEditing=()=>{const el=document.activeElement;if(!el)return false;const tag=String(el.tagName||"").toLowerCase();return !!(el.isContentEditable||["input","textarea","select"].includes(tag));};
+App.registerLiveSyncRenderer=(fn,label="app")=>{if(typeof fn==="function"){App.liveSync.render=fn;App.liveSync.label=label;}return App.liveSync;};
+App.requestLiveSync=(reason="database_change")=>{
+  const ls=App.liveSync||{};
+  if(!ls.enabled||!DB_ONLY||!window.AITradeXDB?.loadAll)return false;
+  clearTimeout(ls.timer);
+  ls.timer=setTimeout(async()=>{
+    if(Date.now()<Number(ls.busyUntil||0)||App.isUserEditing()){
+      clearTimeout(ls.retryTimer);
+      ls.retryTimer=setTimeout(()=>App.requestLiveSync(reason),1800);
+      return;
+    }
+    if(ls.syncing)return;
+    ls.syncing=true;ls.status="syncing";ls.lastReason=reason;
+    const scrollY=window.scrollY;
+    try{
+      await window.AITradeXDB.loadAll();
+      ls.lastAt=Date.now();ls.status="synced";
+      if(typeof ls.render==="function")ls.render({liveSync:true,reason});
+      try{window.scrollTo({top:scrollY,left:0,behavior:"instant"});}catch{try{window.scrollTo(0,scrollY);}catch{}}
+    }catch(err){ls.status="error";console.warn("Live Sync Lite load skipped",err?.message||err);}
+    finally{ls.syncing=false;}
+  },900);
+  return true;
+};
+App.startLiveSync=(opts={})=>{
+  const ls=App.liveSync||{};
+  if(ls.started||!ls.enabled||!DB_ONLY||!window.AITradeXDB?.subscribeRealtimeChanges)return false;
+  ls.started=true;ls.role=opts.role||"app";
+  try{
+    ls.channel=window.AITradeXDB.subscribeRealtimeChanges((event)=>{
+      const table=event?.table||event?.payload?.table||"database";
+      App.requestLiveSync(`realtime:${table}`);
+    },{role:ls.role});
+    ls.status="listening";
+    return true;
+  }catch(err){ls.status="error";console.warn("Live Sync Lite start failed",err?.message||err);return false;}
+};
+App.saveState=()=>{
+  if(DB_ONLY){
+    // Database-only runtime: business rows are written by action-specific DB methods.
+    // Do not full-sync the whole app state from every UI action.
+    return true;
+  }
+  try{localStorage.setItem(SK,JSON.stringify(App.state));return true;}catch{return false;}
+};
+App.reloadState=()=>{
+  if(DB_ONLY) return App.state;
+  App.state=load();
+  return App.state;
+};
+App.sessionDurationMs=(role)=>String(role||App.session?.role||"").toLowerCase()==="admin"?2*60*60*1000:24*60*60*1000;
+App.setSession=(userId,role)=>{
+  const cleanRole=role||App.state.users.find(u=>u.id===userId)?.role||"user";
+  const savedAt=Date.now();
+  App.session={userId,role:cleanRole,savedAt,expiresAt:savedAt+App.sessionDurationMs(cleanRole)};
+  localStorage.setItem(SS,JSON.stringify(App.session));
+};
 App.clearSession=()=>{App.session=null;localStorage.removeItem(SS)};
-App.currentUser=()=>App.state.users.find(u=>u.id===App.session?.userId)||null;
-App.realBalance=id=>App.state.walletLedger.filter(x=>x.userId===id).reduce((s,x)=>s+Number(x.amount||0),0);
-App.demoBalance=id=>{const rows=App.state.demoLedger.filter(x=>x.userId===id);return rows.reduce((s,x)=>s+Number(x.amount||0),Number(App.state.settings.demoBalance||100000))};
+App.clearOldUiCache=()=>{
+  try{
+    [
+      "AITradeX_AUTO_PERCENT",
+      "AITradeX_AUTO_ON",
+      "AITradeX_ACCOUNT_MODE"
+    ].forEach(k=>localStorage.removeItem(k));
+    return true;
+  }catch{return false;}
+};
+App.isSessionExpired=()=>!!(App.session?.expiresAt&&Date.now()>Number(App.session.expiresAt));
+App.sessionTimeLeft=()=>App.session?.expiresAt?Math.max(0,Number(App.session.expiresAt)-Date.now()):0;
+App.touchSession=()=>{
+  if(!App.session?.userId)return false;
+  if(App.isSessionExpired()){App.clearSession();return false;}
+  App.session.savedAt=Date.now();
+  App.session.expiresAt=Date.now()+App.sessionDurationMs(App.session.role);
+  localStorage.setItem(SS,JSON.stringify(App.session));
+  return true;
+};
+App.currentUser=()=>{
+  if(App.isSessionExpired()){App.clearSession();return null;}
+  return App.state.users.find(u=>u.id===App.session?.userId)||null;
+};
+App.realBalance=id=>App.state.walletLedger.filter(x=>x.userId===id&&String(x.accountType||"REAL").toUpperCase()==="REAL").reduce((s,x)=>s+Number(x.amount||0),0);
+App.demoBalance=id=>{const rows=App.state.demoLedger.filter(x=>x.userId===id&&String(x.accountType||"DEMO").toUpperCase()==="DEMO");return rows.reduce((s,x)=>s+Number(x.amount||0),Number(App.state.settings.demoBalance||100000))};
 App.pendingDeposit=id=>App.state.depositRequests.filter(x=>x.userId===id&&x.status==="PENDING").reduce((s,x)=>s+Number(x.amount||0),0);
 App.pendingWithdrawal=id=>App.state.withdrawalRequests.filter(x=>x.userId===id&&x.status==="PENDING").reduce((s,x)=>s+Number(x.amount||0),0);
 App.kycStatus=id=>([...App.state.kycRequests].reverse().find(x=>x.userId===id)?.status)||"NOT_SUBMITTED";
@@ -383,11 +651,30 @@ App.currentPlan=id=>{
 };
 
 App.todayKey=()=>new Date().toISOString().slice(0,10);
-App.aiTradesToday=userId=>App.state.trades.filter(t=>t.userId===userId&&["AI_AUTO","AI_LIVE"].includes(String(t.tradeType||""))&&String(t.createdDate||"")===App.todayKey()).length;
+App.aiLimitWindowStart=userId=>{
+  const sub=App.activeSubscription(userId);
+  if(sub){
+    const start=Date.parse(sub.startsAt||sub.createdAt||sub.planChangedAt||"");
+    if(Number.isFinite(start))return start;
+  }
+  return Date.parse(App.todayKey()+"T00:00:00.000Z")||0;
+};
+App.aiTradesToday=userId=>{
+  const windowStart=App.aiLimitWindowStart(userId);
+  const today=App.todayKey();
+  return (App.state.trades||[]).filter(t=>{
+    if(t.userId!==userId)return false;
+    if(!["AI_AUTO","AI_LIVE"].includes(String(t.tradeType||"")))return false;
+    if(String(t.createdDate||"")!==today)return false;
+    const created=Date.parse(t.createdAt||t.openedAt||t.closedAt||"");
+    return !Number.isFinite(windowStart)||!Number.isFinite(created)||created>=windowStart;
+  }).length;
+};
 App.aiDailyLimit=userId=>{const sub=App.activeSubscription(userId);if(sub){const plan=App.planById(sub.planId)||{};return Number(sub.aiTradeLimit||sub.signals||plan.signals||50)||50}const trial=App.freeTrialInfo(userId);return trial.active?Number(App.state.settings.freeAiTradesPerDay||5):Number(App.state.settings.postTrialFreeAiTradesPerDay||1)};
 App.aiSettings=user=>({enabled:!!user?.aiTradeOn,percent:Number(user?.aiTradePercent||25)});
 App.aiAllowedAmount=user=>{const settings=App.aiSettings(user);if(!settings.enabled)return 0;return Math.max(0,App.realBalance(user.id))*settings.percent/100};
-App.addLedger=({userId,accountType="REAL",type,amount,referenceId,note=""})=>{const list=accountType==="DEMO"?App.state.demoLedger:App.state.walletLedger;if(list.some(x=>x.type===type&&x.referenceId===referenceId))return false;const before=accountType==="DEMO"?App.demoBalance(userId):App.realBalance(userId),after=before+Number(amount||0);if(after<0)throw new Error("Insufficient balance");list.push({id:uid("ledger"),userId,accountType,type,amount:Number(amount||0),referenceId,note,balanceAfter:after,createdAt:now()});App.saveState();return true};
+App.addLedger=({userId,accountType="REAL",type,amount,referenceId,note=""})=>{accountType=String(accountType||"REAL").toUpperCase();const list=accountType==="DEMO"?App.state.demoLedger:App.state.walletLedger;if(list.some(x=>x.userId===userId&&String(x.accountType||accountType).toUpperCase()===accountType&&x.type===type&&x.referenceId===referenceId))return false;const before=accountType==="DEMO"?App.demoBalance(userId):App.realBalance(userId),after=before+Number(amount||0);if(after<0)throw new Error("Insufficient balance");const row={id:uid("ledger"),userId,accountType,type,amount:Number(amount||0),referenceId,note,balanceAfter:after,createdAt:now()};list.push(row);if(DB_ONLY&&window.AITradeXDB?.writeLedger){window.AITradeXDB.writeLedger(row).catch(err=>console.warn("ledger write failed",err));}App.saveState();return row};
+App.addLedgerAsync=async ({userId,accountType="REAL",type,amount,referenceId,note=""})=>{accountType=String(accountType||"REAL").toUpperCase();const list=accountType==="DEMO"?App.state.demoLedger:App.state.walletLedger;if(list.some(x=>x.userId===userId&&String(x.accountType||accountType).toUpperCase()===accountType&&x.type===type&&x.referenceId===referenceId))return false;const before=accountType==="DEMO"?App.demoBalance(userId):App.realBalance(userId),after=before+Number(amount||0);if(after<0)throw new Error("Insufficient balance");const row={id:uid("ledger"),userId,accountType,type,amount:Number(amount||0),referenceId,note,balanceAfter:after,createdAt:now()};if(DB_ONLY&&window.AITradeXDB?.writeLedger){await window.AITradeXDB.writeLedger(row);}list.push(row);App.saveState();return row};
 
 App.referralSettings=()=>{
   App.state.settings=App.state.settings||{};
@@ -406,7 +693,7 @@ App.referralByReferredUser=userId=>{
   return App.state.referrals.find(r=>r.referredUserId===userId)||null;
 };
 App.referralBonusAlreadyCredited=(referral,type)=>!!(referral&&referral.bonuses&&referral.bonuses[type]&&referral.bonuses[type].credited);
-App.creditReferralBonus=({referredUserId,eventType,amount,referenceId,sourceLabel})=>{
+App.creditReferralBonusAsync=async ({referredUserId,eventType,amount,referenceId,sourceLabel})=>{
   const settings=App.referralSettings();
   const referral=App.referralByReferredUser(referredUserId);
   const baseAmount=Number(amount||0);
@@ -421,14 +708,20 @@ App.creditReferralBonus=({referredUserId,eventType,amount,referenceId,sourceLabe
   if(!bonus||bonus<=0)return {credited:false,reason:"Bonus percent is zero"};
   const ledgerRef=`ref_${key}_${referral.id}_${referenceId||Date.now()}`;
   try{
-    const added=App.addLedger({userId:referral.referrerUserId,accountType:"REAL",type:key==="subscription"?"REFERRAL_SUBSCRIPTION_BONUS":"REFERRAL_DEPOSIT_BONUS",amount:bonus,referenceId:ledgerRef,note:`Referral ${key} bonus · ${percent}% of ${money(baseAmount)}${sourceLabel?` · ${sourceLabel}`:""}`});
+    const added=App.addLedgerAsync?await App.addLedgerAsync({userId:referral.referrerUserId,accountType:"REAL",type:key==="subscription"?"REFERRAL_SUBSCRIPTION_BONUS":"REFERRAL_DEPOSIT_BONUS",amount:bonus,referenceId:ledgerRef,note:`Referral ${key} bonus · ${percent}% of ${money(baseAmount)}${sourceLabel?` · ${sourceLabel}`:""}`}):App.addLedger({userId:referral.referrerUserId,accountType:"REAL",type:key==="subscription"?"REFERRAL_SUBSCRIPTION_BONUS":"REFERRAL_DEPOSIT_BONUS",amount:bonus,referenceId:ledgerRef,note:`Referral ${key} bonus · ${percent}% of ${money(baseAmount)}${sourceLabel?` · ${sourceLabel}`:""}`});
     if(!referral.bonuses)referral.bonuses={};
     referral.bonuses[key]={credited:true,amount:bonus,percent,baseAmount,referenceId,ledgerReferenceId:ledgerRef,creditedAt:new Date().toISOString(),eventType:key.toUpperCase()};
     referral.status=referral.bonuses.deposit?.credited&&referral.bonuses.subscription?.credited?"BONUSES_CREDITED":key==="deposit"?"DEPOSIT_BONUS_CREDITED":"SUBSCRIPTION_BONUS_CREDITED";
     referral.updatedAt=new Date().toISOString();
+    if(DB_ONLY&&window.AITradeXDB?.writeReferral) await window.AITradeXDB.writeReferral(referral);
     App.saveState();
     return {credited:!!added,amount:bonus,percent,referral};
   }catch(err){return {credited:false,reason:err.message||"Unable to credit referral bonus"};}
+};
+App.creditReferralBonus=(payload)=>{
+  const task=App.creditReferralBonusAsync(payload);
+  task.catch(err=>console.warn("referral bonus failed",err));
+  return {credited:false,pending:true};
 };
 App.referralStats=userId=>{
   const rows=(App.state.referrals||[]).filter(r=>r.referrerUserId===userId);

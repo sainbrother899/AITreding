@@ -1,0 +1,26 @@
+AITradeX Phase 6.9.5 - Strict Separated AI Pages
+
+Fix applied for admin AI trade screens:
+
+1. Removed the two-option mode switch bar from inside both pages.
+   - Instant AI Trade page no longer shows the Live Position Trade option inside the page body.
+   - Live Position Trade page no longer shows the Instant AI Trade option inside the page body.
+
+2. Sidebar/navigation still keeps both pages as separate admin menu items.
+
+3. Instant AI Trade page now contains only:
+   - Instant metrics
+   - Instant-only explanation
+   - Instant eligible users
+   - Instant trade execution form
+   - Instant history
+
+4. Live Position Trade page now contains only:
+   - Live metrics
+   - Live-only explanation
+   - Running live positions
+   - Live eligible users
+   - Open live position form
+   - Live history
+
+5. No SQL required. This is a UI/render separation fix only.

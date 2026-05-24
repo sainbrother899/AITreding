@@ -1,0 +1,16 @@
+AITradeX Phase 6.9.5 Home Quick Action Duplicate Fix
+
+Base used:
+- AITradeX-Phase6.9.5-AISettingsSidebar.zip
+
+Changes made:
+- Removed the duplicated quick-action button row from the Home hero/banner card.
+- Kept the main Quick Actions section below the summary area unchanged.
+- Did not change Trade page, chart layout, admin side, routes, SQL, or database logic.
+
+Result:
+- Home page no longer shows quick actions in two places.
+- Quick actions remain available in one clean section only.
+
+SQL:
+- No SQL required.

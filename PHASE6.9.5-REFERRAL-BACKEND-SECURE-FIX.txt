@@ -1,0 +1,57 @@
+AITradeX Phase 6.9.5 - Referral Backend Secure Fix
+
+Base used:
+- AITradeX-Phase6.9.5-AiLiveMaxLossAutoCloseFix.zip
+
+Scope:
+- Referral logic only.
+- No home/trade/chart/wallet/admin layout redesign.
+
+What changed:
+1. Added SQL patch:
+   - supabase-referral-backend-secure-fix.sql
+
+2. Backend referral helper added:
+   - public.aitradex_credit_referral_bonus(...)
+   - Credits deposit/subscription referral bonus from backend.
+   - Blocks duplicate bonus using wallet_ledger unique reference.
+   - Updates referrals.raw.bonuses.deposit/subscription for UI consistency.
+
+3. Deposit approve RPC upgraded:
+   - public.aitradex_approve_deposit now calls referral helper after wallet credit.
+   - Referral bonus no longer depends on admin browser/frontend after secure deposit approval.
+
+4. Subscription purchase RPC upgraded:
+   - public.aitradex_purchase_plan now calls referral helper after successful plan purchase.
+   - Referral subscription bonus no longer depends on user browser/frontend in DB mode.
+
+5. Admin repair tool added:
+   - Admin -> Referrals -> Repair missed bonuses
+   - Calls public.aitradex_repair_referral_bonuses(...)
+   - Backfills missed deposit/subscription referral bonuses safely.
+
+6. Frontend duplicate triggers cleaned:
+   - Secure deposit approve branch no longer calls frontend referral credit.
+   - Secure subscription purchase branch no longer calls frontend referral credit.
+   - Local/non-DB fallback referral logic remains unchanged.
+
+Required SQL:
+- Run supabase-referral-backend-secure-fix.sql in Supabase SQL Editor.
+
+Test checklist:
+1. Create user A.
+2. Copy user A referral code.
+3. Create user B with user A referral code.
+4. Submit deposit for user B.
+5. Admin approve deposit.
+6. User A wallet ledger should receive REFERRAL_DEPOSIT_BONUS once.
+7. Refresh admin/user pages; referral bonus should remain credited.
+8. Try approving the same deposit again; no duplicate bonus should be credited.
+9. Buy paid subscription from user B.
+10. User A wallet ledger should receive REFERRAL_SUBSCRIPTION_BONUS once.
+11. Admin -> Referrals -> Repair missed bonuses should not duplicate already credited bonuses.
+
+Notes:
+- SQL does not delete data.
+- Duplicate credit is blocked by wallet_ledger unique reference.
+- Settings still use Admin -> Referrals percentages.

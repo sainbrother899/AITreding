@@ -18,9 +18,18 @@
   let usersPageNo = Math.max(1, Number(localStorage.getItem("AITradeX_ADMIN_USERS_PAGE") || 1));
   let depositHistoryPage = Math.max(1, Number(localStorage.getItem("AITradeX_ADMIN_DEPOSIT_HISTORY_PAGE") || 1));
   let withdrawalHistoryPage = Math.max(1, Number(localStorage.getItem("AITradeX_ADMIN_WITHDRAWAL_HISTORY_PAGE") || 1));
+  let aiBatchAutoCloseRunning = false;
+  let aiBatchAutoCloseTimer = null;
+  let aiLiveEligiblePage = Math.max(1, Number(localStorage.getItem("AITradeX_ADMIN_AI_LIVE_ELIGIBLE_PAGE") || 1));
+  const AI_LIVE_ELIGIBLE_PAGE_SIZE = 12;
 
   function adminUser() {
     return App.currentUser();
+  }
+
+  function isAdminSessionActive() {
+    const current = adminUser ? adminUser() : null;
+    return !!(App.session?.userId && current && String(current.role || "").toLowerCase() === "admin");
   }
 
   function allUsers() {
@@ -44,73 +53,85 @@
   }
 
   function displayNameFor(user) {
-    return localStorage.getItem(`AITradeX_DISPLAY_NAME_${user.id}`) || user.name || "User";
+    return user.name || "User";
+  }
+
+  function kycRecordTime(row) {
+    return new Date(row?.updatedAt || row?.approvedAt || row?.rejectedAt || row?.submittedAt || row?.createdAt || 0).getTime() || 0;
+  }
+
+  function kycStatusRank(row) {
+    const status = String(row?.status || "").toUpperCase();
+    if (status === "APPROVED") return 4;
+    if (status === "PENDING") return 3;
+    if (status === "REJECTED") return 2;
+    return 1;
+  }
+
+  function bestKycRowFor(userId) {
+    const rows = (App.state.kycRequests || []).filter(x => x.userId === userId);
+    if (!rows.length) return null;
+    return rows.sort((a, b) => {
+      const rankDiff = kycStatusRank(b) - kycStatusRank(a);
+      if (rankDiff) return rankDiff;
+      return kycRecordTime(b) - kycRecordTime(a);
+    })[0];
   }
 
   function kycFor(user) {
-    const local = readJson(userKey(user.id, "KYC"), null);
-    if (local) return local;
-
-    const stateRow = (App.state.kycRequests || []).find(x => x.userId === user.id);
+    const stateRow = bestKycRowFor(user.id);
     if (stateRow) {
+      const idDetails = (stateRow.idDetails && typeof stateRow.idDetails === "object")
+        ? stateRow.idDetails
+        : (stateRow.id && typeof stateRow.id === "object")
+          ? stateRow.id
+          : { type: "Aadhaar Card", number: stateRow.id_number || "" };
       return {
+        requestId: typeof stateRow.id === "string" ? stateRow.id : "",
         status: stateRow.status || "NOT_SUBMITTED",
-        personal: stateRow.personal || {
-          fullName: displayNameFor(user),
-          mobile: user.mobile || "",
-          email: user.email || "",
-          dob: ""
-        },
-        id: stateRow.idDetails || stateRow.id || {
-          type: "PAN Card",
-          number: ""
-        },
-        uploads: stateRow.uploads || {
-          frontName: "",
-          backName: "",
-          selfieName: ""
-        },
+        personal: stateRow.personal || { fullName: displayNameFor(user), mobile: user.mobile || "", email: user.email || "", dob: "" },
+        id: idDetails,
+        idDetails,
+        uploads: stateRow.uploads || { frontName: "", backName: "", selfieName: "" },
         submittedAt: stateRow.submittedAt || "",
         approvedAt: stateRow.approvedAt || "",
         rejectedAt: stateRow.rejectedAt || "",
         rejectReason: stateRow.rejectReason || ""
       };
     }
-
     return {
+      requestId: "",
       status: "NOT_SUBMITTED",
-      personal: {
-        fullName: displayNameFor(user),
-        mobile: user.mobile || "",
-        email: user.email || "",
-        dob: ""
-      },
-      id: {
-        type: "PAN Card",
-        number: ""
-      },
-      uploads: {
-        frontName: "",
-        backName: "",
-        selfieName: ""
-      },
-      submittedAt: "",
-      approvedAt: "",
-      rejectedAt: "",
-      rejectReason: ""
+      personal: { fullName: displayNameFor(user), mobile: user.mobile || "", email: user.email || "", dob: "" },
+      id: { type: "Aadhaar Card", number: "" },
+      idDetails: { type: "Aadhaar Card", number: "" },
+      uploads: { frontName: "", backName: "", selfieName: "" },
+      submittedAt: "", approvedAt: "", rejectedAt: "", rejectReason: ""
     };
   }
 
-  function saveKyc(user, kyc) {
-    writeJson(userKey(user.id, "KYC"), kyc);
+  function kycActionId(kyc, userId = "") {
+    const requestId = String(kyc?.requestId || "").trim();
+    if (requestId) return requestId;
+    const rawId = kyc?.rawId || kyc?.rowId;
+    if (typeof rawId === "string" && rawId.trim()) return rawId.trim();
+    return String(userId || "").trim();
+  }
 
-    const existing = (App.state.kycRequests || []).find(x => x.userId === user.id);
+  async function saveKyc(user, kyc) {
+    App.state.kycRequests = App.state.kycRequests || [];
+    const existing = bestKycRowFor(user.id) || App.state.kycRequests.find(x => x.userId === user.id);
+    const idDetails = (kyc.idDetails && typeof kyc.idDetails === "object")
+      ? kyc.idDetails
+      : (kyc.id && typeof kyc.id === "object")
+        ? kyc.id
+        : { type: "Aadhaar Card", number: "" };
     const row = {
-      id: existing?.id || App.uid("kyc"),
+      id: (typeof existing?.id === "string" ? existing.id : "") || kyc.requestId || App.uid("kyc"),
       userId: user.id,
       status: kyc.status,
       personal: kyc.personal,
-      idDetails: kyc.id,
+      idDetails,
       uploads: kyc.uploads,
       submittedAt: kyc.submittedAt || "",
       approvedAt: kyc.approvedAt || "",
@@ -119,65 +140,65 @@
       updatedAt: App.now()
     };
 
+    if (App.isDatabaseMode?.() && window.AITradeXDB?.writeKycRequest) {
+      await window.AITradeXDB.writeKycRequest(row);
+    }
     if (existing) Object.assign(existing, row);
     else App.state.kycRequests.push(row);
-
     App.saveState();
+    return row;
   }
 
   function paymentMethodsFor(user) {
-    const local = readJson(userKey(user.id, "PAYMENT_METHODS"), []);
-    if (local.length) return local;
-
     return (App.state.paymentMethods || [])
       .filter(m => m.userId === user.id)
       .map(m => ({ ...m }));
   }
 
-  function savePaymentMethods(user, methods) {
-    writeJson(userKey(user.id, "PAYMENT_METHODS"), methods);
-
+  async function savePaymentMethods(user, methods) {
+    const rows = methods.map(m => ({ ...m, userId: user.id, userEmail: user.email, source: m.source || "ADMIN_PAYMENT_METHOD" }));
+    if (App.isDatabaseMode?.() && window.AITradeXDB?.writePaymentMethod) {
+      for (const row of rows) await window.AITradeXDB.writePaymentMethod(row);
+    }
     App.state.paymentMethods = (App.state.paymentMethods || []).filter(m => m.userId !== user.id);
-    methods.forEach(m => {
-      App.state.paymentMethods.push({
-        ...m,
-        userId: user.id,
-        source: "ADMIN_PAYMENT_METHOD"
-      });
-    });
-
+    rows.forEach(row => App.state.paymentMethods.push(row));
     App.saveState();
+    return rows;
   }
 
 
   function depositRequestsFor(user) {
-    const local = readJson(userKey(user.id, "DEPOSIT_REQUESTS"), []);
-    if (local.length) return local;
     return (App.state.depositRequests || [])
       .filter(r => r.userId === user.id)
       .map(r => ({ ...r }));
   }
 
-  function saveDepositRequests(user, requests) {
-    writeJson(userKey(user.id, "DEPOSIT_REQUESTS"), requests);
+  async function saveDepositRequests(user, requests) {
+    const rows = requests.map(r => ({ ...r, userId: user.id, userEmail: user.email }));
+    if (App.isDatabaseMode?.() && window.AITradeXDB?.writeDepositRequest) {
+      for (const row of rows) await window.AITradeXDB.writeDepositRequest(row);
+    }
     App.state.depositRequests = (App.state.depositRequests || []).filter(r => r.userId !== user.id);
-    requests.forEach(r => App.state.depositRequests.push({ ...r, userId: user.id, userEmail: user.email }));
+    rows.forEach(row => App.state.depositRequests.push(row));
     App.saveState();
+    return rows;
   }
 
   function withdrawalRequestsFor(user) {
-    const local = readJson(userKey(user.id, "WITHDRAWAL_REQUESTS"), []);
-    if (local.length) return local;
     return (App.state.withdrawalRequests || [])
       .filter(r => r.userId === user.id)
       .map(r => ({ ...r }));
   }
 
-  function saveWithdrawalRequests(user, requests) {
-    writeJson(userKey(user.id, "WITHDRAWAL_REQUESTS"), requests);
+  async function saveWithdrawalRequests(user, requests) {
+    const rows = requests.map(r => ({ ...r, userId: user.id, userEmail: user.email }));
+    if (App.isDatabaseMode?.() && window.AITradeXDB?.writeWithdrawalRequest) {
+      for (const row of rows) await window.AITradeXDB.writeWithdrawalRequest(row);
+    }
     App.state.withdrawalRequests = (App.state.withdrawalRequests || []).filter(r => r.userId !== user.id);
-    requests.forEach(r => App.state.withdrawalRequests.push({ ...r, userId: user.id, userEmail: user.email }));
+    rows.forEach(row => App.state.withdrawalRequests.push(row));
     App.saveState();
+    return rows;
   }
 
   function allWalletRequests() {
@@ -253,7 +274,7 @@
           <article><span>Email</span><b>${esc(user.email || "-")}</b></article>
           <article><span>Mobile</span><b>${esc(user.mobile || "-")}</b></article>
           <article><span>Request Amount</span><b>${App.money(request.amount || 0)}</b></article>
-          <article><span>Current Real Balance</span><b>${App.money(safeBalance)}</b></article>
+          <article><span>Current Balance</span><b>${App.money(safeBalance)}</b></article>
           <article><span>${isDeposit ? "UTR / Method" : "Balance After Approval"}</span><b>${isDeposit ? esc(financeMethodText(request, type)) : App.money(afterWithdrawal)}</b></article>
           <article><span>Request ID</span><b>${esc(request.id || "-")}</b></article>
           <article><span>Created</span><b>${request.createdAt ? new Date(request.createdAt).toLocaleString() : "-"}</b></article>
@@ -265,7 +286,7 @@
             ${method.ifsc ? `<span>IFSC: ${esc(method.ifsc)}</span>` : ""}
           </div>`}
         <div class="finance-safety-note">
-          ${isDeposit ? "Approve will credit real wallet once only. Duplicate approved UTR is blocked." : "Approve will debit real wallet at approval time. If balance is insufficient, approval is blocked."}
+          ${isDeposit ? "Approve will credit wallet once only. Duplicate approved UTR is blocked." : "Approve will debit wallet at approval time. If balance is insufficient, approval is blocked."}
         </div>
       </section>`;
   }
@@ -331,6 +352,17 @@
     return digits ? `XXXX XXXX ${digits.slice(-4)}` : "-";
   }
 
+  function kycStoredText(meta, fallbackName) {
+    const name = meta?.name || fallbackName || "-";
+    return `${name}${meta?.path ? " · Storage saved" : ""}`;
+  }
+
+  function kycFileLink(meta, label = "View") {
+    const url = meta?.url || "";
+    if (!url) return "";
+    return `<a class="kyc-file-link admin" href="${esc(url)}" target="_blank" rel="noopener">${esc(label)}</a>`;
+  }
+
   function duplicateAadhaarWarning(user, kyc) {
     const aadhaar = digitsOnly(kyc?.id?.number || kyc?.idDetails?.number, 12);
     if (!aadhaar) return "";
@@ -360,7 +392,20 @@
       depositBankName: "AITradeX Bank",
       depositAccountName: "AITradeX Private Wallet",
       depositAccountNumber: "123456789012",
-      depositIfsc: "AITX0001234"
+      depositIfsc: "AITX0001234",
+      depositEnabled: true,
+      withdrawalEnabled: true,
+      manualTradingEnabled: true,
+      aiTradingEnabled: true,
+      maintenanceMode: false,
+      maxDeposit: 1000000,
+      maxWithdrawal: 500000,
+      minManualTrade: 100,
+      maxManualTrade: 250000,
+      minAiTrade: 100,
+      maxAiTrade: 250000,
+      maxLeverage: 2000,
+      maxOpenPositionsPerUser: 10
     };
     App.state.settings = { ...defaults, ...(App.state.settings || {}) };
     return App.state.settings;
@@ -445,6 +490,14 @@
   function dateLine(label, value) {
     if (!value) return "";
     return `<div class="admin-date-line"><span>${label}</span><b>${new Date(value).toLocaleString()}</b></div>`;
+  }
+
+  async function persistSettings(label="settings") {
+    if (App.isDatabaseMode?.() && window.AITradeXDB?.writeSettings) {
+      await window.AITradeXDB.writeSettings(App.state.settings || {});
+    }
+    App.saveState();
+    return true;
   }
 
   function jsArg(value) {
@@ -542,7 +595,8 @@
             ])}
             ${navGroup("Finance", [
               navButton("deposits", "⬇️", "Deposits", "UTR/proof"),
-              navButton("withdrawals", "⬆️", "Withdrawals", "Payout control")
+              navButton("withdrawals", "⬆️", "Withdrawals", "Payout control"),
+              navButton("paymentMethods", "💳", "Payment Methods", "UPI/bank setup")
             ])}
             ${navGroup("AI Trading", [
               navButton("instantAi", "⚡", "Instant AI Trade", "Direct result"),
@@ -552,7 +606,11 @@
               navButton("plans", "⭐", "Plans", "AI limits"),
               navButton("referrals", "🎁", "Referrals", "Rewards"),
               navButton("support", "🎧", "Support Tickets", "Inbox"),
-              navButton("settings", "⚙️", "Payment Settings", "UPI/bank")
+              navButton("telegram", "📨", "Telegram Alerts", "KYC/payment/finance"),
+              navButton("settings", "⚙️", "App Settings", "Payments/trading"),
+              navButton("database", "🗄️", "Database", "Supabase sync"),
+              navButton("security", "🔐", "Security", "Admin lock"),
+              navButton("audit", "🧾", "Audit Logs", "Security log")
             ])}
           </nav>
           <button class="logout-btn admin-pro-logout" onclick="AITradeXAdmin.logout()">🚪 Logout</button>
@@ -563,7 +621,7 @@
               <p>AITradeX Admin</p>
               <h1>${pageTitle()}</h1>
             </div>
-            <div class="admin-header-actions"><button class="notification-bell admin-bell" onclick="AITradeXAdmin.go('notifications')" aria-label="Notifications">🔔${adminNotificationBadgeHtml()}</button><div class="admin-profile-chip">${avatar(admin?.name || "A")}<b>${esc(admin?.name || "Admin")}</b></div></div>
+            <div class="admin-header-actions"><span class="admin-session-pill">${adminSessionLabel()}</span><button class="notification-bell admin-bell" onclick="AITradeXAdmin.go('notifications')" aria-label="Notifications">🔔${adminNotificationBadgeHtml()}</button><div class="admin-profile-chip">${avatar(admin?.name || "A")}<b>${esc(admin?.name || "Admin")}</b></div></div>
           </div>
           ${content}
         </main>
@@ -593,9 +651,25 @@
       plans: "Subscription Plans",
       referrals: "Referrals",
       support: "Support Tickets",
-      settings: "Payment Settings"
+      settings: "App Settings",
+      paymentMethods: "Payment Methods",
+      telegram: "Telegram Alerts",
+      database: "Database",
+      security: "Security Center",
+      audit: "Audit Logs"
     };
     return titles[page] || "Dashboard";
+  }
+
+  function adminSessionLabel() {
+    const ms = App.sessionTimeLeft?.() || 0;
+    if (!ms) return "Session secure";
+    const mins = Math.max(1, Math.ceil(ms / 60000));
+    return mins >= 60 ? `Session ${Math.floor(mins / 60)}h ${mins % 60}m` : `Session ${mins}m`;
+  }
+
+  function adminLockRow(email) {
+    try { return JSON.parse(localStorage.getItem("AITradeX_ADMIN_LOGIN_LOCK_" + String(email || "").trim().toLowerCase()) || "{}") || {}; } catch { return {}; }
   }
 
   function loginPage() {
@@ -605,9 +679,14 @@
           <div class="brand center aitx-login-logo">${App.logoHtml("full", "aitx-logo-login")}</div>
           <p class="eyebrow">AI Control Center</p>
           <h1>Admin Login</h1>
+          <div class="admin-login-security-note">
+            <b>Protected Control Center</b>
+            <span>5 wrong attempts lock admin login for 15 minutes. Session expires automatically after 2 hours.</span>
+          </div>
           <form onsubmit="AITradeXAdmin.login(event)" class="form-grid">
-            <label>Email<input id="adminEmail" type="email" required placeholder="control@aitradex.com"/></label>
-            <label>Password<input id="adminPassword" type="password" required placeholder="admin123"/></label>
+            <label>Email<input id="adminEmail" type="email" required placeholder="Admin email" oninput="AITradeXAdmin.previewAdminLock && AITradeXAdmin.previewAdminLock(this.value)"/></label>
+            <label>Password<input id="adminPassword" type="password" required placeholder="Admin password"/></label>
+            <div id="adminLoginLockStatus" class="admin-login-lock-status"></div>
             <button class="btn">Login</button>
           </form>
         </section>
@@ -755,7 +834,7 @@
         ${metric("👥", "Total Users", stats.users.length)}
         ${metric("✅", "Active Users", stats.activeUsers)}
         ${metric("🚫", "Blocked / Suspended", `${stats.blockedUsers}/${stats.suspendedUsers}`)}
-        ${metric("💰", "Total Real Wallet", App.money(stats.totalWallet))}
+        ${metric("💰", "Total Wallet", App.money(stats.totalWallet))}
         ${metric("⬇️", "Today Deposits", App.money(stats.deposits.todayAmount))}
         ${metric("⬆️", "Today Withdrawals", App.money(stats.withdrawals.todayAmount))}
         ${metric("⌛", "Pending Deposits", `${stats.deposits.pending} · ${App.money(stats.deposits.pendingAmount)}`)}
@@ -869,7 +948,7 @@
       ${userFilterBar()}
       <section class="metrics-grid user-wallet-metrics">
         ${metric("👥", "Filtered Users", users.length)}
-        ${metric("💰", "Total Real Balance", App.money(users.reduce((sum, u) => sum + App.realBalance(u.id), 0)))}
+        ${metric("💰", "Total Balance", App.money(users.reduce((sum, u) => sum + App.realBalance(u.id), 0)))}
         ${metric("🤖", "AI Enabled", users.filter(u => u.aiTradeOn).length)}
         ${metric("⛔", "Blocked", allUsers().filter(u => userStatus(u) === "BLOCKED").length)}
       </section>
@@ -933,8 +1012,7 @@
         </div>
 
         <div class="user-control-grid admin-user-premium-grid">
-          <article><span>Real Balance</span><b>${App.money(App.realBalance(user.id))}</b></article>
-          <article><span>Demo Balance</span><b>${App.money(App.demoBalance(user.id))}</b></article>
+          <article><span>Available Balance</span><b>${App.money(App.realBalance(user.id))}</b></article>
           <article><span>Plan</span><b>${esc(plan.name || "Free")}</b></article>
           <article><span>AI Limit</span><b>${aiUsed}/${aiLimit}</b></article>
           <article><span>Active AI</span><b>${activeAi}</b></article>
@@ -1104,9 +1182,11 @@
           <article><span>Document</span><b>Aadhaar Card</b></article>
           <article><span>Aadhaar No.</span><b>${esc(maskAadhaar(kyc.id.number))}</b></article>
           <article><span>Submitted</span><b>${kyc.submittedAt ? new Date(kyc.submittedAt).toLocaleString() : "-"}</b></article>
-          <article><span>Aadhaar Front</span><b>${esc(kyc.uploads.frontName || "-")}</b></article>
-          <article><span>Aadhaar Back</span><b>${esc(kyc.uploads.backName || "-")}</b></article>
-          <article><span>Selfie</span><b>${esc(kyc.uploads.selfieName || "-")}</b></article>
+          <article><span>Request ID</span><b>${esc(kycActionId(kyc, user.id) || "-")}</b></article>
+          <article><span>Last Review</span><b>${kyc.approvedAt || kyc.rejectedAt ? new Date(kyc.approvedAt || kyc.rejectedAt).toLocaleString() : "-"}</b></article>
+          <article><span>Aadhaar Front</span><b>${esc(kycStoredText({ name: kyc.uploads.frontName, path: kyc.uploads.frontPath }, "-"))}</b>${kycFileLink({ url: kyc.uploads.frontUrl }, "Open")}</article>
+          <article><span>Aadhaar Back</span><b>${esc(kycStoredText({ name: kyc.uploads.backName, path: kyc.uploads.backPath }, "-"))}</b>${kycFileLink({ url: kyc.uploads.backUrl }, "Open")}</article>
+          <article><span>Selfie</span><b>${esc(kycStoredText({ name: kyc.uploads.selfieName, path: kyc.uploads.selfiePath }, "-"))}</b>${kycFileLink({ url: kyc.uploads.selfieUrl }, "Open")}</article>
         </div>
 
         ${dateLine("Approved", kyc.approvedAt)}
@@ -1355,7 +1435,7 @@
         <div class="request-grid wallet-request-grid finance-quick-grid">
           <article><span>User</span><b>${esc(displayNameFor(user))}</b></article>
           <article><span>Amount</span><b>${App.money(request.amount || 0)}</b></article>
-          <article><span>Real Balance</span><b>${App.money(App.realBalance(user.id))}</b></article>
+          <article><span>Available Balance</span><b>${App.money(App.realBalance(user.id))}</b></article>
           <article><span>${isDeposit ? "UTR" : "Pay To"}</span><b>${esc(isDeposit ? (request.utr || "-") : methodText)}</b></article>
         </div>
 
@@ -1416,7 +1496,7 @@
         return;
       }
       if (balance < minBalance) {
-        report.skipped.push({ userId: u.id, reason: "Below minimum real balance" });
+        report.skipped.push({ userId: u.id, reason: "Below minimum balance" });
         report.reasons.lowBalance += 1;
         return;
       }
@@ -1432,10 +1512,71 @@
     return report;
   }
 
+  function aiLiveEligibilityReport(minBalance = 0) {
+    const report = {
+      eligible: [],
+      skipped: [],
+      reasons: {
+        inactive: 0,
+        aiOff: 0,
+        limit: 0,
+        maxOpen: 0,
+        lowBalance: 0,
+        noPool: 0
+      }
+    };
+    const maxOpen = Math.max(1, Number(platformSettings()?.maxOpenPositionsPerUser || App.state.settings?.maxOpenPositionsPerUser || 10));
+
+    allUsers().forEach(u => {
+      const status = userStatus(u);
+      const balance = App.realBalance(u.id);
+      const allowedPool = App.aiAllowedAmount(u);
+      const used = App.aiTradesToday(u.id);
+      const limit = App.aiDailyLimit(u.id);
+      const openLiveCount = aiLivePositions().filter(pos => pos.userId === u.id).length;
+
+      if (status !== "ACTIVE") {
+        report.skipped.push({ userId: u.id, reason: "Inactive / suspended / blocked" });
+        report.reasons.inactive += 1;
+        return;
+      }
+      if (!u.aiTradeOn) {
+        report.skipped.push({ userId: u.id, reason: "AI Live Trading OFF" });
+        report.reasons.aiOff += 1;
+        return;
+      }
+      if (used >= limit) {
+        report.skipped.push({ userId: u.id, reason: "Daily AI trade limit completed" });
+        report.reasons.limit += 1;
+        return;
+      }
+      if (openLiveCount >= maxOpen) {
+        report.skipped.push({ userId: u.id, reason: "Maximum open live positions reached" });
+        report.reasons.maxOpen += 1;
+        return;
+      }
+      if (balance < minBalance) {
+        report.skipped.push({ userId: u.id, reason: "Below minimum balance" });
+        report.reasons.lowBalance += 1;
+        return;
+      }
+      if (allowedPool <= 0) {
+        report.skipped.push({ userId: u.id, reason: "No live position pool available" });
+        report.reasons.noPool += 1;
+        return;
+      }
+
+      report.eligible.push(u);
+    });
+
+    return report;
+  }
+
   function skipReasonLine(reasons = {}) {
     const rows = [
       ["AI OFF", reasons.aiOff],
       ["Limit done", reasons.limit],
+      ["Max live open", reasons.maxOpen],
       ["Low balance", reasons.lowBalance],
       ["Inactive", reasons.inactive],
       ["No pool", reasons.noPool]
@@ -1449,14 +1590,35 @@
     return Math.max(0, Number(limit || 0) - Number(used || 0));
   }
 
-  function aiValidationOverviewHtml(report) {
-    const users = (report?.eligible || []).slice(0, 8);
+  function sortedAiEligibleUsers(users = [], mode = "instant") {
+    return [...users].sort((a, b) => {
+      const remainingDiff = aiRemainingForUser(b.id) - aiRemainingForUser(a.id);
+      if (remainingDiff) return remainingDiff;
+      const poolDiff = App.aiAllowedAmount(b) - App.aiAllowedAmount(a);
+      if (poolDiff) return poolDiff;
+      const balanceDiff = App.realBalance(b.id) - App.realBalance(a.id);
+      if (balanceDiff) return balanceDiff;
+      return displayNameFor(a).localeCompare(displayNameFor(b));
+    });
+  }
+
+  function aiValidationOverviewHtml(report, mode = "instant") {
     const skipped = report?.skipped || [];
+    const isLive = mode === "live";
+    const allEligible = isLive ? sortedAiEligibleUsers(report?.eligible || [], "live") : (report?.eligible || []);
+    const totalEligible = allEligible.length;
+    const pageSize = isLive ? AI_LIVE_ELIGIBLE_PAGE_SIZE : 8;
+    const totalPages = Math.max(1, Math.ceil(totalEligible / pageSize));
+    if (isLive && aiLiveEligiblePage > totalPages) aiLiveEligiblePage = totalPages;
+    const currentPage = isLive ? aiLiveEligiblePage : 1;
+    const startIndex = (currentPage - 1) * pageSize;
+    const users = allEligible.slice(startIndex, startIndex + pageSize);
+    const rangeText = totalEligible ? `${startIndex + 1}-${startIndex + users.length} of ${totalEligible}` : "0 of 0";
     return `
-      <section class="panel-card ai-validation-panel">
+      <section class="panel-card ai-validation-panel ${isLive ? "live-only" : "instant-only"}">
         <div class="section-head">
-          <div><h3>Eligible AI Users</h3><span>Shows users who can receive the next AI trade: active, AI ON, wallet available, and limit remaining.</span></div>
-          <span class="admin-count-pill">${users.length} shown · ${skipped.length} skipped</span>
+          <div><h3>${isLive ? "Eligible Live Position Users" : "Eligible Instant AI Users"}</h3><span>${isLive ? "Sorted by remaining AI limit first. Only 12 users are shown per page to avoid long scrolling." : "Instant AI uses daily AI trade limit, wallet pool and AI ON. Live positions are not included here."}</span></div>
+          <span class="admin-count-pill">${isLive ? `${rangeText} shown` : `${users.length} shown`} · ${skipped.length} skipped</span>
         </div>
         <div class="admin-list">
           ${users.length ? users.map(target => {
@@ -1465,18 +1627,26 @@
             const pool = App.aiAllowedAmount(target);
             const used = App.aiTradesToday(target.id);
             const limit = App.aiDailyLimit(target.id);
+            const remaining = aiRemainingForUser(target.id);
+            const openLive = aiLivePositions().filter(pos => pos.userId === target.id).length;
             return `
               <article class="admin-user-card ai-validation-card">
                 <div class="admin-user-main">
                   <div><b>${esc(displayNameFor(target))}</b><span>${esc(plan.name || "Free")} · AI ${target.aiTradeOn ? "ON" : "OFF"} · ${Number(target.aiTradePercent || 25)}% allocation</span></div>
                   <div class="admin-user-stats"><span>Wallet</span><b>${App.money(balance)}</b></div>
                   <div class="admin-user-stats"><span>AI Pool</span><b>${App.money(pool)}</b></div>
-                  <div class="admin-user-stats"><span>Remaining</span><b>${aiRemainingForUser(target.id)}/${limit}</b></div>
-                  <div class="admin-user-stats"><span>Used</span><b>${used}</b></div>
+                  <div class="admin-user-stats"><span>${isLive ? "Remaining" : "Remaining"}</span><b>${remaining}/${limit}</b></div>
+                  <div class="admin-user-stats"><span>${isLive ? "Open Live" : "Used"}</span><b>${isLive ? openLive : used}</b></div>
                 </div>
               </article>`;
           }).join("") : `<div class="empty-state">No eligible AI users found. Check user status, AI ON, wallet balance and plan limit.</div>`}
         </div>
+        ${isLive && totalPages > 1 ? `
+          <div class="admin-pagination ai-live-pagination">
+            <button type="button" class="secondary-btn" onclick="AITradeXAdmin.changeAiLiveEligiblePage(${Math.max(1, currentPage - 1)})" ${currentPage <= 1 ? "disabled" : ""}>Previous</button>
+            <span>Page ${currentPage} of ${totalPages}</span>
+            <button type="button" class="secondary-btn" onclick="AITradeXAdmin.changeAiLiveEligiblePage(${Math.min(totalPages, currentPage + 1)})" ${currentPage >= totalPages ? "disabled" : ""}>Next</button>
+          </div>` : ""}
       </section>`;
   }
 
@@ -1519,9 +1689,17 @@
 
 
 
+  function aiTradeTypeOf(row) {
+    return String(row?.tradeType || row?.trade_type || "").toUpperCase();
+  }
+
+  function tradeStatusOf(row) {
+    return String(row?.status || "").toUpperCase();
+  }
+
   function aiLivePositions() {
     return (App.state.trades || [])
-      .filter(t => t.tradeType === "AI_LIVE" && String(t.status || "").toUpperCase() === "OPEN")
+      .filter(t => aiTradeTypeOf(t) === "AI_LIVE" && tradeStatusOf(t) === "OPEN")
       .sort((a, b) => Date.parse(b.openedAt || b.createdAt || 0) - Date.parse(a.openedAt || a.createdAt || 0));
   }
 
@@ -1535,16 +1713,26 @@
     }));
   }
 
-  function lockAiLiveMargin(position, balanceBeforeOverride = null) {
+  async function lockAiLiveMargin(position, balanceBeforeOverride = null) {
     if (!position || !position.userId) return false;
     const margin = Number(Number(position.marginAmount || 0).toFixed(2));
     if (!Number.isFinite(margin) || margin <= 0) return false;
     if (aiLiveMarginLockExists(position)) {
       position.marginLocked = true;
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.writeTrade) {
+        await window.AITradeXDB.writeTrade(position);
+      }
       return true;
     }
     const before = balanceBeforeOverride === null ? App.realBalance(position.userId) : Number(balanceBeforeOverride || 0);
-    const added = App.addLedger({
+    const added = App.addLedgerAsync ? await App.addLedgerAsync({
+      userId: position.userId,
+      accountType: "REAL",
+      type: "AI_LIVE_MARGIN_LOCK",
+      amount: -margin,
+      referenceId: position.id,
+      note: `${position.pair} AI live ${position.side || "BUY"} amount locked`
+    }) : App.addLedger({
       userId: position.userId,
       accountType: "REAL",
       type: "AI_LIVE_MARGIN_LOCK",
@@ -1557,23 +1745,26 @@
     position.balanceBefore = Number(before.toFixed(2));
     position.balanceAfterOpen = Number(App.realBalance(position.userId).toFixed(2));
     position.marginLockedAt = position.marginLockedAt || new Date().toISOString();
+    if (App.isDatabaseMode?.() && window.AITradeXDB?.writeTrade) {
+      await window.AITradeXDB.writeTrade(position);
+    }
     return true;
   }
 
-  function reconcileAiLiveMarginLocks() {
+  async function reconcileAiLiveMarginLocks() {
     let fixed = 0;
-    aiLivePositions().forEach(position => {
+    for (const position of aiLivePositions()) {
       if (aiLiveMarginLockExists(position)) {
         position.marginLocked = true;
-        return;
+        continue;
       }
       try {
-        lockAiLiveMargin(position);
+        await lockAiLiveMargin(position);
         fixed += 1;
       } catch (error) {
         position.marginLockError = error.message || "AI amount lock failed";
       }
-    });
+    }
     if (fixed) App.saveState();
     return fixed;
   }
@@ -1610,22 +1801,99 @@
     return [...map.values()].sort((a, b) => Date.parse(b.openedAt || 0) - Date.parse(a.openedAt || 0));
   }
 
-  function aiLivePositionPnl(position) {
-    const entry = Number(position.entryPrice || 0);
-    const cached = App.getCachedPairPrice ? App.getCachedPairPrice(position.pair) : null;
-    const current = Number(cached?.price || position.entryPrice || 0);
-    const exposure = Number(position.positionSize || 0);
+  function aiLiveMarginAmount(position) {
+    const margin = Math.max(0, Number(position?.marginAmount || position?.amount || 0));
+    return Number.isFinite(margin) ? margin : 0;
+  }
+
+  function aiLiveLeverageAmount(position) {
+    const lev = Math.max(1, Number(position?.leverage || 1));
+    return Number.isFinite(lev) ? lev : 1;
+  }
+
+  function aiLiveSafeExposure(position) {
+    const margin = aiLiveMarginAmount(position);
+    const leverage = aiLiveLeverageAmount(position);
+    const formulaExposure = margin * leverage;
+    const storedExposure = Math.max(0, Number(position?.positionSize || 0));
+    if (formulaExposure > 0) return Number(formulaExposure.toFixed(2));
+    return Number(storedExposure.toFixed(2));
+  }
+
+  function aiLiveTargetPnlAmount(position) {
+    const targetPercent = Math.max(0, Number(position?.targetPercent || 0));
+    return Number((aiLiveSafeExposure(position) * targetPercent / 100).toFixed(2));
+  }
+
+  function aiLiveExitPriceRow(position) {
+    const cached = App.getCachedPairPrice ? App.getCachedPairPrice(position?.pair) : null;
+    const last = App.getLastPairPrice ? App.getLastPairPrice(position?.pair) : null;
+    return cached || last || null;
+  }
+
+  async function aiLiveFreshExitPriceRow(position) {
+    if (!position) return null;
+    try {
+      if (App.getFreshLivePairPrice) {
+        const fresh = await App.getFreshLivePairPrice(position.pair);
+        if (fresh && Number(fresh.price || 0) > 0) return fresh;
+      }
+      if (App.getLivePairPrice) {
+        const live = await App.getLivePairPrice(position.pair);
+        if (live && Number(live.price || 0) > 0) return live;
+      }
+    } catch (err) {
+      console.warn("AI live fresh exit price unavailable; using cached price", err?.message || err);
+    }
+    return aiLiveExitPriceRow(position) || { price: Number(position.entryPrice || 0), display: position.entryPriceDisplay || String(position.entryPrice || "-"), source: "Entry fallback" };
+  }
+
+  function aiLiveBackendAdminPayload() {
+    const admin = adminUser() || {};
+    return {
+      adminUserId: admin.id || "control_root",
+      adminEmail: admin.email || "",
+      adminName: displayNameFor(admin) || "Admin"
+    };
+  }
+
+  function aiLiveRawPnl(position, forcedPriceRow = null) {
+    const entry = Number(position?.entryPrice || 0);
+    const row = forcedPriceRow || aiLiveExitPriceRow(position);
+    const current = Number(row?.price || position?.entryPrice || 0);
+    const exposure = aiLiveSafeExposure(position);
     if (!entry || !current || !exposure) return 0;
-    const direction = String(position.side || "BUY").toUpperCase() === "SELL" ? -1 : 1;
-    let pnl = exposure * ((current - entry) / entry) * direction;
-    const margin = Math.max(0, Number(position.marginAmount || 0));
-    const maxLoss = position.marginLocked ? margin : Math.max(0, App.realBalance(position.userId));
-    if (pnl < 0) pnl = Math.max(pnl, -maxLoss);
+    const direction = String(position?.side || "BUY").toUpperCase() === "SELL" ? -1 : 1;
+    return exposure * ((current - entry) / entry) * direction;
+  }
+
+  function aiLiveSettlementPnl(position, forcedPriceRow = null) {
+    const raw = aiLiveRawPnl(position, forcedPriceRow);
+    const margin = aiLiveMarginAmount(position);
+    const target = aiLiveTargetPnlAmount(position);
+    const targetType = String(position?.targetType || "PROFIT").toUpperCase();
+    let pnl = raw;
+    if (target > 0) {
+      if (targetType === "LOSS") {
+        pnl = Math.max(pnl, -Math.min(margin || target, target));
+      } else {
+        pnl = Math.min(pnl, target);
+      }
+    }
+    if (pnl < 0) {
+      // Hard safety cap: AI live loss can never exceed the locked AI amount/margin.
+      const maxLoss = Math.max(0, margin);
+      pnl = Math.max(pnl, -maxLoss);
+    }
     return Number(pnl.toFixed(2));
   }
 
+  function aiLivePositionPnl(position) {
+    return aiLiveSettlementPnl(position);
+  }
+
   function aiLivePreviewStats(leverage = 1, minBalance = 0) {
-    const report = aiEligibilityReport(Math.max(0, Number(minBalance || 0)));
+    const report = aiLiveEligibilityReport(Math.max(0, Number(minBalance || 0)));
     const lev = normalizeAdminLeverage(leverage || 1);
     let totalMargin = 0;
     let totalExposure = 0;
@@ -1643,12 +1911,12 @@
     const batches = aiLiveBatches();
     return `
       <section class="panel-card">
-        <div class="section-head"><div><h3>Running AI Live Positions</h3><span>Market-connected AI positions remain active until target hit or admin closes them</span></div></div>
+        <div class="section-head"><div><h3>Running AI Live Positions</h3><span>Batch watcher closes on profit target, loss target, or max-loss hit. Loss is capped at AI amount.</span></div><button class="ghost-action" type="button" onclick="AITradeXAdmin.checkAiLiveAutoClose(this)">Check Auto Close</button></div>
         <div class="admin-list">
           ${batches.length ? batches.map(batch => `
             <article class="admin-user-card ai-live-batch-card">
               <div class="admin-user-main">
-                <div><b>${esc(batch.pair)} · ${esc(batch.side)}</b><span>Entry ${esc(batch.entryPriceDisplay || batch.entryPrice || "-")} · ${Number(batch.leverage || 1)}x · Target ${esc(batch.targetType || "PROFIT")} ${Number(batch.targetPercent || 0)}%</span></div>
+                <div><b>${esc(batch.pair)} · ${esc(batch.side)}</b><span>Entry ${esc(batch.entryPriceDisplay || batch.entryPrice || "-")} · ${Number(batch.leverage || 1)}x · Target ${esc(batch.targetType || "PROFIT")} ${Number(batch.targetPercent || 0)}% · Max loss = AI amount</span></div>
                 <div class="admin-user-stats"><span>Users</span><b>${batch.users}</b></div>
                 <div class="admin-user-stats"><span>AI Amount</span><b>${App.money(batch.totalMargin)}</b></div>
                 <div class="admin-user-stats"><span>Exposure</span><b>${App.money(batch.totalExposure)}</b></div>
@@ -1663,7 +1931,7 @@
 
   function aiRecentTrades() {
     return (App.state.trades || [])
-      .filter(t => t.tradeType === "AI_AUTO")
+      .filter(t => aiTradeTypeOf(t) === "AI_AUTO")
       .sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
   }
 
@@ -1693,7 +1961,7 @@
 
   function aiLiveHistoryRows() {
     return (App.state.trades || [])
-      .filter(t => (t.tradeType === "AI_LIVE" || t.source === "ADMIN_AI_LIVE_CLOSE") && String(t.status || "").toUpperCase() === "CLOSED")
+      .filter(t => (aiTradeTypeOf(t) === "AI_LIVE" || t.source === "ADMIN_AI_LIVE_CLOSE") && tradeStatusOf(t) === "CLOSED")
       .sort((a, b) => Date.parse(b.closedAt || b.createdAt || 0) - Date.parse(a.closedAt || a.createdAt || 0));
   }
 
@@ -1788,6 +2056,20 @@
       </section>`;
   }
 
+  function aiModeSeparationNotice(activeMode) {
+    const instantActive = activeMode === "instant";
+    return `
+      <section class="panel-card ai-separation-notice ai-single-mode-head ${instantActive ? "instant-mode" : "live-mode"}">
+        <div class="section-head">
+          <div>
+            <h3>${instantActive ? "Instant AI Trade = immediate result" : "Live Position Trade = running position"}</h3>
+            <span>${instantActive ? "This section creates closed AI_AUTO entries and credits/debits wallet P/L immediately. It never opens live positions." : "This section creates AI_LIVE open positions, locks wallet amount on open, and settles only when admin/target closes the position."}</span>
+          </div>
+          <span class="admin-count-pill">${instantActive ? "INSTANT ONLY" : "LIVE ONLY"}</span>
+        </div>
+      </section>`;
+  }
+
   function instantAiPage() {
     const settings = App.state.settings || {};
     const initialStats = aiPreviewStats(2, 1, 0, "PROFIT");
@@ -1805,9 +2087,9 @@
         ${metric("🎁", "Free AI / Day", Number(settings.freeAiTradesPerDay || 5))}
       </section>
 
-      ${aiTradeModeBars("instant")}
+      ${aiModeSeparationNotice("instant")}
 
-      ${aiValidationOverviewHtml(previewReport)}
+      ${aiValidationOverviewHtml(previewReport, "instant")}
 
       <section class="panel-card ai-desk-panel instant-ai-control-panel">
         <div class="section-head ai-desk-head">
@@ -1855,8 +2137,8 @@
             <div class="ai-step-card">
               <div class="ai-step-label"><b>4</b><span>Result & leverage up to 2000x</span></div>
               <div class="ai-toggle-grid two">
-                <label class="ai-radio-card profit"><input type="radio" name="aiTradeResultType" value="PROFIT" checked onchange="AITradeXAdmin.updateAiPreview()"/><span>Profit</span><small>Add P/L to real wallet</small></label>
-                <label class="ai-radio-card loss"><input type="radio" name="aiTradeResultType" value="LOSS" onchange="AITradeXAdmin.updateAiPreview()"/><span>Loss</span><small>Deduct P/L from real wallet</small></label>
+                <label class="ai-radio-card profit"><input type="radio" name="aiTradeResultType" value="PROFIT" checked onchange="AITradeXAdmin.updateAiPreview()"/><span>Profit</span><small>Add P/L to wallet</small></label>
+                <label class="ai-radio-card loss"><input type="radio" name="aiTradeResultType" value="LOSS" onchange="AITradeXAdmin.updateAiPreview()"/><span>Loss</span><small>Deduct P/L from wallet</small></label>
               </div>
               <div class="ai-inline-fields">
                 <label>Profit / Loss %
@@ -1872,7 +2154,7 @@
 
             <div class="ai-step-card">
               <div class="ai-step-label"><b>5</b><span>Final check</span></div>
-              <label>Minimum Real Balance
+              <label>Minimum Available Balance
                 <input id="aiTradeMinBalance" type="number" min="0" value="0" oninput="AITradeXAdmin.updateAiPreview()"/>
                 <small>Users below this balance will be skipped. Keep 0 for all valid users.</small>
               </label>
@@ -1912,24 +2194,25 @@
 
   function liveAiPage() {
     const settings = App.state.settings || {};
-    const initialStats = aiPreviewStats(2, 1, 0, "PROFIT");
-    const previewReport = initialStats.report;
+    const liveStats = aiLivePreviewStats(1, 0);
+    const previewReport = liveStats.report;
     const aiOnCount = allUsers().filter(u => u.aiTradeOn && userStatus(u) === "ACTIVE").length;
     const eligibleNow = previewReport.eligible.length;
+    const maxOpenPerUser = Number(platformSettings()?.maxOpenPositionsPerUser || App.state.settings?.maxOpenPositionsPerUser || 10);
 
     shell(`
       <section class="metrics-grid">
         ${metric("🤖", "AI ON Users", aiOnCount)}
-        ${metric("✅", "Valid Now", eligibleNow)}
-        ${metric("⏭️", "Skipped Now", previewReport.skipped.length)}
-        ${metric("🎁", "Free AI / Day", Number(settings.freeAiTradesPerDay || 5))}
+        ${metric("✅", "Live Eligible", eligibleNow)}
+        ${metric("⏭️", "Live Skipped", previewReport.skipped.length)}
+        ${metric("📌", "Max Open/User", maxOpenPerUser)}
       </section>
 
-      ${aiTradeModeBars("live")}
+      ${aiModeSeparationNotice("live")}
 
       ${aiLiveRunningHtml()}
 
-      ${aiValidationOverviewHtml(previewReport)}
+      ${aiValidationOverviewHtml(previewReport, "live")}
 
       <section class="panel-card ai-desk-panel ai-live-open-panel">
         <div class="section-head ai-desk-head">
@@ -1972,11 +2255,11 @@
             <div class="ai-step-card">
               <div class="ai-step-label"><b>3</b><span>Admin close rule</span></div>
               <div class="ai-inline-fields">
-                <label>Minimum Real Balance
+                <label>Minimum Available Balance
                   <input id="aiLiveMinBalance" type="number" min="0" value="0" oninput="AITradeXAdmin.updateAiLivePreview()"/>
                 </label>
                 <label>Close Mode
-                  <input value="Target hit or Admin Close" readonly/>
+                  <input value="Batch auto close or Admin Close" readonly/>
                 </label>
               </div>
               <label>Position Note
@@ -1996,7 +2279,7 @@
               <article><span>Exposure</span><b id="aiLivePreviewExposure">${App.money(aiLivePreviewStats(1,0).totalExposure)}</b></article>
               <article><span>Target</span><b id="aiLivePreviewTarget">Profit 2%</b></article>
               <article><span>Close rule</span><b id="aiLivePreviewDuration">Target/Admin</b></article>
-              <article><span>Plan limit check</span><b id="aiLivePreviewLimitCheck">${previewReport.reasons.limit ? previewReport.reasons.limit + " blocked" : "Passed"}</b></article>
+              <article><span>Plan/live limit check</span><b id="aiLivePreviewLimitCheck">${(previewReport.reasons.limit || previewReport.reasons.maxOpen) ? `${previewReport.reasons.limit || 0} limit · ${previewReport.reasons.maxOpen || 0} max-open blocked` : "Passed"}</b></article>
               <article><span>Wallet check</span><b id="aiLivePreviewWalletCheck">${previewReport.reasons.lowBalance || previewReport.reasons.noPool ? "Needs review" : "Passed"}</b></article>
             </div>
             <div class="premium-bank-card ai-last-card">
@@ -2136,7 +2419,7 @@
       </section>
 
       <section class="panel-card referral-settings-panel">
-        <div class="section-head"><div><h3>Referral Bonus Settings</h3><span>Bonus is credited automatically to real wallet. No manual approval is required.</span></div><span class="admin-count-pill">Auto Credit</span></div>
+        <div class="section-head"><div><h3>Referral Bonus Settings</h3><span>Bonus is credited automatically by backend during deposit/plan approval.</span></div><div class="panel-actions"><button class="mini-action" type="button" onclick="AITradeXAdmin.repairReferralBonuses(this)">Repair missed bonuses</button><span class="admin-count-pill">Backend Auto Credit</span></div></div>
         <form class="admin-settings-grid" onsubmit="AITradeXAdmin.saveReferralSettings(event)">
           <label>Deposit Bonus %
             <input id="referralDepositPercent" type="number" min="0" step="0.01" value="${Number(settings.referralDepositPercent ?? settings.referralFirstDepositPercent ?? 10)}" required/>
@@ -2266,16 +2549,133 @@
   function settingsPage() {
     const settings = platformSettings();
     shell(`
-      <section class="panel-card payment-settings-panel">
+      <section class="panel-card payment-settings-panel app-settings-clean-panel">
         <div class="section-head">
-          <div><h3>Payment Settings</h3><span>Control the deposit UPI, QR, bank details and wallet limits shown to users.</span></div>
+          <div><h3>App Settings & Trading Control</h3><span>Global app access, limits, maintenance and trading rules. Payment bank/UPI details are now managed separately.</span></div>
           <span class="admin-count-pill">Admin editable</span>
         </div>
 
         <div class="admin-grid-two payment-settings-grid">
           <form class="payment-form-card form-grid" onsubmit="AITradeXAdmin.savePaymentSettings(event)">
-            <p>DEPOSIT METHOD ACCESS</p>
-            <h2>Deposit Payment Setup</h2>
+            <p>APP ACCESS CONTROL</p>
+            <div class="method-toggle-grid app-control-grid">
+              <label>Maintenance Mode
+                <select id="settingMaintenanceMode">
+                  <option value="false" ${settings.maintenanceMode === true ? "" : "selected"}>OFF - App Live</option>
+                  <option value="true" ${settings.maintenanceMode === true ? "selected" : ""}>ON - User App Paused</option>
+                </select>
+                <small>Use this during urgent updates or checks.</small>
+              </label>
+              <label>Deposit Access
+                <select id="settingDepositEnabled">
+                  <option value="true" ${settings.depositEnabled !== false ? "selected" : ""}>Enabled</option>
+                  <option value="false" ${settings.depositEnabled === false ? "selected" : ""}>Disabled</option>
+                </select>
+                <small>Master switch for all user deposits.</small>
+              </label>
+              <label>Withdrawal Access
+                <select id="settingWithdrawalEnabled">
+                  <option value="true" ${settings.withdrawalEnabled !== false ? "selected" : ""}>Enabled</option>
+                  <option value="false" ${settings.withdrawalEnabled === false ? "selected" : ""}>Disabled</option>
+                </select>
+                <small>Master switch for withdrawal requests.</small>
+              </label>
+              <label>Manual Trading
+                <select id="settingManualTradingEnabled">
+                  <option value="true" ${settings.manualTradingEnabled !== false ? "selected" : ""}>Enabled</option>
+                  <option value="false" ${settings.manualTradingEnabled === false ? "selected" : ""}>Disabled</option>
+                </select>
+                <small>Controls user manual buy/sell trades.</small>
+              </label>
+              <label>AI Trading
+                <select id="settingAiTradingEnabled">
+                  <option value="true" ${settings.aiTradingEnabled !== false ? "selected" : ""}>Enabled</option>
+                  <option value="false" ${settings.aiTradingEnabled === false ? "selected" : ""}>Disabled</option>
+                </select>
+                <small>Controls instant AI and live AI positions.</small>
+              </label>
+            </div>
+
+            <p>WALLET LIMITS</p>
+            <label>Minimum Deposit
+              <input id="settingMinDeposit" type="number" min="1" value="${Number(settings.minDeposit || 500)}" required/>
+            </label>
+            <label>Maximum Deposit
+              <input id="settingMaxDeposit" type="number" min="1" value="${Number(settings.maxDeposit || 1000000)}" required/>
+            </label>
+            <label>Minimum Withdrawal
+              <input id="settingMinWithdrawal" type="number" min="1" value="${Number(settings.minWithdrawal || 1000)}" required/>
+            </label>
+            <label>Maximum Withdrawal
+              <input id="settingMaxWithdrawal" type="number" min="1" value="${Number(settings.maxWithdrawal || 500000)}" required/>
+            </label>
+
+            <p>TRADING LIMITS</p>
+            <label>Minimum Manual Trade
+              <input id="settingMinManualTrade" type="number" min="1" value="${Number(settings.minManualTrade || 100)}" required/>
+            </label>
+            <label>Maximum Manual Trade
+              <input id="settingMaxManualTrade" type="number" min="1" value="${Number(settings.maxManualTrade || 250000)}" required/>
+            </label>
+            <label>Minimum AI Trade
+              <input id="settingMinAiTrade" type="number" min="1" value="${Number(settings.minAiTrade || 100)}" required/>
+            </label>
+            <label>Maximum AI Trade
+              <input id="settingMaxAiTrade" type="number" min="1" value="${Number(settings.maxAiTrade || 250000)}" required/>
+            </label>
+            <label>Maximum Leverage
+              <input id="settingMaxLeverage" type="number" min="1" max="2000" value="${Number(settings.maxLeverage || 2000)}" required/>
+            </label>
+            <label>Max Open Positions / User
+              <input id="settingMaxOpenPositions" type="number" min="1" value="${Number(settings.maxOpenPositionsPerUser || 10)}" required/>
+            </label>
+
+            <p>CRYPTO INR DISPLAY</p>
+            <label>USDT to INR Rate
+              <input id="settingUsdtInrRate" type="number" min="1" step="0.01" value="${Number(settings.usdtInrRate || 95)}" required/>
+              <small>This controls INR-only crypto price display. Default is ₹95 per USDT.</small>
+            </label>
+
+            <button class="save-profile-btn">Save App Settings</button>
+          </form>
+
+          <section class="payment-form-card payment-settings-preview">
+            <p>APP CONTROL PREVIEW</p>
+            <h2>Current Global Rules</h2>
+            <div class="review-grid compact-review">
+              <article><span>Maintenance</span><b class="${settings.maintenanceMode === true ? "text-loss" : "text-profit"}">${settings.maintenanceMode === true ? "ON" : "OFF"}</b></article>
+              <article><span>Deposits</span><b class="${settings.depositEnabled !== false ? "text-profit" : "text-loss"}">${settings.depositEnabled !== false ? "Enabled" : "Disabled"}</b></article>
+              <article><span>Withdrawals</span><b class="${settings.withdrawalEnabled !== false ? "text-profit" : "text-loss"}">${settings.withdrawalEnabled !== false ? "Enabled" : "Disabled"}</b></article>
+              <article><span>Manual Trading</span><b class="${settings.manualTradingEnabled !== false ? "text-profit" : "text-loss"}">${settings.manualTradingEnabled !== false ? "Enabled" : "Disabled"}</b></article>
+              <article><span>AI Trading</span><b class="${settings.aiTradingEnabled !== false ? "text-profit" : "text-loss"}">${settings.aiTradingEnabled !== false ? "Enabled" : "Disabled"}</b></article>
+              <article><span>Deposit Range</span><b>${App.money(settings.minDeposit)} - ${App.money(settings.maxDeposit)}</b></article>
+              <article><span>Withdrawal Range</span><b>${App.money(settings.minWithdrawal)} - ${App.money(settings.maxWithdrawal)}</b></article>
+              <article><span>Manual Trade Range</span><b>${App.money(settings.minManualTrade || 100)} - ${App.money(settings.maxManualTrade || 250000)}</b></article>
+              <article><span>AI Trade Range</span><b>${App.money(settings.minAiTrade || 100)} - ${App.money(settings.maxAiTrade || 250000)}</b></article>
+              <article><span>Max Leverage</span><b>${Number(settings.maxLeverage || 2000)}x</b></article>
+              <article><span>Max Positions</span><b>${Number(settings.maxOpenPositionsPerUser || 10)}</b></article>
+              <article><span>USDT-INR Rate</span><b>₹${Number(settings.usdtInrRate || 95).toLocaleString("en-IN")}</b></article>
+            </div>
+            <div class="duplicate-warning-box telegram-scope-note">Payment UPI/QR and bank details are now in Admin → Payment Methods. This keeps App Settings clean and prevents accidental bank-detail edits while changing trading limits.</div>
+            <button class="mini-action" onclick="AITradeXAdmin.go('paymentMethods')">Open Payment Methods</button>
+          </section>
+        </div>
+      </section>
+    `);
+  }
+
+  function paymentMethodsSettingsPage() {
+    const settings = platformSettings();
+    shell(`
+      <section class="panel-card payment-settings-panel payment-methods-control-panel">
+        <div class="section-head">
+          <div><h3>Payment Methods</h3><span>Manage user deposit UPI/QR and bank transfer details separately from global app settings.</span></div>
+          <span class="admin-count-pill">Deposit setup</span>
+        </div>
+
+        <div class="admin-grid-two payment-settings-grid">
+          <form class="payment-form-card form-grid" onsubmit="AITradeXAdmin.saveDepositPaymentMethods(event)">
+            <p>METHOD AVAILABILITY</p>
             <div class="method-toggle-grid">
               <label>UPI / QR Method
                 <select id="settingUpiEnabled">
@@ -2316,25 +2716,16 @@
               <input id="settingIfsc" value="${esc(settings.depositIfsc)}" placeholder="IFSC code" required/>
             </label>
 
-            <p>WALLET LIMITS</p>
-            <label>Minimum Deposit
-              <input id="settingMinDeposit" type="number" min="1" value="${Number(settings.minDeposit || 500)}" required/>
-            </label>
-            <label>Minimum Withdrawal
-              <input id="settingMinWithdrawal" type="number" min="1" value="${Number(settings.minWithdrawal || 1000)}" required/>
-            </label>
-
-            <p>CRYPTO INR DISPLAY</p>
-            <label>USDT to INR Rate
-              <input id="settingUsdtInrRate" type="number" min="1" step="0.01" value="${Number(settings.usdtInrRate || 95)}" required/>
-              <small>This controls INR-only crypto price display. Default is ₹95 per USDT.</small>
-            </label>
-            <button class="save-profile-btn">Save Payment Settings</button>
+            <button class="save-profile-btn">Save Payment Methods</button>
           </form>
 
           <section class="payment-form-card payment-settings-preview">
             <p>USER SIDE PREVIEW</p>
-            <h2>Deposit Details Preview</h2>
+            <h2>Deposit Payment Details</h2>
+            <div class="review-grid compact-review">
+              <article><span>UPI / QR</span><b class="${settings.depositUpiEnabled !== false ? "text-profit" : "text-loss"}">${settings.depositUpiEnabled !== false ? "Enabled" : "Disabled"}</b></article>
+              <article><span>Bank Transfer</span><b class="${settings.depositBankEnabled !== false ? "text-profit" : "text-loss"}">${settings.depositBankEnabled !== false ? "Enabled" : "Disabled"}</b></article>
+            </div>
             <div class="upi-pay-card settings-upi-preview">
               <div class="qr-large-box">
                 ${settings.depositQrImage ? `<img src="${esc(settings.depositQrImage)}" alt="Deposit QR"/>` : `<div class="qr-grid-mark">QR</div>`}
@@ -2342,7 +2733,7 @@
               <div class="upi-pay-info">
                 <p>PAY VIA UPI</p>
                 <h2>${esc(settings.depositUpiId)}</h2>
-                <span>This is what users will see on deposit step 3.</span>
+                <span>This is what users will see inside the deposit panel.</span>
               </div>
             </div>
             <div class="premium-bank-card">
@@ -2351,14 +2742,257 @@
               <div class="copy-row"><b>Account No.</b><span>${esc(settings.depositAccountNumber)}</span><button type="button">Copy</button></div>
               <div class="copy-row"><b>IFSC Code</b><span>${esc(settings.depositIfsc)}</span><button type="button">Copy</button></div>
             </div>
-            <div class="review-grid compact-review">
-              <article><span>UPI / QR</span><b class="${settings.depositUpiEnabled !== false ? "text-profit" : "text-loss"}">${settings.depositUpiEnabled !== false ? "Enabled" : "Disabled"}</b></article>
-              <article><span>Bank Transfer</span><b class="${settings.depositBankEnabled !== false ? "text-profit" : "text-loss"}">${settings.depositBankEnabled !== false ? "Enabled" : "Disabled"}</b></article>
-              <article><span>Minimum Deposit</span><b>${App.money(settings.minDeposit)}</b></article>
-              <article><span>Minimum Withdrawal</span><b>${App.money(settings.minWithdrawal)}</b></article>
-              <article><span>USDT-INR Rate</span><b>₹${Number(settings.usdtInrRate || 95).toLocaleString("en-IN")}</b></article>
-            </div>
+            <div class="duplicate-warning-box telegram-scope-note">Deposit master ON/OFF and min/max deposit amount stay in App Settings. This page controls only payment method availability and the actual UPI/bank details shown to users.</div>
           </section>
+        </div>
+      </section>
+    `);
+  }
+
+  function telegramPage() {
+    const settings = platformSettings();
+    shell(`
+      <section class="panel-card payment-settings-panel telegram-settings-page">
+        <div class="section-head">
+          <div><h3>Telegram Alerts</h3><span>Configure clear Telegram alerts for KYC, payment method, deposit and withdrawal events.</span></div>
+          <span class="admin-count-pill">KYC + Payment + Finance</span>
+        </div>
+        <div class="admin-grid-two payment-settings-grid">
+          <form class="payment-form-card form-grid" onsubmit="AITradeXAdmin.saveTelegramSettings(event)">
+            <p>TELEGRAM BOT ALERTS</p>
+            <div class="method-toggle-grid">
+              <label>Telegram Alerts
+                <select id="settingTelegramEnabled">
+                  <option value="false" ${settings.telegramEnabled === true ? "" : "selected"}>Disabled</option>
+                  <option value="true" ${settings.telegramEnabled === true ? "selected" : ""}>Enabled</option>
+                </select>
+                <small>Master switch for Telegram alerts.</small>
+              </label>
+              <label>Admin Alerts
+                <select id="settingTelegramAdminAlerts">
+                  <option value="true" ${settings.telegramAdminAlerts !== false ? "selected" : ""}>Enabled</option>
+                  <option value="false" ${settings.telegramAdminAlerts === false ? "selected" : ""}>Disabled</option>
+                </select>
+                <small>New KYC, bank/payment method, deposit and withdrawal requests.</small>
+              </label>
+              <label>User Alerts Mirror
+                <select id="settingTelegramUserAlerts">
+                  <option value="false" ${settings.telegramUserAlerts === true ? "" : "selected"}>Disabled</option>
+                  <option value="true" ${settings.telegramUserAlerts === true ? "selected" : ""}>Enabled</option>
+                </select>
+                <small>Optional approve/reject mirror alerts.</small>
+              </label>
+            </div>
+            <label>Telegram Edge Function URL
+              <input id="settingTelegramEdgeFunctionUrl" value="${esc(settings.telegramEdgeFunctionUrl || App.config?.TELEGRAM_EDGE_FUNCTION_URL || "")}" placeholder="https://xxxxx.functions.supabase.co/telegram-alert" autocomplete="off"/>
+              <small>Recommended and required for safe alerts. Bot token should stay inside Supabase Edge Function secrets.</small>
+            </label>
+            <label>Telegram Bot Token (legacy/local only)
+              <input id="settingTelegramBotToken" value="${esc(settings.telegramBotToken || "")}" placeholder="Disabled in frontend safety mode" autocomplete="off"/>
+              <small>Direct frontend bot-token sending is disabled in this build; use Edge Function URL above.</small>
+            </label>
+            <label>Telegram Chat ID
+              <input id="settingTelegramChatId" value="${esc(settings.telegramChatId || "")}" placeholder="123456789 or -100xxxxxxxxxx"/>
+              <small>Personal, group or channel chat ID where alerts should be delivered.</small>
+            </label>
+            <div class="admin-inline-actions">
+              <button type="button" class="outline-btn" onclick="AITradeXAdmin.testTelegramBot()">Send Test Telegram Alert</button>
+              <button class="save-profile-btn">Save Telegram Settings</button>
+            </div>
+          </form>
+
+          <section class="payment-form-card payment-settings-preview">
+            <p>ALERT SCOPE</p>
+            <h2>KYC, Bank Account, Deposit & Withdrawal</h2>
+            <div class="review-grid compact-review">
+              <article><span>Telegram Bot</span><b class="${settings.telegramEnabled === true ? "text-profit" : "text-loss"}">${settings.telegramEnabled === true ? "Enabled" : "Disabled"}</b></article>
+              <article><span>Admin Alerts</span><b class="${settings.telegramAdminAlerts !== false ? "text-profit" : "text-loss"}">${settings.telegramAdminAlerts !== false ? "Enabled" : "Disabled"}</b></article>
+              <article><span>User Mirror</span><b class="${settings.telegramUserAlerts === true ? "text-profit" : "text-loss"}">${settings.telegramUserAlerts === true ? "Enabled" : "Disabled"}</b></article>
+              <article><span>Edge Function</span><b>${(settings.telegramEdgeFunctionUrl || App.config?.TELEGRAM_EDGE_FUNCTION_URL) ? "Configured" : "Missing"}</b></article>
+              <article><span>Chat ID</span><b>${settings.telegramChatId ? esc(settings.telegramChatId) : "Missing"}</b></article>
+            </div>
+            <div class="duplicate-warning-box telegram-scope-note">Telegram alert rules are clear: Admin Alerts send new KYC, new bank account, new deposit and new withdrawal requests. User Mirror sends KYC/bank/deposit/withdraw approve-reject messages. Signup, support, AI trade, wallet-adjustment, plan and security alerts stay inside the website only.</div>
+          </section>
+        </div>
+      </section>
+    `);
+  }
+
+
+  function databasePage() {
+    const DB = window.AITradeXDB;
+    const configured = !!DB?.ready;
+    const counts = DB?.countsFromState ? DB.countsFromState(App.state) : {};
+    const lastSync = DB?.lastSyncStatus ? DB.lastSyncStatus() : null;
+    const countRows = Object.entries(counts).map(([key, value]) => `<article><span>${esc(key.replace(/([A-Z])/g, " $1"))}</span><b>${Number(value || 0).toLocaleString("en-IN")}</b></article>`).join("");
+    shell(`
+      <section class="premium-card database-control-card">
+        <div class="section-head">
+          <div>
+            <h3>Database Sync Center</h3>
+            <span>Supabase backup/restore plus Phase 5.4 row-by-row sync for users, wallet, deposits, withdrawals, trades, AI positions and orders.</span>
+          </div>
+          <span class="admin-count-pill ${configured ? "text-profit" : "text-loss"}">${configured ? "Supabase Configured" : "Local Mode"}</span>
+        </div>
+        <div class="database-status-panel">
+          <article>
+            <b>Current Mode</b>
+            <p>${configured ? "Supabase URL and anon key are configured. Snapshot backup and core/trade table sync are available." : "Supabase keys are blank. App will continue working with local browser storage until config.js is updated."}</p>
+          </article>
+          <article>
+            <b>Setup Required</b>
+            <p>Run <code>supabase-schema.sql</code>, then run <code>supabase-storage-policies.sql</code> and <code>supabase-core-sync-policies.sql</code> for testing RLS. For production review, use <code>supabase-rls-readiness-audit.sql</code> first. Use <code>supabase-strict-rls-final-lock-template.sql</code> only after backend/Auth migration is fully complete.</p>
+          </article>
+          <article>
+            <b>Last Core Sync</b>
+            <p class="${lastSync?.ok === false ? "text-loss" : ""}">${lastSync ? `${esc(lastSync.message || "Sync done")} · ${esc(new Date(lastSync.at).toLocaleString("en-IN"))}` : "No row-by-row sync yet."}</p>
+          </article>
+        </div>
+        <div class="review-grid compact-review database-count-grid">
+          ${countRows}
+        </div>
+        <div class="database-status-panel security-status-panel">
+          <article><b>Security Notice</b><p class="text-loss">Phase6.9 RLS readiness is prepared. Testing policies stay frontend-compatible; strict production RLS must be enabled only after Supabase Auth/Edge Functions are fully active.</p></article>
+          <article><b>Admin Action Logs</b><p>${(App.state.adminActionLogs || []).length} local audit row(s) ready for Supabase sync.</p></article>
+          <article><b>Last Backup</b><p>${lastSync ? esc(new Date(lastSync.at).toLocaleString("en-IN")) : "No sync yet."}</p></article>
+        </div>
+        <div class="database-action-grid">
+          <button class="save-profile-btn" onclick="AITradeXAdmin.testDatabase(this)">Test Supabase Connection</button>
+          <button class="save-profile-btn" onclick="AITradeXAdmin.syncCoreDatabase(this)">Sync Core + Trades</button>
+          <button class="ghost-action" onclick="AITradeXAdmin.pullCoreDatabase(this)">Load Core + Trades</button>
+          <button class="save-profile-btn" onclick="AITradeXAdmin.backupDatabase(this)">Backup Local Data to Supabase</button>
+          <button class="ghost-action" onclick="AITradeXAdmin.restoreDatabase(this)">Restore Latest Backup</button>
+          <button class="ghost-action" onclick="AITradeXAdmin.go('audit')">Open Audit Logs</button>
+          <button class="ghost-action" onclick="AITradeXAdmin.exportLocalData()">Download Local Backup JSON</button>
+          <label class="ghost-action import-backup-label">Import Backup JSON<input type="file" accept="application/json" onchange="AITradeXAdmin.importLocalData(this.files && this.files[0])" hidden/></label>
+          <a class="ghost-action" href="supabase-schema.sql" download>Download SQL Schema</a>
+          <a class="ghost-action" href="supabase-storage-policies.sql" download>Download Storage Policies</a>
+          <a class="ghost-action" href="supabase-core-sync-policies.sql" download>Download Testing RLS Policies</a>
+          <a class="ghost-action" href="supabase-production-rls-template.sql" download>Download Production RLS Template</a>
+        </div>
+        <div id="databaseStatusBox" class="database-result-box">No database action yet.</div>
+      </section>
+      <section class="premium-card database-roadmap-card">
+        <div class="section-head"><div><h3>Migration Roadmap</h3><span>Safe sequence so current UI does not break.</span></div></div>
+        <div class="database-roadmap-list">
+          <article><b>Step 1</b><span>Supabase schema + backup/restore foundation</span><em>Added now</em></article>
+          <article><b>Step 2</b><span>Sync users, KYC, bank methods, wallet ledger, deposit and withdrawal rows</span><em>Added now</em></article>
+          <article><b>Step 3</b><span>Sync manual trades, pending orders, AI live positions and instant AI batches</span><em>Added now</em></article>
+          <article><b>Step 4</b><span>Admin action audit logs and security status panel</span><em>Added now</em></article>
+          <article><b>Step 5</b><span>Move login/auth reads fully to database with secure user/admin roles</span><em>Next</em></article>
+        </div>
+      </section>
+    `);
+  }
+
+
+  function auditLogRows() {
+    App.state.adminActionLogs = Array.isArray(App.state.adminActionLogs) ? App.state.adminActionLogs : [];
+    return [...App.state.adminActionLogs].sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
+  }
+
+  function logAdminAction(action, targetType = "SYSTEM", targetId = "", meta = {}) {
+    try {
+      return App.addAdminAction?.({ action, targetType, targetId, meta });
+    } catch (error) {
+      console.warn("Admin action log failed", error);
+      return null;
+    }
+  }
+
+  async function logAdminActionAsync(action, targetType = "SYSTEM", targetId = "", meta = {}) {
+    try {
+      return await App.addAdminActionAsync?.({ action, targetType, targetId, meta });
+    } catch (error) {
+      console.warn("Admin action log failed", error);
+      throw error;
+    }
+  }
+
+  function securityPage() {
+    const admin = adminUser();
+    const sessionMs = App.sessionTimeLeft?.() || 0;
+    const loginLogs = auditLogRows().filter(x => String(x.action || "").includes("LOGIN")).slice(0, 12);
+    const lockKeys = Object.keys(localStorage).filter(k => k.startsWith("AITradeX_ADMIN_LOGIN_LOCK_"));
+    const locks = lockKeys.map(k => ({ key: k, email: k.replace("AITradeX_ADMIN_LOGIN_LOCK_", ""), row: (() => { try { return JSON.parse(localStorage.getItem(k) || "{}") || {}; } catch { return {}; } })() }));
+    shell(`
+      <section class="admin-module-hero security-hero">
+        <div>
+          <p class="eyebrow">Admin Security</p>
+          <h2>Control Center Protection</h2>
+          <span>Session expiry, login attempt lock, and security audit visibility for sensitive admin access.</span>
+        </div>
+        <div class="admin-hero-stats"><b>${adminSessionLabel()}</b><span>Current admin session</span></div>
+      </section>
+      <section class="metrics-grid security-metrics-grid">
+        <article><span>Admin</span><b>${esc(admin?.email || "-")}</b></article>
+        <article><span>Session left</span><b>${Math.max(0, Math.ceil(sessionMs / 60000))} min</b></article>
+        <article><span>Login lock rule</span><b>5 attempts</b></article>
+        <article><span>Lock duration</span><b>15 min</b></article>
+      </section>
+      <section class="admin-grid-two">
+        <article class="premium-card security-card">
+          <div class="section-head"><div><h3>Security Rules</h3><span>Active in this ZIP</span></div></div>
+          <div class="admin-list">
+            <article class="admin-small-row"><b>Admin session expiry</b><span>Auto logout after 2 hours</span></article>
+            <article class="admin-small-row"><b>Wrong password lock</b><span>5 wrong attempts = 15 minute lock</span></article>
+            <article class="admin-small-row"><b>Audit record</b><span>Admin login/logout and sensitive actions are recorded locally + syncable</span></article>
+            <article class="admin-small-row"><b>Manual logout</b><span>Clears current admin session immediately</span></article>
+            <article class="admin-small-row"><b>Phase6.9 RLS Readiness</b><span>Backend RPC flows are staged; strict RLS templates and audit queries are included, while legacy testing login remains active until final Auth migration.</span></article>
+            <article class="admin-small-row"><b>Real-money readiness</b><span>Do not run strict production RLS until Supabase Auth roles/Edge Functions are live for every sensitive action.</span></article>
+          </div>
+        </article>
+        <article class="premium-card security-card">
+          <div class="section-head"><div><h3>Login Lock Status</h3><span>Stored on this browser/device</span></div><button class="ghost-action" onclick="AITradeXAdmin.clearAdminLocks()">Clear Locks</button></div>
+          <div class="admin-list">
+            ${locks.length ? locks.map(x => { const until = Number(x.row.lockedUntil || 0); const active = until && Date.now() < until; return `<article class="admin-small-row"><b>${esc(x.email)}</b><span>${active ? `Locked · ${Math.ceil((until - Date.now()) / 60000)} min left` : `${Number(x.row.attempts || 0)} failed attempt(s)`}</span></article>`; }).join("") : `<article class="admin-small-row"><b>No active lock</b><span>Admin login is clear on this browser</span></article>`}
+          </div>
+        </article>
+      </section>
+      <section class="premium-card security-card">
+        <div class="section-head"><div><h3>Recent Security Timeline</h3><span>Login/logout and database/security actions</span></div><button class="ghost-action" onclick="AITradeXAdmin.go('audit')">Open Full Audit</button></div>
+        <div class="admin-mini-table audit-log-table">
+          ${loginLogs.length ? loginLogs.map(row => `<div><span>${esc(row.action || "SECURITY")}</span><b>${esc(row.adminName || row.adminUserId || "Admin")}</b><small>${row.createdAt ? new Date(row.createdAt).toLocaleString("en-IN") : "-"}</small></div>`).join("") : `<div class="empty-state">No security login timeline yet.</div>`}
+        </div>
+      </section>
+    `);
+  }
+
+  function auditPage() {
+    const logs = auditLogRows();
+    const last = logs[0];
+    const todayKey = new Date().toLocaleDateString("en-IN");
+    const todayCount = logs.filter(row => row.createdAt && new Date(row.createdAt).toLocaleDateString("en-IN") === todayKey).length;
+    const sensitive = logs.filter(row => /WALLET|DEPOSIT|WITHDRAWAL|AI_|KYC|PAYMENT|USER_STATUS|PLAN|PASSWORD/.test(String(row.action || ""))).length;
+    const visible = logs.slice(0, 60);
+    shell(`
+      <section class="premium-card database-control-card audit-control-card">
+        <div class="section-head">
+          <div><h3>Admin Security & Audit Logs</h3><span>Every sensitive admin action is recorded locally and synced to Supabase admin_action_logs.</span></div>
+          <span class="admin-count-pill">${logs.length} logs</span>
+        </div>
+        <div class="database-status-panel security-status-panel">
+          <article><b>Security Mode</b><p class="text-loss">Phase6.9 readiness is active: current UI stays same, backend RPC flows are prepared for sensitive actions, and strict RLS templates are included for final production lock after Auth/Edge Functions.</p></article>
+          <article><b>Today Actions</b><p>${todayCount} admin action(s) recorded today.</p></article>
+          <article><b>Sensitive Actions</b><p>${sensitive} wallet, finance, KYC, AI, plan or user-control actions tracked.</p></article>
+          <article><b>Latest Action</b><p>${last ? `${esc(last.action)} · ${new Date(last.createdAt).toLocaleString("en-IN")}` : "No action recorded yet."}</p></article>
+        </div>
+        <div class="database-action-grid">
+          <button class="save-profile-btn" onclick="AITradeXAdmin.syncCoreDatabase(this)">Sync Audit Logs to Supabase</button>
+          <button class="ghost-action" onclick="AITradeXAdmin.exportAuditLogs()">Export Audit JSON</button>
+          <button class="ghost-action" onclick="AITradeXAdmin.go('database')">Open Database Center</button>
+        </div>
+      </section>
+      <section class="premium-card audit-log-list-card">
+        <div class="section-head"><div><h3>Recent Audit Timeline</h3><span>Latest 60 admin actions. Use export for full list.</span></div></div>
+        <div class="admin-mini-table audit-log-table">
+          ${visible.length ? visible.map(row => `
+            <div>
+              <span>${esc(row.action || "ADMIN_ACTION")}</span>
+              <b>${esc(row.targetType || "SYSTEM")}${row.targetId ? ` · ${esc(row.targetId)}` : ""}</b>
+              <small>${row.createdAt ? new Date(row.createdAt).toLocaleString("en-IN") : "-"} · ${esc(row.adminName || row.adminUserId || "Admin")} ${row.meta ? `· ${esc(Object.entries(row.meta).slice(0,3).map(([k,v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join(" · "))}` : ""}</small>
+            </div>
+          `).join("") : `<div class="empty-state">No audit logs yet. Sensitive admin actions will appear here.</div>`}
         </div>
       </section>
     `);
@@ -2373,10 +3007,12 @@
 
   function render() {
     if (App.reloadState) App.reloadState();
-    reconcileAiLiveMarginLocks();
+    reconcileAiLiveMarginLocks().catch(err => console.warn("AI live margin reconcile failed", err));
     page = localStorage.getItem("AITradeX_ADMIN_PAGE") || "dashboard";
     const current = adminUser();
     if (!current || current.role !== "admin") return loginPage();
+    if (App.touchSession && !App.touchSession()) return loginPage();
+    if ((page === "liveAi" || page === "dashboard") && aiLivePositions().length) triggerAiLiveAutoCloseCheckSoon(300);
 
     if (page === "dashboard") return dashboardPage();
     if (page === "notifications") return notificationsPage();
@@ -2393,22 +3029,212 @@
     if (page === "referrals") return referralsPage();
     if (page === "support") return supportPage();
     if (page === "settings") return settingsPage();
+    if (page === "paymentMethods") return paymentMethodsSettingsPage();
+    if (page === "telegram") return telegramPage();
+    if (page === "database") return databasePage();
+    if (page === "security") return securityPage();
+    if (page === "audit") return auditPage();
     return dashboardPage();
   }
 
 
-  function settleAiLivePositionByAdmin(position, reason = "ADMIN_CLOSE") {
-    if (!position || String(position.status || "").toUpperCase() !== "OPEN") return false;
-    const cached = App.getCachedPairPrice ? App.getCachedPairPrice(position.pair) : null;
+  function aiLiveBatchId(position) {
+    return String(position?.batchId || position?.id || "");
+  }
+
+  function aiLiveOpenPositionsByBatch(batchId) {
+    const cleanId = String(batchId || "");
+    return aiLivePositions().filter(position => aiLiveBatchId(position) === cleanId);
+  }
+
+  function aiLiveAutoCloseTriggerForBatch(positions, priceRow) {
+    if (!positions || !positions.length || !priceRow) return null;
+    for (const position of positions) {
+      const rawPnl = aiLiveRawPnl(position, priceRow);
+      const settlementPnl = aiLiveSettlementPnl(position, priceRow);
+      const margin = aiLiveMarginAmount(position);
+      const targetPnl = aiLiveTargetPnlAmount(position);
+      const targetType = String(position?.targetType || "PROFIT").toUpperCase();
+      const maxLoss = Math.max(0, margin);
+      const tolerance = Math.max(0.01, Math.abs(targetPnl || maxLoss || 0) * 0.0001);
+
+      if (rawPnl < 0 && maxLoss > 0 && Math.abs(rawPnl) + tolerance >= maxLoss) {
+        return {
+          reason: "AUTO_RISK_CLOSE",
+          label: "Loss reached locked AI amount",
+          rawPnl: Number(rawPnl.toFixed(2)),
+          settlementPnl: Number(settlementPnl.toFixed(2)),
+          triggerPositionId: position.id
+        };
+      }
+
+      if (targetPnl > 0) {
+        if (targetType === "LOSS") {
+          const lossTarget = Math.min(maxLoss || targetPnl, targetPnl);
+          if (lossTarget > 0 && (rawPnl <= -lossTarget + tolerance || settlementPnl <= -lossTarget + tolerance)) {
+            return {
+              reason: "AUTO_LOSS_TARGET_CLOSE",
+              label: `Loss target hit (${Number(position.targetPercent || 0)}%)`,
+              rawPnl: Number(rawPnl.toFixed(2)),
+              settlementPnl: Number(settlementPnl.toFixed(2)),
+              triggerPositionId: position.id
+            };
+          }
+        } else if (rawPnl + tolerance >= targetPnl || settlementPnl + tolerance >= targetPnl) {
+          return {
+            reason: "AUTO_PROFIT_TARGET_CLOSE",
+            label: `Profit target hit (${Number(position.targetPercent || 0)}%)`,
+            rawPnl: Number(rawPnl.toFixed(2)),
+            settlementPnl: Number(settlementPnl.toFixed(2)),
+            triggerPositionId: position.id
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  async function markAiLiveBatchClosed(batchId, reason, closed, totalPositions, priceRow, trigger = null) {
+    const batch = (App.state.aiLiveBatches || []).find(row => String(row.id) === String(batchId));
+    if (!batch) return;
+    batch.status = closed === totalPositions ? "CLOSED" : "PARTIAL_CLOSE";
+    batch.closedAt = new Date().toISOString();
+    batch.closeReason = reason;
+    batch.exitPrice = Number(priceRow?.price || batch.entryPrice || 0);
+    batch.exitPriceDisplay = priceRow?.display || String(batch.exitPrice || batch.entryPrice || "-");
+    batch.exitPriceSource = priceRow?.source || batch.priceSource || "Live market";
+    batch.closedCount = closed;
+    batch.totalPositions = totalPositions;
+    if (trigger) batch.autoCloseTrigger = trigger.label || trigger.reason || reason;
+    if (App.isDatabaseMode?.() && window.AITradeXDB?.writeAiBatch) await window.AITradeXDB.writeAiBatch(batch);
+  }
+
+  async function runAiLiveBatchAutoClose({ silent = false } = {}) {
+    if (aiBatchAutoCloseRunning) return 0;
+    aiBatchAutoCloseRunning = true;
+    let closedTotal = 0;
+    let checkedBatches = 0;
+    try {
+      const groups = new Map();
+      aiLivePositions().forEach(position => {
+        const id = aiLiveBatchId(position);
+        if (!id) return;
+        if (!groups.has(id)) groups.set(id, []);
+        groups.get(id).push(position);
+      });
+
+      for (const [batchId, positions] of groups.entries()) {
+        if (!positions.length) continue;
+        checkedBatches += 1;
+        let priceRow = null;
+        let trigger = null;
+        const cachedRow = aiLiveExitPriceRow(positions[0]);
+        if (cachedRow) {
+          trigger = aiLiveAutoCloseTriggerForBatch(positions, cachedRow);
+          if (trigger) priceRow = cachedRow;
+        }
+        if (!trigger) {
+          try {
+            priceRow = App.getFreshLivePairPrice
+              ? await App.getFreshLivePairPrice(positions[0].pair)
+              : (App.getLivePairPrice ? await App.getLivePairPrice(positions[0].pair) : null);
+          } catch (err) {
+            priceRow = cachedRow || null;
+            if (!priceRow) {
+              console.warn("AI live auto-close price unavailable", batchId, err?.message || err);
+              continue;
+            }
+          }
+          trigger = aiLiveAutoCloseTriggerForBatch(positions, priceRow);
+        }
+        if (!trigger) continue;
+
+        let closed = 0;
+        if (App.isDatabaseMode?.() && window.AITradeXDB?.closeAiLiveBatchSecure) {
+          try {
+            const result = await window.AITradeXDB.closeAiLiveBatchSecure({
+              batchId,
+              reason: trigger.reason || "AUTO_BATCH_CLOSE",
+              exitPrice: Number(priceRow?.price || positions[0]?.entryPrice || 0),
+              exitPriceDisplay: priceRow?.display || String(priceRow?.price || positions[0]?.entryPrice || "-"),
+              exitPriceSource: priceRow?.source || "Auto close watcher",
+              ...aiLiveBackendAdminPayload()
+            });
+            closed = Number(result.closed || result.closedCount || positions.length || 0);
+            if (window.AITradeXDB?.loadAll) await window.AITradeXDB.loadAll();
+          } catch (error) {
+            console.warn("AI live backend auto-close failed; using safe browser fallback", batchId, error?.message || error);
+            closed = 0;
+          }
+        }
+        if (!closed) {
+          for (const position of positions) {
+            try {
+              if (await settleAiLivePositionByAdmin(position, trigger.reason, priceRow)) closed += 1;
+            } catch (error) {
+              console.warn("AI live auto-close failed", position.id, error?.message || error);
+            }
+          }
+          if (closed) {
+            try { await markAiLiveBatchClosed(batchId, trigger.reason, closed, positions.length, priceRow, trigger); }
+            catch (err) { console.warn("AI live auto-close batch save failed", err?.message || err); }
+            await (typeof logAdminActionAsync === "function"
+              ? logAdminActionAsync("AI_LIVE_AUTO_CLOSE", "AI_BATCH", batchId, { closed, totalPositions: positions.length, reason: trigger.reason, trigger: trigger.label, price: priceRow?.display || priceRow?.price || "" })
+              : logAdminAction("AI_LIVE_AUTO_CLOSE", "AI_BATCH", batchId, { closed, totalPositions: positions.length, reason: trigger.reason, trigger: trigger.label, price: priceRow?.display || priceRow?.price || "" }));
+          }
+        }
+        if (closed) {
+          closedTotal += closed;
+        }
+      }
+    } finally {
+      aiBatchAutoCloseRunning = false;
+    }
+    if (closedTotal) {
+      App.saveState();
+      if (!silent) App.toast(`AI live auto-closed ${closedTotal} position(s) at batch level.`);
+      if (typeof render === "function") setTimeout(() => render(), 0);
+    } else if (!silent) {
+      App.toast(checkedBatches ? "No AI live batch target/risk hit yet." : "No running AI live batch found.");
+    }
+    return closedTotal;
+  }
+
+  function triggerAiLiveAutoCloseCheckSoon(delay = 250) {
+    setTimeout(() => {
+      if (isAdminSessionActive()) {
+        runAiLiveBatchAutoClose({ silent: true }).catch(err => console.warn("AI live auto-close watcher failed", err?.message || err));
+      }
+    }, Math.max(0, Number(delay || 0)));
+  }
+
+  function startAiLiveBatchAutoCloseWatcher() {
+    if (aiBatchAutoCloseTimer) clearInterval(aiBatchAutoCloseTimer);
+    aiBatchAutoCloseTimer = setInterval(() => {
+      if (isAdminSessionActive()) {
+        runAiLiveBatchAutoClose({ silent: true }).catch(err => console.warn("AI live auto-close watcher failed", err?.message || err));
+      }
+    }, 3000);
+    if (!window.__aitxAiLiveAutoCloseListeners) {
+      window.__aitxAiLiveAutoCloseListeners = true;
+      window.addEventListener("focus", () => triggerAiLiveAutoCloseCheckSoon(150));
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) triggerAiLiveAutoCloseCheckSoon(150);
+      });
+    }
+  }
+
+  async function settleAiLivePositionByAdmin(position, reason = "ADMIN_CLOSE", forcedPriceRow = null) {
+    if (!position || tradeStatusOf(position) !== "OPEN") return false;
+    const original = { ...position };
+    const cached = forcedPriceRow || aiLiveExitPriceRow(position);
     const current = Number(cached?.price || position.entryPrice || 0);
-    let pnl = aiLivePositionPnl(position);
+    const pnl = aiLiveSettlementPnl(position, cached);
     const balanceBefore = App.realBalance(position.userId);
-    const margin = Math.max(0, Number(position.marginAmount || 0));
-    if (position.marginLocked && pnl < -margin) pnl = -margin;
-    if (!position.marginLocked && pnl < 0 && Math.abs(pnl) > balanceBefore) pnl = -balanceBefore;
+    const margin = aiLiveMarginAmount(position);
     const settlementAmount = position.marginLocked ? Math.max(0, margin + pnl) : pnl;
     const now = new Date().toISOString();
-    position.tradeType = "AI_AUTO";
+    position.tradeType = "AI_LIVE";
     position.status = "CLOSED";
     position.exitPrice = current;
     position.exitPriceDisplay = cached?.display || String(current || position.entryPrice || "-");
@@ -2421,26 +3247,45 @@
     position.settlementAmount = Number(settlementAmount.toFixed(2));
     position.balanceAfter = Number((balanceBefore + position.settlementAmount).toFixed(2));
     position.source = "ADMIN_AI_LIVE_CLOSE";
-    if (position.settlementAmount !== 0) {
-      App.addLedger({
-        userId: position.userId,
-        accountType: "REAL",
-        type: position.marginLocked ? "AI_LIVE_SETTLEMENT" : (position.pnl >= 0 ? "AI_LIVE_PROFIT" : "AI_LIVE_LOSS"),
-        amount: position.settlementAmount,
-        referenceId: position.id,
-        note: position.marginLocked
-          ? `${position.pair} AI live ${position.side} closed by admin · AI amount ${App.money(margin)} · P/L ${position.pnl >= 0 ? "+" : ""}${App.money(position.pnl)}`
-          : `${position.pair} AI live ${position.side} closed by admin`
-      });
-    } else {
+    let settlementAdded = false;
+    try {
+      if (position.settlementAmount !== 0) {
+        const ledgerPayload = {
+          userId: position.userId,
+          accountType: "REAL",
+          type: position.marginLocked ? "AI_LIVE_SETTLEMENT" : (position.pnl >= 0 ? "AI_LIVE_PROFIT" : "AI_LIVE_LOSS"),
+          amount: position.settlementAmount,
+          referenceId: position.id,
+          note: position.marginLocked
+            ? `${position.pair} AI live ${position.side} closed by admin · AI amount ${App.money(margin)} · P/L ${position.pnl >= 0 ? "+" : ""}${App.money(position.pnl)}`
+            : `${position.pair} AI live ${position.side} closed · ${reason}`
+        };
+        const row = App.addLedgerAsync ? await App.addLedgerAsync(ledgerPayload) : App.addLedger(ledgerPayload);
+        settlementAdded = !!row;
+      }
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.writeTrade) await window.AITradeXDB.writeTrade(position);
       App.saveState();
+    } catch (err) {
+      if (settlementAdded && position.settlementAmount) {
+        try {
+          await (App.addLedgerAsync ? App.addLedgerAsync({ userId: position.userId, accountType: "REAL", type: "AI_LIVE_SETTLEMENT_ROLLBACK", amount: -position.settlementAmount, referenceId: `${position.id}_admin_close_rollback`, note: "Rollback: admin AI live close save failed" }) : App.addLedger({ userId: position.userId, accountType: "REAL", type: "AI_LIVE_SETTLEMENT_ROLLBACK", amount: -position.settlementAmount, referenceId: `${position.id}_admin_close_rollback`, note: "Rollback: admin AI live close save failed" }));
+        } catch {}
+      }
+      Object.assign(position, original);
+      throw err;
     }
-    App.addNotification?.({ audience: "USER", userId: position.userId, title: "AI live position closed", message: `${position.pair} ${position.side} closed. P/L ${position.pnl >= 0 ? "+" : ""}${App.money(position.pnl)}. Settlement ${App.money(position.settlementAmount)}.`, type: "AI", linkPage: "orders", referenceId: `ai_close_${position.id}` });
-    App.addNotification?.({ audience: "ADMIN", title: "AI live trade closed", message: `${position.pair} ${position.side} closed for user ${position.userId}. P/L ${position.pnl >= 0 ? "+" : ""}${App.money(position.pnl)}.`, type: "AI", linkPage: "liveAi", referenceId: `admin_ai_close_${position.id}` });
+    await (App.addNotificationAsync ? App.addNotificationAsync({ audience: "USER", userId: position.userId, title: "AI live position closed", message: `${position.pair} ${position.side} closed. P/L ${position.pnl >= 0 ? "+" : ""}${App.money(position.pnl)}. Settlement ${App.money(position.settlementAmount)}.`, type: "AI", linkPage: "orders", referenceId: `ai_close_${position.id}` }) : App.addNotification?.({ audience: "USER", userId: position.userId, title: "AI live position closed", message: `${position.pair} ${position.side} closed. P/L ${position.pnl >= 0 ? "+" : ""}${App.money(position.pnl)}. Settlement ${App.money(position.settlementAmount)}.`, type: "AI", linkPage: "orders", referenceId: `ai_close_${position.id}` }));
+    await (App.addNotificationAsync ? App.addNotificationAsync({ audience: "ADMIN", title: "AI live trade closed", message: `${position.pair} ${position.side} closed for user ${position.userId}. P/L ${position.pnl >= 0 ? "+" : ""}${App.money(position.pnl)}.`, type: "AI", linkPage: "liveAi", referenceId: `admin_ai_close_${position.id}` }) : App.addNotification?.({ audience: "ADMIN", title: "AI live trade closed", message: `${position.pair} ${position.side} closed for user ${position.userId}. P/L ${position.pnl >= 0 ? "+" : ""}${App.money(position.pnl)}.`, type: "AI", linkPage: "liveAi", referenceId: `admin_ai_close_${position.id}` }));
     return true;
   }
 
   window.AITradeXAdmin = {
+    async checkAiLiveAutoClose(button) {
+      markButton(button, "Checking...");
+      try { await runAiLiveBatchAutoClose({ silent: false }); }
+      catch (err) { App.toast(`AI live auto-close check failed: ${err.message || err}`); }
+      finally { render(); }
+    },
     changeAiHistoryPage(kind, delta) {
       const key = `AITradeX_ADMIN_${kind}_PAGE`;
       const current = Math.max(1, Number(localStorage.getItem(key) || 1));
@@ -2463,24 +3308,153 @@
       }
       render();
     },
+    async testDatabase(button) {
+      const box = document.getElementById("databaseStatusBox");
+      try {
+        markButton(button, "Testing...");
+        const result = await window.AITradeXDB.testConnection();
+        if (box) box.textContent = result.message;
+        App.toast(result.ok ? "Database connected." : "Database not connected.");
+      } catch (err) {
+        if (box) box.textContent = err.message || "Database test failed.";
+        App.toast(err.message || "Database test failed.");
+      } finally {
+        if (button) { button.disabled = false; button.textContent = button.dataset.oldText || "Test Supabase Connection"; }
+      }
+    },
+    async syncCoreDatabase(button) {
+      const box = document.getElementById("databaseStatusBox");
+      try {
+        markButton(button, "Syncing...");
+        const result = await window.AITradeXDB.syncCoreTables({ silent: true });
+        if (box) box.textContent = `Core + trade tables synced to Supabase. ${result.total || 0} row(s) upserted. Users, wallet, deposits, withdrawals, manual trades, AI live positions, pending orders and AI batches included.`;
+        logAdminAction("DATABASE_SYNC", "DATABASE", "core_trades", { rows: result.total || 0 });
+        App.toast("Core + trade tables synced.");
+        render();
+      } catch (err) {
+        if (box) box.textContent = err.message || "Core sync failed.";
+        App.toast(err.message || "Core sync failed.");
+      } finally {
+        if (button) { button.disabled = false; button.textContent = button.dataset.oldText || "Sync Core + Trades"; }
+      }
+    },
+    async pullCoreDatabase(button) {
+      const ok = confirm("Load core + trade rows from Supabase into this browser? This replaces local users, wallet ledger, deposits, withdrawals, KYC, bank methods, notifications, manual trades, AI positions and AI batches on this device.");
+      if (!ok) return;
+      const box = document.getElementById("databaseStatusBox");
+      try {
+        markButton(button, "Loading...");
+        const result = await window.AITradeXDB.pullCoreTables();
+        if (box) box.textContent = `Core + trade tables loaded. Users: ${result.users || 0}, deposits: ${result.deposits || 0}, withdrawals: ${result.withdrawals || 0}, ledger: ${result.walletLedger || 0}, trades: ${result.trades || 0}, AI batches: ${result.aiBatches || 0}.`;
+        logAdminAction("DATABASE_LOAD", "DATABASE", "core_trades", result);
+        App.toast("Core + trade tables loaded from Supabase.");
+        render();
+      } catch (err) {
+        if (box) box.textContent = err.message || "Load core tables failed.";
+        App.toast(err.message || "Load core tables failed.");
+      } finally {
+        if (button) { button.disabled = false; button.textContent = button.dataset.oldText || "Load Core + Trades"; }
+      }
+    },
+    async backupDatabase(button) {
+      const box = document.getElementById("databaseStatusBox");
+      try {
+        markButton(button, "Backing up...");
+        const admin = adminUser();
+        const row = await window.AITradeXDB.backupFullState({ savedBy: admin?.email || admin?.id || "admin", note: "Manual backup from admin database page" });
+        if (box) box.textContent = `Backup saved to Supabase. Snapshot #${row.id} · ${row.saved_at || ""}`;
+        logAdminAction("DATABASE_BACKUP", "DATABASE", String(row.id || "snapshot"), { savedAt: row.saved_at || "" });
+        App.toast("Database backup saved.");
+      } catch (err) {
+        if (box) box.textContent = err.message || "Backup failed.";
+        App.toast(err.message || "Backup failed.");
+      } finally {
+        if (button) { button.disabled = false; button.textContent = button.dataset.oldText || "Backup Local Data to Supabase"; }
+      }
+    },
+    async restoreDatabase(button) {
+      const ok = confirm("Restore the latest Supabase backup? This will replace current local browser data on this device.");
+      if (!ok) return;
+      const box = document.getElementById("databaseStatusBox");
+      try {
+        markButton(button, "Restoring...");
+        const snap = await window.AITradeXDB.restoreLatestSnapshot();
+        if (box) box.textContent = `Restored snapshot #${snap.id} from ${snap.saved_at || "database"}.`;
+        logAdminAction("DATABASE_RESTORE", "DATABASE", String(snap.id || "snapshot"), { savedAt: snap.saved_at || "" });
+        App.toast("Database backup restored.");
+        render();
+      } catch (err) {
+        if (box) box.textContent = err.message || "Restore failed.";
+        App.toast(err.message || "Restore failed.");
+      } finally {
+        if (button) { button.disabled = false; button.textContent = button.dataset.oldText || "Restore Latest Backup"; }
+      }
+    },
+    exportLocalData() {
+      window.AITradeXDB.downloadLocalBackup();
+      App.toast("Local backup download started.");
+    },
+    exportAuditLogs() {
+      const data = { app: "AITradeX", exportedAt: new Date().toISOString(), logs: auditLogRows() };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `aitradex-admin-audit-${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+      App.toast("Audit logs exported.");
+    },
+    async importLocalData(file) {
+      try {
+        const counts = await window.AITradeXDB.importLocalBackup(file);
+        App.toast(`Backup imported. Users: ${counts.users || 0}`);
+        render();
+      } catch (err) {
+        App.toast(err.message || "Import failed.");
+      }
+    },
+    previewAdminLock(email) {
+      const box = document.getElementById("adminLoginLockStatus");
+      if (!box) return;
+      const row = adminLockRow(email);
+      const until = Number(row.lockedUntil || 0);
+      if (until && Date.now() < until) {
+        box.textContent = `Temporarily locked. Try again in ${Math.ceil((until - Date.now()) / 60000)} minute(s).`;
+        box.className = "admin-login-lock-status locked";
+      } else if (Number(row.attempts || 0) > 0) {
+        box.textContent = `${Number(row.attempts || 0)} failed attempt(s) on this browser.`;
+        box.className = "admin-login-lock-status warn";
+      } else {
+        box.textContent = "";
+        box.className = "admin-login-lock-status";
+      }
+    },
+    clearAdminLocks() {
+      Object.keys(localStorage).filter(k => k.startsWith("AITradeX_ADMIN_LOGIN_LOCK_")).forEach(k => localStorage.removeItem(k));
+      logAdminAction("ADMIN_LOGIN_LOCKS_CLEARED", "SECURITY", "local_browser", {});
+      App.toast("Admin login locks cleared on this browser.");
+      render();
+    },
     confirmFinanceAction(action, userId, requestId, userName, amountText, button) {
       const actionTitle = String(action || "").includes("approve") ? "Approve" : "Reject";
       const isWithdrawal = String(action || "").toLowerCase().includes("withdrawal");
-      const impact = isWithdrawal ? "This may debit the user's real wallet on approval." : "This may credit the user's real wallet on approval.";
+      const impact = isWithdrawal ? "This may debit the user's wallet on approval." : "This may credit the user's wallet on approval.";
       const ok = confirm(`${actionTitle} request for ${userName || "user"}?\nAmount: ${amountText || "-"}\n${impact}`);
       if (!ok) return;
       if (typeof this[action] === "function") this[action](userId, requestId, button);
     },
-    login(event) {
+    async login(event) {
       event.preventDefault();
       try {
         const login = Auth.loginAdmin || Auth.loginControl;
-        login({
+        await login({
           email: adminEmail.value,
           password: adminPassword.value
         });
         page = "dashboard";
         localStorage.setItem("AITradeX_ADMIN_PAGE", page);
+        logAdminAction("ADMIN_LOGIN", "ADMIN", App.session?.userId || "admin", { email: adminEmail.value });
         App.toast("Admin logged in.");
         render();
       } catch (err) {
@@ -2488,6 +3462,7 @@
       }
     },
     logout() {
+      logAdminAction("ADMIN_LOGOUT", "ADMIN", App.session?.userId || "admin", {});
       App.clearSession();
       localStorage.removeItem("AITradeX_ADMIN_PAGE");
       page = "dashboard";
@@ -2573,7 +3548,7 @@
       localStorage.setItem("AITradeX_ADMIN_WALLET_HISTORY_PAGE", "1");
       render();
     },
-    setUserStatus(userId, status, button) {
+    async setUserStatus(userId, status, button) {
       const target = allUsers().find(u => u.id === userId);
       if (!target) return;
       const nextStatus = String(status || "ACTIVE").toUpperCase();
@@ -2587,42 +3562,67 @@
       markButton(button, "Updating...");
       target.status = nextStatus;
       target.statusUpdatedAt = App.now();
+      try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeUser) await window.AITradeXDB.writeUser(target); } catch (err) { App.toast(`User status save failed: ${err.message || err}`); render(); return; }
+      logAdminAction("USER_STATUS_CHANGE", "USER", userId, { user: displayNameFor(target), status: nextStatus });
       App.saveState();
       App.toast(`User status changed to ${nextStatus}.`);
       render();
     },
-    adjustUserWallet(event, userId) {
+    async adjustUserWallet(event, userId) {
       event.preventDefault();
       const target = allUsers().find(u => u.id === userId);
       if (!target) return;
       const amount = Math.max(0, Number(document.getElementById(`walletAmount_${userId}`)?.value || 0));
       const action = String(document.getElementById(`walletAction_${userId}`)?.value || "ADD").toUpperCase();
       const note = String(document.getElementById(`walletNote_${userId}`)?.value || "").trim();
+      const button = event.submitter;
       if (!amount) {
         App.toast("Enter wallet amount.");
+        return;
+      }
+      if (!["ADD", "DEDUCT"].includes(action)) {
+        App.toast("Invalid wallet action.");
         return;
       }
       const signed = action === "DEDUCT" ? -amount : amount;
       const label = action === "DEDUCT" ? "deduct" : "add";
       if (!confirm(`Confirm ${label} ${App.money(amount)} for ${displayNameFor(target)}?`)) return;
+      markButton(button, "Updating...");
       try {
         const referenceId = App.uid("admin_wallet");
-        App.addLedger({
-          userId,
-          accountType: "REAL",
-          type: action === "DEDUCT" ? "ADMIN_WALLET_DEBIT" : "ADMIN_WALLET_CREDIT",
-          amount: signed,
-          referenceId,
-          note: note || `Admin wallet ${action.toLowerCase()}`
-        });
-        App.addNotification?.({ audience: "USER", userId, title: action === "DEDUCT" ? "Wallet debited by admin" : "Wallet credited by admin", message: `${App.money(amount)} ${action === "DEDUCT" ? "deducted from" : "added to"} your real wallet.${note ? ` Note: ${note}` : ""}`, type: "WALLET", linkPage: "wallet", referenceId });
+        if (App.isDatabaseMode?.() && window.AITradeXDB?.adjustWalletSecure) {
+          const admin = adminUser() || {};
+          await window.AITradeXDB.adjustWalletSecure({
+            userId,
+            action,
+            amount,
+            note: note || `Admin wallet ${action.toLowerCase()}`,
+            referenceId,
+            adminUserId: admin.id || "control_root",
+            adminEmail: admin.email || "",
+            adminName: displayNameFor(admin) || "Admin"
+          });
+          await window.AITradeXDB.loadAll?.();
+        } else {
+          App.addLedger({
+            userId,
+            accountType: "REAL",
+            type: action === "DEDUCT" ? "ADMIN_WALLET_DEBIT" : "ADMIN_WALLET_CREDIT",
+            amount: signed,
+            referenceId,
+            note: note || `Admin wallet ${action.toLowerCase()}`
+          });
+          App.addNotification?.({ audience: "USER", userId, title: action === "DEDUCT" ? "Wallet debited by admin" : "Wallet credited by admin", message: `${App.money(amount)} ${action === "DEDUCT" ? "deducted from" : "added to"} your wallet.${note ? ` Note: ${note}` : ""}`, type: "WALLET", linkPage: "wallet", referenceId });
+          logAdminAction(action === "DEDUCT" ? "WALLET_DEBIT" : "WALLET_CREDIT", "USER", userId, { user: displayNameFor(target), amount, note, referenceId });
+        }
         App.toast(`Wallet ${action === "DEDUCT" ? "deducted" : "credited"} successfully.`);
         render();
       } catch (error) {
         App.toast(error.message || "Wallet update failed.");
+        render();
       }
     },
-    changeUserPlan(event, userId) {
+    async changeUserPlan(event, userId) {
       event.preventDefault();
       const target = allUsers().find(u => u.id === userId);
       if (!target) return;
@@ -2630,40 +3630,63 @@
       const plan = App.planById(planId) || App.planById("free");
       if (!plan) return;
       if (!confirm(`Change ${displayNameFor(target)} plan to ${plan.name}?`)) return;
-      App.state.subscriptions = App.state.subscriptions || [];
-      App.state.subscriptions.forEach(sub => {
-        if (sub.userId === userId && sub.status === "ACTIVE") {
-          sub.status = "ADMIN_REPLACED";
-          sub.replacedAt = App.now();
+      try {
+        if (App.isDatabaseMode?.() && window.AITradeXDB?.changeUserPlanSecure) {
+          const admin = adminUser() || {};
+          await window.AITradeXDB.changeUserPlanSecure({
+            userId,
+            planId: plan.id,
+            adminUserId: admin.id || "control_root",
+            adminEmail: admin.email || "",
+            adminName: displayNameFor(admin) || "Admin"
+          });
+          await window.AITradeXDB.loadAll?.();
+        } else {
+          App.state.subscriptions = App.state.subscriptions || [];
+          const changedSubscriptions = [];
+          App.state.subscriptions.forEach(sub => {
+            if (sub.userId === userId && sub.status === "ACTIVE") {
+              sub.status = "ADMIN_REPLACED";
+              sub.replacedAt = App.now();
+              changedSubscriptions.push(sub);
+            }
+          });
+          let newSubscription = null;
+          if (plan.id !== "free") {
+            const days = Math.max(1, Number(plan.durationDays || 30));
+            const created = new Date();
+            const expires = new Date(created.getTime() + days * 86400000);
+            newSubscription = {
+              id: App.uid("sub"),
+              userId,
+              planId: plan.id,
+              planName: plan.name,
+              price: Number(plan.price || 0),
+              amount: Number(plan.price || 0),
+              aiTradeLimit: Number(plan.signals || 0),
+              signals: Number(plan.signals || 0),
+              durationDays: days,
+              status: "ACTIVE",
+              source: "ADMIN_PLAN_CHANGE",
+              createdAt: created.toISOString(),
+              startsAt: created.toISOString(),
+              expiresAt: expires.toISOString()
+            };
+            App.state.subscriptions.push(newSubscription);
+          }
+          target.planChangedAt = App.now();
+          target.planChangedBy = "admin";
+          App.addNotification?.({ audience: "USER", userId, title: "Subscription plan updated", message: `Your plan was changed to ${plan.name} by admin.`, type: "PLAN", linkPage: "subscription", referenceId: `plan_${userId}_${Date.now()}` });
+          logAdminAction("PLAN_CHANGE", "USER", userId, { user: displayNameFor(target), planId: plan.id, planName: plan.name });
+          App.saveState();
         }
-      });
-      if (plan.id !== "free") {
-        const days = Math.max(1, Number(plan.durationDays || 30));
-        const created = new Date();
-        const expires = new Date(created.getTime() + days * 86400000);
-        App.state.subscriptions.push({
-          id: App.uid("sub"),
-          userId,
-          planId: plan.id,
-          planName: plan.name,
-          price: Number(plan.price || 0),
-          aiTradeLimit: Number(plan.signals || 0),
-          signals: Number(plan.signals || 0),
-          durationDays: days,
-          status: "ACTIVE",
-          source: "ADMIN_PLAN_CHANGE",
-          createdAt: created.toISOString(),
-          expiresAt: expires.toISOString()
-        });
+        App.toast(`${displayNameFor(target)} plan updated to ${plan.name}.`);
+        render();
+      } catch (error) {
+        App.toast(error.message || "Plan update failed.");
       }
-      target.planChangedAt = App.now();
-      target.planChangedBy = "admin";
-      App.addNotification?.({ audience: "USER", userId, title: "Subscription plan updated", message: `Your plan was changed to ${plan.name} by admin.`, type: "PLAN", linkPage: "subscription", referenceId: `plan_${userId}_${Date.now()}` });
-      App.saveState();
-      App.toast(`${displayNameFor(target)} plan updated to ${plan.name}.`);
-      render();
     },
-    resetUserPassword(event, userId) {
+    async resetUserPassword(event, userId) {
       event.preventDefault();
       const target = allUsers().find(u => u.id === userId);
       if (!target) return;
@@ -2673,9 +3696,12 @@
         return;
       }
       if (!confirm(`Reset password for ${displayNameFor(target)}?`)) return;
-      target.password = next;
-      target.passwordUpdatedAt = App.now();
-      target.passwordUpdatedBy = "admin";
+      try {
+        if (!window.AITradeXAuth?.setPassword) throw new Error("Secure password service is not loaded.");
+        await window.AITradeXAuth.setPassword(target, next, { updatedBy: "admin" });
+        if (App.isDatabaseMode?.() && window.AITradeXDB?.writeUser) await window.AITradeXDB.writeUser(target);
+      } catch (err) { App.toast(`Password save failed: ${err.message || err}`); return; }
+      logAdminAction("PASSWORD_RESET", "USER", userId, { user: displayNameFor(target) });
       App.saveState();
       App.toast("Password reset successfully.");
       render();
@@ -2710,7 +3736,7 @@
       localStorage.setItem("AITradeX_ADMIN_SUPPORT_STATUS", supportStatusFilter);
       render();
     },
-    saveSupportSettings(event) {
+    async saveSupportSettings(event) {
       event.preventDefault();
       const raw = String(document.getElementById("supportWhatsAppNumber")?.value || "").replace(/\D/g, "");
       if (!raw || raw.length < 10) {
@@ -2718,11 +3744,13 @@
         return;
       }
       App.state.settings = { ...(App.state.settings || {}), supportWhatsAppNumber: raw };
+      logAdminAction("SUPPORT_SETTINGS_UPDATE", "SETTINGS", "support", { whatsapp: raw });
+      await persistSettings("support settings");
       App.saveState();
       App.toast("Support settings saved.");
       render();
     },
-    replySupportTicket(event, ticketId) {
+    async replySupportTicket(event, ticketId) {
       event.preventDefault();
       App.state.supportTickets = App.state.supportTickets || [];
       const ticket = App.state.supportTickets.find(t => t.id === ticketId);
@@ -2737,11 +3765,13 @@
       ticket.replies.push({ by: "admin", message, createdAt: App.now() });
       ticket.status = "REPLIED";
       ticket.updatedAt = App.now();
+      try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeSupportTicket) await window.AITradeXDB.writeSupportTicket(ticket); } catch (err) { App.toast(`Support reply save failed: ${err.message || err}`); return; }
+      logAdminAction("SUPPORT_REPLY", "SUPPORT", ticketId, { subject: ticket.subject || "", userId: ticket.userId || "" });
       App.saveState();
       App.toast("Reply sent.");
       render();
     },
-    closeSupportTicket(ticketId, button) {
+    async closeSupportTicket(ticketId, button) {
       App.state.supportTickets = App.state.supportTickets || [];
       const ticket = App.state.supportTickets.find(t => t.id === ticketId);
       if (!ticket) return;
@@ -2750,11 +3780,13 @@
       ticket.status = "CLOSED";
       ticket.closedAt = App.now();
       ticket.updatedAt = App.now();
+      try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeSupportTicket) await window.AITradeXDB.writeSupportTicket(ticket); } catch (err) { App.toast(`Support close save failed: ${err.message || err}`); return; }
+      logAdminAction("SUPPORT_CLOSE", "SUPPORT", ticketId, { subject: ticket.subject || "", userId: ticket.userId || "" });
       App.saveState();
       App.toast("Ticket closed.");
       render();
     },
-    savePlan(event, planId) {
+    async savePlan(event, planId) {
       event.preventDefault();
       const plan = App.planById(planId);
       if (!plan) {
@@ -2785,11 +3817,21 @@
           postTrialFreeAiTradesPerDay: Math.max(0, Number(get("postTrial")?.value || 1))
         };
       }
+      const savedPlan = App.planById(planId) || App.normalizePlan(next);
+      try {
+        if (App.isDatabaseMode?.() && window.AITradeXDB?.writePlan) {
+          // Keep the full plan catalog safe. Older DBs could contain only the edited plan,
+          // which made the admin/user pages show a single plan after realtime reload.
+          for (const row of App.getPlans()) await window.AITradeXDB.writePlan(App.normalizePlan(row));
+        }
+      } catch (err) { App.toast(`Plan save failed: ${err.message || err}`); return; }
+      logAdminAction("PLAN_SETTINGS_UPDATE", "PLAN", planId, { name: next.name, price: next.price, signals: next.signals, status: next.status, catalogCount: App.getPlans().length });
+      await persistSettings("plan settings");
       App.saveState();
       App.toast(`${next.name} plan saved.`);
       render();
     },
-    saveReferralSettings(event) {
+    async saveReferralSettings(event) {
       event.preventDefault();
       App.state.settings = {
         ...(App.state.settings || {}),
@@ -2799,15 +3841,83 @@
         referralDepositEnabled: document.getElementById("referralDepositEnabled")?.value !== "false",
         referralSubscriptionEnabled: document.getElementById("referralSubscriptionEnabled")?.value !== "false"
       };
+      logAdminAction("REFERRAL_SETTINGS_UPDATE", "SETTINGS", "referrals", { depositPercent: App.state.settings.referralDepositPercent, subscriptionPercent: App.state.settings.referralSubscriptionPercent });
+      await persistSettings("referral settings");
       App.saveState();
       App.toast("Referral settings saved.");
       render();
     },
-    savePaymentSettings(event) {
+    async repairReferralBonuses(button) {
+      if (!window.AITradeXDB?.repairReferralBonusesSecure) { App.toast("Run the referral backend SQL patch first, then refresh admin."); return; }
+      if (!confirm("Repair missed referral bonuses from approved deposits and paid subscriptions? Duplicate bonuses will be skipped.")) return;
+      const original = button?.textContent || "Repair missed bonuses";
+      if (button) { button.disabled = true; button.textContent = "Repairing..."; }
+      try {
+        const admin = adminUser() || {};
+        const result = await window.AITradeXDB.repairReferralBonusesSecure({ adminUserId: admin.id || "control_root", adminEmail: admin.email || "", adminName: displayNameFor(admin) || "Admin" });
+        await window.AITradeXDB.loadAll?.();
+        App.toast(`Referral repair done. Deposit: ${result.depositCredited || 0}, Plan: ${result.subscriptionCredited || 0}.`);
+        render();
+      } catch (err) {
+        App.toast(`Referral repair failed: ${err.message || err}`);
+      } finally {
+        if (button) { button.disabled = false; button.textContent = original; }
+      }
+    },
+    async saveTelegramSettings(event) {
+      event.preventDefault();
+      const settings = platformSettings();
+      App.state.settings = {
+        ...settings,
+        telegramEnabled: document.getElementById("settingTelegramEnabled")?.value === "true",
+        telegramBotToken: inputValue("settingTelegramBotToken"),
+        telegramEdgeFunctionUrl: inputValue("settingTelegramEdgeFunctionUrl"),
+        telegramChatId: inputValue("settingTelegramChatId"),
+        telegramAdminAlerts: document.getElementById("settingTelegramAdminAlerts")?.value !== "false",
+        telegramUserAlerts: document.getElementById("settingTelegramUserAlerts")?.value === "true"
+      };
+      logAdminAction("TELEGRAM_SETTINGS_UPDATE", "SETTINGS", "telegram", { telegramEnabled: App.state.settings.telegramEnabled, adminAlerts: App.state.settings.telegramAdminAlerts, userMirror: App.state.settings.telegramUserAlerts });
+      await persistSettings("telegram settings");
+      App.saveState();
+      App.toast("Telegram settings saved.");
+      render();
+    },
+    async savePaymentSettings(event) {
+      event.preventDefault();
+      const settings = platformSettings();
+      App.state.settings = {
+        ...settings,
+        maintenanceMode: document.getElementById("settingMaintenanceMode")?.value === "true",
+        depositEnabled: document.getElementById("settingDepositEnabled")?.value !== "false",
+        withdrawalEnabled: document.getElementById("settingWithdrawalEnabled")?.value !== "false",
+        manualTradingEnabled: document.getElementById("settingManualTradingEnabled")?.value !== "false",
+        aiTradingEnabled: document.getElementById("settingAiTradingEnabled")?.value !== "false",
+        minDeposit: Math.max(1, Number(inputValue("settingMinDeposit") || 500)),
+        maxDeposit: Math.max(1, Number(inputValue("settingMaxDeposit") || 1000000)),
+        minWithdrawal: Math.max(1, Number(inputValue("settingMinWithdrawal") || 1000)),
+        maxWithdrawal: Math.max(1, Number(inputValue("settingMaxWithdrawal") || 500000)),
+        minManualTrade: Math.max(1, Number(inputValue("settingMinManualTrade") || 100)),
+        maxManualTrade: Math.max(1, Number(inputValue("settingMaxManualTrade") || 250000)),
+        minAiTrade: Math.max(1, Number(inputValue("settingMinAiTrade") || 100)),
+        maxAiTrade: Math.max(1, Number(inputValue("settingMaxAiTrade") || 250000)),
+        maxLeverage: Math.min(2000, Math.max(1, Number(inputValue("settingMaxLeverage") || 2000))),
+        maxOpenPositionsPerUser: Math.max(1, Number(inputValue("settingMaxOpenPositions") || 10)),
+        usdtInrRate: Math.max(1, Number(inputValue("settingUsdtInrRate") || 95)),
+        phase6AuthMode: settings.phase6AuthMode || "legacy-testing",
+        phase6BackendMode: settings.phase6BackendMode || "deposit-withdrawal-ai-manual-kyc-payment-subscription-wallet-rpc-rls-ready",
+        phase6Build: "6.9.5-strict-separated-ai-pages"
+      };
+      logAdminAction("APP_SETTINGS_UPDATE", "SETTINGS", "app", { depositEnabled: App.state.settings.depositEnabled, withdrawalEnabled: App.state.settings.withdrawalEnabled, manualTradingEnabled: App.state.settings.manualTradingEnabled, aiTradingEnabled: App.state.settings.aiTradingEnabled, maintenanceMode: App.state.settings.maintenanceMode, maxLeverage: App.state.settings.maxLeverage });
+      await persistSettings("app settings");
+      App.saveState();
+      App.toast("App settings saved.");
+      render();
+    },
+    async saveDepositPaymentMethods(event) {
       event.preventDefault();
       const settings = platformSettings();
       const file = document.getElementById("settingQrImage")?.files?.[0];
-      const apply = qrImage => {
+      const apply = async qrImage => {
         App.state.settings = {
           ...settings,
           depositUpiId: inputValue("settingUpiId") || "aitradex@upi",
@@ -2817,24 +3927,42 @@
           depositBankName: inputValue("settingBankName") || "AITradeX Bank",
           depositAccountName: inputValue("settingAccountName") || "AITradeX Private Wallet",
           depositAccountNumber: inputValue("settingAccountNumber") || "123456789012",
-          depositIfsc: inputValue("settingIfsc").toUpperCase() || "AITX0001234",
-          minDeposit: Math.max(1, Number(inputValue("settingMinDeposit") || 500)),
-          minWithdrawal: Math.max(1, Number(inputValue("settingMinWithdrawal") || 1000)),
-          usdtInrRate: Math.max(1, Number(inputValue("settingUsdtInrRate") || 95))
+          depositIfsc: inputValue("settingIfsc").toUpperCase() || "AITX0001234"
         };
+        logAdminAction("PAYMENT_METHODS_UPDATE", "SETTINGS", "paymentMethods", { upiEnabled: App.state.settings.depositUpiEnabled, bankEnabled: App.state.settings.depositBankEnabled, upiId: App.state.settings.depositUpiId, bankName: App.state.settings.depositBankName });
+        await persistSettings("payment methods settings");
         App.saveState();
-        App.toast("Payment settings saved.");
+        App.toast("Payment methods saved.");
         render();
       };
-
       if (file) {
         const reader = new FileReader();
-        reader.onload = () => apply(String(reader.result || ""));
+        reader.onload = () => { apply(String(reader.result || "")).catch(err => App.toast(err.message || "Payment methods save failed.")); };
         reader.onerror = () => App.toast("QR image could not be saved.");
         reader.readAsDataURL(file);
       } else {
         apply(settings.depositQrImage || "");
       }
+    },
+    async testTelegramBot() {
+      const currentSettings = platformSettings();
+      const temp = {
+        ...currentSettings,
+        telegramEnabled: document.getElementById("settingTelegramEnabled")?.value === "true",
+        telegramBotToken: inputValue("settingTelegramBotToken"),
+        telegramEdgeFunctionUrl: inputValue("settingTelegramEdgeFunctionUrl"),
+        telegramChatId: inputValue("settingTelegramChatId"),
+        telegramAdminAlerts: document.getElementById("settingTelegramAdminAlerts")?.value !== "false",
+        telegramUserAlerts: document.getElementById("settingTelegramUserAlerts")?.value === "true"
+      };
+      if (!temp.telegramEnabled) { App.toast("Enable Telegram Alerts first."); return; }
+      if (!temp.telegramEdgeFunctionUrl || !temp.telegramChatId) { App.toast("Telegram Edge Function URL and chat ID are required."); return; }
+      const oldSettings = App.state.settings || {};
+      App.state.settings = { ...oldSettings, ...temp };
+      App.toast("Sending Telegram test...");
+      const result = await App.sendTelegramMessage?.(`✅ <b>AITradeX Telegram Test</b>\nTelegram bot alerts are connected.\nTime: ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`);
+      App.state.settings = oldSettings;
+      if (result?.ok) App.toast("Telegram test alert sent."); else App.toast(result?.error || result?.reason || "Telegram test failed.");
     },
     onAiPairChange() {
       this.updateAiPreview();
@@ -2858,7 +3986,7 @@
     updateAiPreview() {
       const resultType = document.querySelector('input[name="aiTradeResultType"]:checked')?.value || "PROFIT";
       const resultPercent = Math.max(0, Number(inputValue("aiTradeResultPercent") || 0));
-      const leverage = normalizeAdminLeverage(inputValue("aiTradeLeverage") || 1);
+      const leverage = Math.min(Number(settings.maxLeverage || 2000), normalizeAdminLeverage(inputValue("aiTradeLeverage") || 1));
       const minBalance = Math.max(0, Number(inputValue("aiTradeMinBalance") || 0));
       const stats = aiPreviewStats(resultPercent, leverage, minBalance, resultType);
       const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
@@ -2881,6 +4009,8 @@
     },
     async executeAiTrade(event) {
       event.preventDefault();
+      const settings = platformSettings();
+      if (settings.aiTradingEnabled === false) { App.toast("AI trading is disabled in App Settings."); return; }
       const selectedPairData = pairDataByPair(inputValue("aiTradePair") || "BTC/USDT");
       const market = selectedPairData.market || "CRYPTO";
       const pair = String(selectedPairData.pair || "BTC/USDT").toUpperCase();
@@ -2904,18 +4034,54 @@
 
       const batchId = App.uid("ai_batch");
       const report = aiEligibilityReport(minBalance);
+      // Instant AI must use the instant eligibility rules: daily AI trade limit + AI ON + wallet pool.
+      // Live Position eligibility is separate and should only be used in openLiveAiPosition().
       let appliedCount = 0;
       let totalMargin = 0;
       let totalExposure = 0;
       let totalPnl = 0;
+      const instantBatchStartedAt = new Date().toISOString();
+      const instantBatchDraft = {
+        id: batchId,
+        batchType: "INSTANT",
+        market,
+        pair,
+        side,
+        entryPrice: Number(priceRow.price || 0),
+        entryPriceDisplay: priceRow.display || String(priceRow.price || ""),
+        priceSource: priceRow.source || "Live API",
+        priceSourceType: priceRow.sourceType || "LIVE_API",
+        priceLockedAt: priceRow.fetchedAt || instantBatchStartedAt,
+        leverage,
+        resultType,
+        resultPercent,
+        minBalance,
+        note,
+        status: "PROCESSING",
+        appliedCount: 0,
+        skippedCount: 0,
+        totalMargin: 0,
+        totalExposure: 0,
+        totalPnl: 0,
+        createdAt: instantBatchStartedAt
+      };
+      try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeAiBatch) await window.AITradeXDB.writeAiBatch(instantBatchDraft); }
+      catch (err) { App.toast(`AI batch init save failed: ${err.message || err}`); return; }
 
-      report.eligible.forEach(target => {
+      for (const target of report.eligible) {
+        const liveUsedNow = App.aiTradesToday(target.id);
+        const liveLimitNow = App.aiDailyLimit(target.id);
+        if (liveUsedNow >= liveLimitNow) {
+          report.skipped.push({ userId: target.id, reason: "Daily AI trade limit completed" });
+          report.reasons.limit = Number(report.reasons.limit || 0) + 1;
+          continue;
+        }
         const balanceBefore = App.realBalance(target.id);
-        const margin = Math.min(balanceBefore, App.aiAllowedAmount(target));
-        if (!margin || margin <= 0) {
+        const margin = Math.min(balanceBefore, App.aiAllowedAmount(target), Number(settings.maxAiTrade || 250000));
+        if (!margin || margin < Number(settings.minAiTrade || 100)) {
           report.skipped.push({ userId: target.id, reason: "No AI trade pool available" });
           report.reasons.noPool += 1;
-          return;
+          continue;
         }
 
         const exposure = margin * leverage;
@@ -2954,27 +4120,49 @@
           createdDate: App.todayKey()
         };
 
-        App.state.trades.unshift(trade);
-        if (trade.pnl !== 0) {
-          App.addLedger({
-            userId: target.id,
-            accountType: "REAL",
-            type: trade.pnl >= 0 ? "AI_TRADE_PROFIT" : "AI_TRADE_LOSS",
-            amount: trade.pnl,
-            referenceId: trade.id,
-            note: `${pair} ${side} AI auto trade · ${resultType} ${resultPercent}% · ${leverage}x`
-          });
+        try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeTrade) await window.AITradeXDB.writeTrade(trade); }
+        catch (err) {
+          report.skipped.push({ userId: target.id, reason: `Trade DB save failed: ${err.message || err}` });
+          continue;
         }
-        App.addNotification?.({ audience: "USER", userId: target.id, title: "Instant AI trade completed", message: `${pair} ${side} ${resultType}. P/L ${trade.pnl >= 0 ? "+" : ""}${App.money(trade.pnl)}.`, type: "AI", linkPage: "orders", referenceId: `instant_${trade.id}` });
+        if (trade.pnl !== 0) {
+          try {
+            if (App.isDatabaseMode?.() && App.addLedgerAsync) await App.addLedgerAsync({
+              userId: target.id,
+              accountType: "REAL",
+              type: trade.pnl >= 0 ? "AI_TRADE_PROFIT" : "AI_TRADE_LOSS",
+              amount: trade.pnl,
+              referenceId: trade.id,
+              note: `${pair} ${side} AI auto trade · ${resultType} ${resultPercent}% · ${leverage}x`
+            });
+            else App.addLedger({
+              userId: target.id,
+              accountType: "REAL",
+              type: trade.pnl >= 0 ? "AI_TRADE_PROFIT" : "AI_TRADE_LOSS",
+              amount: trade.pnl,
+              referenceId: trade.id,
+              note: `${pair} ${side} AI auto trade · ${resultType} ${resultPercent}% · ${leverage}x`
+            });
+          } catch (err) {
+            if (App.isDatabaseMode?.() && window.AITradeXDB?.deleteTrade) {
+              try { await window.AITradeXDB.deleteTrade(trade.id); } catch (rollbackErr) { console.warn("AI instant trade rollback delete failed", rollbackErr); }
+            }
+            report.skipped.push({ userId: target.id, reason: `Ledger DB save failed: ${err.message || err}` });
+            continue;
+          }
+        }
+        App.state.trades.unshift(trade);
+        await (App.addNotificationAsync ? App.addNotificationAsync({ audience: "USER", userId: target.id, title: "Instant AI trade completed", message: `${pair} ${side} ${resultType}. P/L ${trade.pnl >= 0 ? "+" : ""}${App.money(trade.pnl)}.`, type: "AI", linkPage: "orders", referenceId: `instant_${trade.id}` }) : App.addNotification?.({ audience: "USER", userId: target.id, title: "Instant AI trade completed", message: `${pair} ${side} ${resultType}. P/L ${trade.pnl >= 0 ? "+" : ""}${App.money(trade.pnl)}.`, type: "AI", linkPage: "orders", referenceId: `instant_${trade.id}` }));
         appliedCount += 1;
         totalMargin += margin;
         totalExposure += exposure;
         totalPnl += trade.pnl;
-      });
+      }
 
       if (!App.state.aiTradeBatches) App.state.aiTradeBatches = [];
-      App.state.aiTradeBatches.unshift({
+      const instantBatch = {
         id: batchId,
+        batchType: "INSTANT",
         market,
         pair,
         side,
@@ -2994,9 +4182,22 @@
         skippedCount: report.skipped.length,
         skipReasons: report.reasons,
         totalPnl: Number(totalPnl.toFixed(2)),
-        createdAt: new Date().toISOString()
-      });
-      App.addNotification?.({ audience: "ADMIN", title: "Instant AI trade applied", message: `${pair} ${side} applied to ${appliedCount} user(s). Total P/L ${totalPnl >= 0 ? "+" : ""}${App.money(totalPnl)}.`, type: "AI", linkPage: "instantAi", referenceId: batchId });
+        status: "COMPLETED",
+        createdAt: instantBatchStartedAt,
+        completedAt: new Date().toISOString()
+      };
+      try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeAiBatch) await window.AITradeXDB.writeAiBatch(instantBatch); }
+      catch (err) {
+        instantBatch.status = "SAVE_FAILED";
+        instantBatch.errorMessage = err.message || String(err);
+        App.state.aiTradeBatches.unshift(instantBatch);
+        App.saveState();
+        App.toast(`AI batch final save failed. Trades already saved; batch marked for review: ${err.message || err}`);
+        return;
+      }
+      App.state.aiTradeBatches.unshift(instantBatch);
+      await (App.addNotificationAsync ? App.addNotificationAsync({ audience: "ADMIN", title: "Instant AI trade applied", message: `${pair} ${side} applied to ${appliedCount} user(s). Total P/L ${totalPnl >= 0 ? "+" : ""}${App.money(totalPnl)}.`, type: "AI", linkPage: "instantAi", referenceId: batchId }) : App.addNotification?.({ audience: "ADMIN", title: "Instant AI trade applied", message: `${pair} ${side} applied to ${appliedCount} user(s). Total P/L ${totalPnl >= 0 ? "+" : ""}${App.money(totalPnl)}.`, type: "AI", linkPage: "instantAi", referenceId: batchId }));
+      await (typeof logAdminActionAsync === "function" ? logAdminActionAsync("AI_INSTANT_TRADE", "AI_BATCH", batchId, { pair, side, leverage, appliedCount, skippedCount: report.skipped.length, totalPnl: Number(totalPnl.toFixed(2)) }) : logAdminAction("AI_INSTANT_TRADE", "AI_BATCH", batchId, { pair, side, leverage, appliedCount, skippedCount: report.skipped.length, totalPnl: Number(totalPnl.toFixed(2)) }));
       App.saveState();
       App.toast(appliedCount ? `AI trade applied to ${appliedCount} valid user(s). ${report.skipped.length} skipped.` : "No valid AI users found. Trade was not applied.");
       render();
@@ -3015,11 +4216,13 @@
       setText("aiLivePreviewExposure", App.money(stats.totalExposure));
       setText("aiLivePreviewTarget", `${targetType === "LOSS" ? "Loss" : "Profit"} ${targetPercent}%`);
       setText("aiLivePreviewDuration", "Target/Admin");
-      setText("aiLivePreviewLimitCheck", stats.report.reasons.limit ? `${stats.report.reasons.limit} blocked` : "Passed");
+      setText("aiLivePreviewLimitCheck", (stats.report.reasons.limit || stats.report.reasons.maxOpen) ? `${stats.report.reasons.limit || 0} limit · ${stats.report.reasons.maxOpen || 0} max-open blocked` : "Passed");
       setText("aiLivePreviewWalletCheck", (stats.report.reasons.lowBalance || stats.report.reasons.noPool) ? "Needs review" : "Passed");
     },
     async openLiveAiPosition(event) {
       event.preventDefault();
+      const settings = platformSettings();
+      if (settings.aiTradingEnabled === false) { App.toast("AI trading is disabled in App Settings."); return; }
       const selectedPairData = pairDataByPair(inputValue("aiLivePair") || "BTC/USDT");
       const market = selectedPairData.market || "CRYPTO";
       const pair = String(selectedPairData.pair || "BTC/USDT").toUpperCase();
@@ -3028,7 +4231,7 @@
         return;
       }
       const side = document.querySelector('input[name="aiLiveSide"]:checked')?.value || "BUY";
-      const leverage = normalizeAdminLeverage(inputValue("aiLiveLeverage") || 1);
+      const leverage = Math.min(Number(settings.maxLeverage || 2000), normalizeAdminLeverage(inputValue("aiLiveLeverage") || 1));
       const targetType = document.querySelector('input[name="aiLiveTargetType"]:checked')?.value || "PROFIT";
       const targetPercent = Math.max(0.01, Number(inputValue("aiLiveTargetPercent") || 0));
       const minBalance = Math.max(0, Number(inputValue("aiLiveMinBalance") || 0));
@@ -3045,18 +4248,49 @@
         return;
       }
       const batchId = App.uid("ai_live_batch");
-      const report = aiEligibilityReport(minBalance);
+      const report = aiLiveEligibilityReport(minBalance);
       let appliedCount = 0;
       let totalMargin = 0;
       let totalExposure = 0;
       const openedAt = new Date().toISOString();
-      report.eligible.forEach(target => {
+      const liveBatchDraft = {
+        id: batchId,
+        batchType: "LIVE",
+        market,
+        pair,
+        side,
+        entryPrice,
+        entryPriceDisplay: priceRow?.display || String(entryPrice),
+        priceSource: priceRow?.source || "Live Market",
+        leverage,
+        targetType,
+        targetPercent,
+        minBalance,
+        note,
+        appliedCount: 0,
+        skippedCount: 0,
+        totalMargin: 0,
+        totalExposure: 0,
+        status: "OPENING",
+        createdAt: openedAt
+      };
+      try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeAiBatch) await window.AITradeXDB.writeAiBatch(liveBatchDraft); }
+      catch (err) { App.toast(`AI live batch init save failed: ${err.message || err}`); return; }
+
+      for (const target of report.eligible) {
+        const liveUsedNow = App.aiTradesToday(target.id);
+        const liveLimitNow = App.aiDailyLimit(target.id);
+        if (liveUsedNow >= liveLimitNow) {
+          report.skipped.push({ userId: target.id, reason: "Daily AI trade limit completed" });
+          report.reasons.limit = Number(report.reasons.limit || 0) + 1;
+          continue;
+        }
         const balanceBefore = App.realBalance(target.id);
-        const margin = Math.min(balanceBefore, App.aiAllowedAmount(target));
-        if (!margin || margin <= 0) {
+        const margin = Math.min(balanceBefore, App.aiAllowedAmount(target), Number(settings.maxAiTrade || 250000));
+        if (!margin || margin < Number(settings.minAiTrade || 100)) {
           report.skipped.push({ userId: target.id, reason: "No AI trade pool available" });
           report.reasons.noPool += 1;
-          return;
+          continue;
         }
         const exposure = margin * leverage;
         const positionId = App.uid("ai_live");
@@ -3090,21 +4324,47 @@
           balanceBefore: Number(balanceBefore.toFixed(2))
         };
         try {
-          lockAiLiveMargin(position, balanceBefore);
+          const marginLockRow = App.isDatabaseMode?.() && App.addLedgerAsync ? await App.addLedgerAsync({
+            userId: position.userId,
+            accountType: "REAL",
+            type: "AI_LIVE_MARGIN_LOCK",
+            amount: -Number(position.marginAmount || 0),
+            referenceId: position.id,
+            note: `${position.pair} AI live ${position.side || "BUY"} amount locked`
+          }) : App.addLedger({
+            userId: position.userId,
+            accountType: "REAL",
+            type: "AI_LIVE_MARGIN_LOCK",
+            amount: -Number(position.marginAmount || 0),
+            referenceId: position.id,
+            note: `${position.pair} AI live ${position.side || "BUY"} amount locked`
+          });
+          if (marginLockRow === false && !aiLiveMarginLockExists(position)) throw new Error("AI amount lock was not applied");
+          position.marginLocked = true;
+          position.balanceBefore = Number(balanceBefore.toFixed(2));
+          position.balanceAfterOpen = Number(App.realBalance(position.userId).toFixed(2));
+          position.marginLockedAt = position.marginLockedAt || new Date().toISOString();
         } catch (error) {
           report.skipped.push({ userId: target.id, reason: error.message || "Insufficient wallet balance" });
           report.reasons.noPool += 1;
-          return;
+          continue;
+        }
+        try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeTrade) await window.AITradeXDB.writeTrade(position); }
+        catch (err) {
+          try { await (App.addLedgerAsync ? App.addLedgerAsync({ userId: target.id, accountType: "REAL", type: "AI_LIVE_MARGIN_LOCK_ROLLBACK", amount: Number(position.marginAmount || 0), referenceId: `${position.id}_rollback`, note: `Rollback: ${pair} AI live position save failed` }) : App.addLedger({ userId: target.id, accountType: "REAL", type: "AI_LIVE_MARGIN_LOCK_ROLLBACK", amount: Number(position.marginAmount || 0), referenceId: `${position.id}_rollback`, note: `Rollback: ${pair} AI live position save failed` })); } catch {}
+          report.skipped.push({ userId: target.id, reason: `Live trade DB save failed: ${err.message || err}` });
+          continue;
         }
         App.state.trades.unshift(position);
-        App.addNotification?.({ audience: "USER", userId: target.id, title: "AI live position opened", message: `${pair} ${side} opened with ${App.money(position.marginAmount)} AI amount at ${leverage}x.`, type: "AI", linkPage: "orders", referenceId: `live_open_${position.id}` });
+        await (App.addNotificationAsync ? App.addNotificationAsync({ audience: "USER", userId: target.id, title: "AI live position opened", message: `${pair} ${side} opened with ${App.money(position.marginAmount)} AI amount at ${leverage}x.`, type: "AI", linkPage: "orders", referenceId: `live_open_${position.id}` }) : App.addNotification?.({ audience: "USER", userId: target.id, title: "AI live position opened", message: `${pair} ${side} opened with ${App.money(position.marginAmount)} AI amount at ${leverage}x.`, type: "AI", linkPage: "orders", referenceId: `live_open_${position.id}` }));
         appliedCount += 1;
         totalMargin += margin;
         totalExposure += exposure;
-      });
+      }
       if (!App.state.aiLiveBatches) App.state.aiLiveBatches = [];
-      App.state.aiLiveBatches.unshift({
+      const liveBatch = {
         id: batchId,
+        batchType: "LIVE",
         market,
         pair,
         side,
@@ -3123,73 +4383,101 @@
         totalExposure: Number(totalExposure.toFixed(2)),
         status: "OPEN",
         createdAt: openedAt
-      });
-      App.addNotification?.({ audience: "ADMIN", title: "Live AI position opened", message: `${pair} ${side} opened for ${appliedCount} user(s). Locked ${App.money(totalMargin)}.`, type: "AI", linkPage: "liveAi", referenceId: batchId });
+      };
+      try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeAiBatch) await window.AITradeXDB.writeAiBatch(liveBatch); }
+      catch (err) {
+        liveBatch.status = "SAVE_FAILED";
+        liveBatch.errorMessage = err.message || String(err);
+        App.state.aiLiveBatches.unshift(liveBatch);
+        App.saveState();
+        App.toast(`AI live batch final save failed. Positions already saved; batch marked for review: ${err.message || err}`);
+        return;
+      }
+      App.state.aiLiveBatches.unshift(liveBatch);
+      await (App.addNotificationAsync ? App.addNotificationAsync({ audience: "ADMIN", title: "Live AI position opened", message: `${pair} ${side} opened for ${appliedCount} user(s). Locked ${App.money(totalMargin)}.`, type: "AI", linkPage: "liveAi", referenceId: batchId }) : App.addNotification?.({ audience: "ADMIN", title: "Live AI position opened", message: `${pair} ${side} opened for ${appliedCount} user(s). Locked ${App.money(totalMargin)}.`, type: "AI", linkPage: "liveAi", referenceId: batchId }));
+      await (typeof logAdminActionAsync === "function" ? logAdminActionAsync("AI_LIVE_OPEN", "AI_BATCH", batchId, { pair, side, leverage, appliedCount, skippedCount: report.skipped.length, totalMargin: Number(totalMargin.toFixed(2)), totalExposure: Number(totalExposure.toFixed(2)) }) : logAdminAction("AI_LIVE_OPEN", "AI_BATCH", batchId, { pair, side, leverage, appliedCount, skippedCount: report.skipped.length, totalMargin: Number(totalMargin.toFixed(2)), totalExposure: Number(totalExposure.toFixed(2)) }));
       App.saveState();
       App.toast(appliedCount ? `Live AI position opened for ${appliedCount} valid user(s).` : "No valid AI users found. Live position not opened.");
+      triggerAiLiveAutoCloseCheckSoon(1200);
       render();
     },
-    closeAiLiveBatch(batchId, button) {
-      const positions = aiLivePositions().filter(position => (position.batchId || position.id) === batchId);
+    async closeAiLiveBatch(batchId, button) {
+      const positions = aiLiveOpenPositionsByBatch(batchId);
       if (!positions.length) {
         App.toast("No open AI live positions found.");
         render();
         return;
       }
-      if (!confirm(`Close this AI live trade for ${positions.length} user(s)? Current profit/loss will be settled in real wallet.`)) return;
+      if (!confirm(`Close this AI live trade for ${positions.length} user(s)? Current profit/loss will be settled in wallet.`)) return;
       markButton(button, "Closing...");
-      let closed = 0;
-      positions.forEach(position => {
-        try { if (settleAiLivePositionByAdmin(position, "ADMIN_CLOSE")) closed += 1; } catch (error) {}
-      });
-      const batch = (App.state.aiLiveBatches || []).find(row => row.id === batchId);
-      if (batch) {
-        batch.status = "CLOSED";
-        batch.closedAt = new Date().toISOString();
-        batch.closeReason = "ADMIN_CLOSE";
+      const batchExitRow = await aiLiveFreshExitPriceRow(positions[0]);
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.closeAiLiveBatchSecure) {
+        try {
+          const result = await window.AITradeXDB.closeAiLiveBatchSecure({
+            batchId,
+            reason: "ADMIN_BATCH_CLOSE",
+            exitPrice: Number(batchExitRow?.price || positions[0]?.entryPrice || 0),
+            exitPriceDisplay: batchExitRow?.display || String(batchExitRow?.price || positions[0]?.entryPrice || "-"),
+            exitPriceSource: batchExitRow?.source || "Admin manual close",
+            ...aiLiveBackendAdminPayload()
+          });
+          if (window.AITradeXDB?.loadAll) await window.AITradeXDB.loadAll();
+          App.toast(`Closed AI live trade for ${Number(result.closed || result.closedCount || positions.length || 0)} user(s).`);
+          render();
+          return;
+        } catch (err) {
+          console.warn("AI live backend close failed; using safe browser fallback", err?.message || err);
+          App.toast("Backend close failed. Using safe fallback close...");
+        }
       }
+      let closed = 0;
+      for (const position of positions) {
+        try { if (await settleAiLivePositionByAdmin(position, "ADMIN_BATCH_CLOSE", batchExitRow)) closed += 1; } catch (error) { console.warn("AI live close failed", error); }
+      }
+      try { await markAiLiveBatchClosed(batchId, "ADMIN_CLOSE", closed, positions.length, batchExitRow, { reason: "ADMIN_CLOSE", label: "Admin manual close" }); }
+      catch (err) { App.toast(`AI live batch close save failed: ${err.message || err}`); return; }
+      await (typeof logAdminActionAsync === "function" ? logAdminActionAsync("AI_LIVE_CLOSE", "AI_BATCH", batchId, { closed, totalPositions: positions.length }) : logAdminAction("AI_LIVE_CLOSE", "AI_BATCH", batchId, { closed, totalPositions: positions.length }));
       App.saveState();
       App.toast(closed ? `Closed AI live trade for ${closed} user(s).` : "Unable to close trade.");
       render();
     },
-    approveDeposit(userId, requestId, button) {
+    async approveDeposit(userId, requestId, button) {
       const target = allUsers().find(u => u.id === userId);
       if (!target) return;
       const requests = depositRequestsFor(target);
       const request = requests.find(r => r.id === requestId);
       if (!request) return;
-      if (String(request.status || "").toUpperCase() !== "PENDING") {
-        App.toast("Deposit action already completed.");
-        render();
-        return;
-      }
+      if (String(request.status || "").toUpperCase() !== "PENDING") { App.toast("Deposit action already completed."); render(); return; }
       const amount = Number(request.amount || 0);
-      if (!amount || amount <= 0) {
-        App.toast("Invalid deposit amount.");
-        render();
-        return;
-      }
+      if (!amount || amount <= 0) { App.toast("Invalid deposit amount."); render(); return; }
       const duplicate = depositUtrDuplicateInfo(request);
-      if (duplicate?.approved) {
-        App.toast("Duplicate approved UTR found. Approval blocked for safety.");
-        render();
-        return;
+      if (duplicate?.approved) { App.toast("Duplicate approved UTR found. Approval blocked for safety."); render(); return; }
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.approveDepositSecure) {
+        if (!confirm(`Approve ${App.money(amount)} deposit for ${displayNameFor(target)}? Wallet will be credited once by secure backend function.`)) return;
+        markButton(button, "Approving...");
+        try {
+          const admin = adminUser() || {};
+          const result = await window.AITradeXDB.approveDepositSecure({ requestId: request.id, adminUserId: admin.id || "control_root", adminEmail: admin.email || "", adminName: displayNameFor(admin) || "Admin" });
+          if (window.AITradeXDB?.loadAll) await window.AITradeXDB.loadAll();
+          // Referral deposit bonus is now credited inside the secure backend RPC.
+          App.toast(result?.alreadyCompleted ? `Deposit already ${result.status || "completed"}.` : (result?.ledgerApplied ? "Deposit approved securely and balance credited." : "Deposit marked approved securely. Ledger was already applied."));
+          render();
+          return;
+        } catch (err) {
+          App.toast(`Secure deposit approve failed: ${err.message || err}`);
+          render();
+          return;
+        }
       }
       const ledgerExists = App.hasLedgerEntry?.({ accountType: "REAL", type: "DEPOSIT", referenceId: request.id, userId: target.id });
       if (!ledgerExists && !confirm(`Approve ${App.money(amount)} deposit for ${displayNameFor(target)}? Wallet will be credited once.`)) return;
       markButton(button, "Approving...");
-
+      const previous = { ...request };
+      let ledgerApplied = false;
       try {
-        let ledgerAdded = true;
         if (!ledgerExists) {
-          ledgerAdded = App.addLedger({
-            userId: target.id,
-            accountType: "REAL",
-            type: "DEPOSIT",
-            amount,
-            referenceId: request.id,
-            note: `DEPOSIT_APPROVED · UTR ${request.utr || "-"}`
-          });
+          const row = App.isDatabaseMode?.() && App.addLedgerAsync ? await App.addLedgerAsync({ userId: target.id, accountType: "REAL", type: "DEPOSIT", amount, referenceId: request.id, note: `DEPOSIT_APPROVED · UTR ${request.utr || "-"}` }) : App.addLedger({ userId: target.id, accountType: "REAL", type: "DEPOSIT", amount, referenceId: request.id, note: `DEPOSIT_APPROVED · UTR ${request.utr || "-"}` });
+          ledgerApplied = !!row;
         }
         request.status = "APPROVED";
         request.approvedAt = new Date().toISOString();
@@ -3197,79 +4485,95 @@
         request.rejectReason = "";
         request.balanceApplied = true;
         request.adminNote = duplicate?.total ? `Checked duplicate UTR warning: ${duplicate.total} similar request(s).` : "Approved by admin.";
-        saveDepositRequests(target, requests);
-        App.addNotification?.({ audience: "USER", userId: target.id, title: "Deposit approved", message: `${App.money(amount)} deposit approved and credited to your wallet.`, type: "DEPOSIT", linkPage: "wallet", referenceId: `dep_ok_${request.id}` });
-        if (ledgerAdded && !ledgerExists) {
-          App.creditReferralBonus?.({ referredUserId: target.id, eventType: "DEPOSIT", amount, referenceId: request.id, sourceLabel: `Deposit UTR ${request.utr || "-"}` });
+        await saveDepositRequests(target, requests);
+        await App.addNotificationAsync?.({ audience: "USER", userId: target.id, title: "Deposit approved", message: `${App.money(amount)} deposit approved and credited to your wallet.`, type: "DEPOSIT", linkPage: "wallet", referenceId: `dep_ok_${request.id}` });
+        await logAdminActionAsync("DEPOSIT_APPROVE", "DEPOSIT", request.id, { userId: target.id, user: displayNameFor(target), amount, utr: request.utr || "", ledgerApplied: !ledgerExists });
+        if (ledgerApplied && !ledgerExists) {
+          const referralResult = await (App.creditReferralBonusAsync ? App.creditReferralBonusAsync({ referredUserId: target.id, eventType: "DEPOSIT", amount, referenceId: request.id, sourceLabel: `Deposit UTR ${request.utr || "-"}` }) : Promise.resolve(App.creditReferralBonus?.({ referredUserId: target.id, eventType: "DEPOSIT", amount, referenceId: request.id, sourceLabel: `Deposit UTR ${request.utr || "-"}` })));
+          if (referralResult?.credited) await logAdminActionAsync("REFERRAL_DEPOSIT_BONUS", "REFERRAL", request.id, { referredUserId: target.id, amount: referralResult.amount });
         }
         App.toast(ledgerExists ? "Deposit marked approved. Ledger was already applied." : "Deposit approved and balance credited.");
       } catch (err) {
+        Object.assign(request, previous);
+        if (ledgerApplied && !ledgerExists) {
+          try { await (App.addLedgerAsync ? App.addLedgerAsync({ userId: target.id, accountType: "REAL", type: "DEPOSIT_APPROVAL_ROLLBACK", amount: -amount, referenceId: `${request.id}_rollback`, note: "Rollback: deposit request save/notification failed" }) : App.addLedger({ userId: target.id, accountType: "REAL", type: "DEPOSIT_APPROVAL_ROLLBACK", amount: -amount, referenceId: `${request.id}_rollback`, note: "Rollback: deposit request save/notification failed" })); } catch {}
+        }
         App.toast(err.message || "Unable to approve deposit.");
       }
       render();
     },
-    rejectDeposit(userId, requestId, button) {
+    async rejectDeposit(userId, requestId, button) {
       const target = allUsers().find(u => u.id === userId);
       if (!target) return;
       const requests = depositRequestsFor(target);
       const request = requests.find(r => r.id === requestId);
       if (!request) return;
-      if (String(request.status || "").toUpperCase() !== "PENDING") {
-        App.toast("Deposit action already completed.");
-        render();
-        return;
-      }
-      const reason = prompt("Reject reason:", "Payment proof / UTR could not be verified.");
+      if (String(request.status || "").toUpperCase() !== "PENDING") { App.toast("Deposit action already completed."); render(); return; }
+      const reason = prompt("Reason for rejecting this deposit request?", "Invalid/unclear payment proof");
       if (reason === null) return;
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.rejectDepositSecure) {
+        markButton(button, "Rejecting...");
+        try {
+          const admin = adminUser() || {};
+          const result = await window.AITradeXDB.rejectDepositSecure({ requestId: request.id, reason: reason || "Rejected by admin.", adminUserId: admin.id || "control_root", adminEmail: admin.email || "", adminName: displayNameFor(admin) || "Admin" });
+          if (window.AITradeXDB?.loadAll) await window.AITradeXDB.loadAll();
+          App.toast(result?.alreadyCompleted ? `Deposit already ${result.status || "completed"}.` : "Deposit request rejected securely.");
+          render();
+          return;
+        } catch (err) {
+          App.toast(`Secure deposit reject failed: ${err.message || err}`);
+          render();
+          return;
+        }
+      }
       markButton(button, "Rejecting...");
-      request.status = "REJECTED";
-      request.rejectReason = reason || "Deposit rejected by admin.";
-      request.rejectedAt = new Date().toISOString();
-      request.reviewedAt = request.rejectedAt;
-      request.balanceApplied = false;
-      request.adminNote = request.rejectReason;
-      saveDepositRequests(target, requests);
-      App.addNotification?.({ audience: "USER", userId: target.id, title: "Deposit rejected", message: request.rejectReason, type: "DEPOSIT", linkPage: "wallet", referenceId: `dep_no_${request.id}` });
-      App.toast("Deposit rejected.");
+      try {
+        request.status = "REJECTED";
+        request.rejectedAt = new Date().toISOString();
+        request.reviewedAt = request.rejectedAt;
+        request.rejectReason = reason || "Rejected by admin.";
+        request.adminNote = request.rejectReason;
+        await saveDepositRequests(target, requests);
+        await App.addNotificationAsync?.({ audience: "USER", userId: target.id, title: "Deposit rejected", message: `Deposit request ${App.money(request.amount || 0)} was rejected. ${request.rejectReason}`, type: "DEPOSIT", linkPage: "wallet", referenceId: `dep_rej_${request.id}` });
+        await logAdminActionAsync("DEPOSIT_REJECT", "DEPOSIT", request.id, { userId: target.id, user: displayNameFor(target), amount: Number(request.amount || 0), reason: request.rejectReason });
+        App.toast("Deposit request rejected.");
+      } catch (err) { App.toast(err.message || "Unable to reject deposit."); }
       render();
     },
-    approveWithdrawal(userId, requestId, button) {
+    async approveWithdrawal(userId, requestId, button) {
       const target = allUsers().find(u => u.id === userId);
       if (!target) return;
       const requests = withdrawalRequestsFor(target);
       const request = requests.find(r => r.id === requestId);
       if (!request) return;
-      if (String(request.status || "").toUpperCase() !== "PENDING") {
-        App.toast("Withdrawal action already completed.");
-        render();
-        return;
-      }
-
+      if (String(request.status || "").toUpperCase() !== "PENDING") { App.toast("Withdrawal action already completed."); render(); return; }
       const amount = Number(request.amount || 0);
-      if (!amount || amount <= 0) {
-        App.toast("Invalid withdrawal amount.");
-        render();
-        return;
-      }
+      if (!amount || amount <= 0) { App.toast("Invalid withdrawal amount."); render(); return; }
       const ledgerExists = App.hasLedgerEntry?.({ accountType: "REAL", type: "WITHDRAWAL", referenceId: request.id, userId: target.id });
-      if (!ledgerExists && App.realBalance(target.id) < amount) {
-        App.toast("Insufficient real balance for withdrawal.");
-        render();
-        return;
-      }
+      if (!ledgerExists && App.realBalance(target.id) < amount) { App.toast("Insufficient balance for withdrawal."); render(); return; }
       if (!ledgerExists && !confirm(`Approve ${App.money(amount)} withdrawal for ${displayNameFor(target)}? Wallet will be debited once.`)) return;
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.approveWithdrawalSecure) {
+        markButton(button, "Approving...");
+        try {
+          const admin = adminUser() || {};
+          const result = await window.AITradeXDB.approveWithdrawalSecure({ requestId: request.id, adminUserId: admin.id || "control_root", adminEmail: admin.email || "", adminName: displayNameFor(admin) || "Admin" });
+          if (window.AITradeXDB?.loadAll) await window.AITradeXDB.loadAll();
+          App.toast(result?.alreadyCompleted ? `Withdrawal already ${result.status || "completed"}.` : "Withdrawal approved securely and balance debited.");
+          render();
+          return;
+        } catch (err) {
+          App.toast(`Secure withdrawal approve failed: ${err.message || err}`);
+          render();
+          return;
+        }
+      }
       markButton(button, "Approving...");
-
+      const previous = { ...request };
+      let ledgerApplied = false;
       try {
         if (!ledgerExists) {
-          App.addLedger({
-            userId: target.id,
-            accountType: "REAL",
-            type: "WITHDRAWAL",
-            amount: -amount,
-            referenceId: request.id,
-            note: "WITHDRAWAL_APPROVED · Admin payout confirmed"
-          });
+          const row = App.isDatabaseMode?.() && App.addLedgerAsync ? await App.addLedgerAsync({ userId: target.id, accountType: "REAL", type: "WITHDRAWAL", amount: -amount, referenceId: request.id, note: "WITHDRAWAL_APPROVED · Admin payout confirmed" }) : App.addLedger({ userId: target.id, accountType: "REAL", type: "WITHDRAWAL", amount: -amount, referenceId: request.id, note: "WITHDRAWAL_APPROVED · Admin payout confirmed" });
+          ledgerApplied = !!row;
         }
         request.status = "APPROVED";
         request.approvedAt = new Date().toISOString();
@@ -3277,15 +4581,20 @@
         request.rejectReason = "";
         request.balanceApplied = true;
         request.adminNote = "Approved payout by admin.";
-        saveWithdrawalRequests(target, requests);
-        App.addNotification?.({ audience: "USER", userId: target.id, title: "Withdrawal approved", message: `${App.money(amount)} withdrawal payout approved.`, type: "WITHDRAWAL", linkPage: "wallet", referenceId: `wd_ok_${request.id}` });
+        await saveWithdrawalRequests(target, requests);
+        await App.addNotificationAsync?.({ audience: "USER", userId: target.id, title: "Withdrawal approved", message: `${App.money(amount)} withdrawal payout approved.`, type: "WITHDRAWAL", linkPage: "wallet", referenceId: `wd_ok_${request.id}` });
+        await logAdminActionAsync("WITHDRAWAL_APPROVE", "WITHDRAWAL", request.id, { userId: target.id, user: displayNameFor(target), amount, ledgerApplied: !ledgerExists });
         App.toast(ledgerExists ? "Withdrawal marked approved. Ledger was already applied." : "Withdrawal approved and balance debited.");
       } catch (err) {
+        Object.assign(request, previous);
+        if (ledgerApplied && !ledgerExists) {
+          try { await (App.addLedgerAsync ? App.addLedgerAsync({ userId: target.id, accountType: "REAL", type: "WITHDRAWAL_APPROVAL_ROLLBACK", amount, referenceId: `${request.id}_rollback`, note: "Rollback: withdrawal request save/notification failed" }) : App.addLedger({ userId: target.id, accountType: "REAL", type: "WITHDRAWAL_APPROVAL_ROLLBACK", amount, referenceId: `${request.id}_rollback`, note: "Rollback: withdrawal request save/notification failed" })); } catch {}
+        }
         App.toast(err.message || "Unable to approve withdrawal.");
       }
       render();
     },
-    rejectWithdrawal(userId, requestId, button) {
+    async rejectWithdrawal(userId, requestId, button) {
       const target = allUsers().find(u => u.id === userId);
       if (!target) return;
       const requests = withdrawalRequestsFor(target);
@@ -3298,6 +4607,21 @@
       }
       const reason = prompt("Reject reason:", "Withdrawal details could not be verified.");
       if (reason === null) return;
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.rejectWithdrawalSecure) {
+        markButton(button, "Rejecting...");
+        try {
+          const admin = adminUser() || {};
+          const result = await window.AITradeXDB.rejectWithdrawalSecure({ requestId: request.id, reason: reason || "Withdrawal rejected by admin.", adminUserId: admin.id || "control_root", adminEmail: admin.email || "", adminName: displayNameFor(admin) || "Admin" });
+          if (window.AITradeXDB?.loadAll) await window.AITradeXDB.loadAll();
+          App.toast(result?.alreadyCompleted ? `Withdrawal already ${result.status || "completed"}.` : "Withdrawal request rejected securely.");
+          render();
+          return;
+        } catch (err) {
+          App.toast(`Secure withdrawal reject failed: ${err.message || err}`);
+          render();
+          return;
+        }
+      }
       markButton(button, "Rejecting...");
       request.status = "REJECTED";
       request.rejectReason = reason || "Withdrawal rejected by admin.";
@@ -3305,12 +4629,13 @@
       request.reviewedAt = request.rejectedAt;
       request.balanceApplied = false;
       request.adminNote = request.rejectReason;
-      saveWithdrawalRequests(target, requests);
-      App.addNotification?.({ audience: "USER", userId: target.id, title: "Withdrawal rejected", message: request.rejectReason, type: "WITHDRAWAL", linkPage: "wallet", referenceId: `wd_no_${request.id}` });
+      await saveWithdrawalRequests(target, requests);
+      await App.addNotificationAsync?.({ audience: "USER", userId: target.id, title: "Withdrawal rejected", message: request.rejectReason, type: "WITHDRAWAL", linkPage: "wallet", referenceId: `wd_no_${request.id}` });
+      await logAdminActionAsync("WITHDRAWAL_REJECT", "WITHDRAWAL", request.id, { userId: target.id, user: displayNameFor(target), amount: request.amount || 0, reason: request.rejectReason });
       App.toast("Withdrawal rejected.");
       render();
     },
-    approveKyc(userId, button) {
+    async approveKyc(userId, button) {
       markButton(button, "Approving...");
       const target = allUsers().find(u => u.id === userId);
       if (!target) return;
@@ -3320,11 +4645,27 @@
         render();
         return;
       }
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.approveKycSecure) {
+        try {
+          const admin = adminUser() || {};
+          const result = await window.AITradeXDB.approveKycSecure({ kycId: kycActionId(kyc, userId), adminUserId: admin.id || "control_root", adminEmail: admin.email || "", adminName: displayNameFor(admin) || "Admin" });
+          if (window.AITradeXDB?.loadAll) await window.AITradeXDB.loadAll();
+          App.toast(result?.alreadyCompleted ? `KYC already ${result.status || "completed"}.` : "KYC approved securely.");
+          render();
+          return;
+        } catch (err) {
+          App.toast(`Secure KYC approve failed: ${err.message || err}`);
+          render();
+          return;
+        }
+      }
       kyc.status = "APPROVED";
       kyc.rejectReason = "";
       kyc.approvedAt = new Date().toISOString();
       kyc.rejectedAt = "";
-      saveKyc(target, kyc);
+      await logAdminActionAsync("KYC_APPROVE", "KYC", kycActionId(kyc, userId), { userId: target.id, user: displayNameFor(target) });
+      await saveKyc(target, kyc);
+      await App.notifyAsync?.({ audience: "USER", userId: target.id, title: "KYC approved", message: "Your KYC verification has been approved.", type: "KYC", linkPage: "kyc", referenceId: `kyc_ok_${kycActionId(kyc, userId)}` });
       App.toast("KYC approved successfully.");
       render();
     },
@@ -3336,7 +4677,7 @@
       }
       App.toast("Reject panel unavailable.");
     },
-    confirmRejectKyc(userId, button) {
+    async confirmRejectKyc(userId, button) {
       const target = allUsers().find(u => u.id === userId);
       if (!target) return;
       const kyc = kycFor(target);
@@ -3352,15 +4693,32 @@
         return;
       }
       markButton(button, "Rejecting...");
+      const finalReason = note ? `${reason}: ${note}` : reason;
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.rejectKycSecure) {
+        try {
+          const admin = adminUser() || {};
+          const result = await window.AITradeXDB.rejectKycSecure({ kycId: kycActionId(kyc, userId), reason: finalReason, adminUserId: admin.id || "control_root", adminEmail: admin.email || "", adminName: displayNameFor(admin) || "Admin" });
+          if (window.AITradeXDB?.loadAll) await window.AITradeXDB.loadAll();
+          App.toast(result?.alreadyCompleted ? `KYC already ${result.status || "completed"}.` : "KYC rejected securely.");
+          render();
+          return;
+        } catch (err) {
+          App.toast(`Secure KYC reject failed: ${err.message || err}`);
+          render();
+          return;
+        }
+      }
       kyc.status = "REJECTED";
-      kyc.rejectReason = note ? `${reason}: ${note}` : reason;
+      kyc.rejectReason = finalReason;
       kyc.rejectedAt = new Date().toISOString();
       kyc.approvedAt = "";
-      saveKyc(target, kyc);
+      await logAdminActionAsync("KYC_REJECT", "KYC", kycActionId(kyc, userId), { userId: target.id, user: displayNameFor(target), reason: kyc.rejectReason });
+      await saveKyc(target, kyc);
+      await App.notifyAsync?.({ audience: "USER", userId: target.id, title: "KYC rejected", message: kyc.rejectReason || "Your KYC verification was rejected.", type: "KYC", linkPage: "kyc", referenceId: `kyc_no_${kycActionId(kyc, userId)}` });
       App.toast("KYC rejected successfully.");
       render();
     },
-    approvePaymentMethod(userId, methodId, button) {
+    async approvePaymentMethod(userId, methodId, button) {
       markButton(button, "Approving...");
       const target = allUsers().find(u => u.id === userId);
       if (!target) return;
@@ -3372,15 +4730,31 @@
         render();
         return;
       }
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.approvePaymentMethodSecure) {
+        try {
+          const admin = adminUser() || {};
+          const result = await window.AITradeXDB.approvePaymentMethodSecure({ methodId: method.id, adminUserId: admin.id || "control_root", adminEmail: admin.email || "", adminName: displayNameFor(admin) || "Admin" });
+          if (window.AITradeXDB?.loadAll) await window.AITradeXDB.loadAll();
+          App.toast(result?.alreadyCompleted ? `Payment method already ${result.status || "completed"}.` : "Payment method approved securely.");
+          render();
+          return;
+        } catch (err) {
+          App.toast(`Secure payment method approve failed: ${err.message || err}`);
+          render();
+          return;
+        }
+      }
       method.status = "APPROVED";
       method.rejectReason = "";
       method.approvedAt = new Date().toISOString();
       method.rejectedAt = "";
-      savePaymentMethods(target, methods);
+      await logAdminActionAsync("PAYMENT_METHOD_APPROVE", "PAYMENT_METHOD", method.id, { userId: target.id, user: displayNameFor(target), bankName: method.bankName || "" });
+      await savePaymentMethods(target, methods);
+      await App.notifyAsync?.({ audience: "USER", userId: target.id, title: "Bank account approved", message: `${method.bankName || "Bank account"} ending ${String(method.accountNumber || "").slice(-4) || "-"} has been approved for withdrawals.`, type: "PAYMENT_METHOD", linkPage: "payments", referenceId: `pm_ok_${method.id}` });
       App.toast("Payment method approved successfully.");
       render();
     },
-    rejectPaymentMethod(userId, methodId, button) {
+    async rejectPaymentMethod(userId, methodId, button) {
       const target = allUsers().find(u => u.id === userId);
       if (!target) return;
       const methods = paymentMethodsFor(target);
@@ -3394,15 +4768,32 @@
       const reason = prompt("Reject reason:", "Holder name does not match KYC.");
       if (reason === null) return;
       markButton(button, "Rejecting...");
+      const finalReason = reason || "Rejected by admin.";
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.rejectPaymentMethodSecure) {
+        try {
+          const admin = adminUser() || {};
+          const result = await window.AITradeXDB.rejectPaymentMethodSecure({ methodId: method.id, reason: finalReason, adminUserId: admin.id || "control_root", adminEmail: admin.email || "", adminName: displayNameFor(admin) || "Admin" });
+          if (window.AITradeXDB?.loadAll) await window.AITradeXDB.loadAll();
+          App.toast(result?.alreadyCompleted ? `Payment method already ${result.status || "completed"}.` : "Payment method rejected securely.");
+          render();
+          return;
+        } catch (err) {
+          App.toast(`Secure payment method reject failed: ${err.message || err}`);
+          render();
+          return;
+        }
+      }
       method.status = "REJECTED";
-      method.rejectReason = reason || "Rejected by admin.";
+      method.rejectReason = finalReason;
       method.rejectedAt = new Date().toISOString();
       method.approvedAt = "";
-      savePaymentMethods(target, methods);
+      await logAdminActionAsync("PAYMENT_METHOD_REJECT", "PAYMENT_METHOD", method.id, { userId: target.id, user: displayNameFor(target), reason: method.rejectReason });
+      await savePaymentMethods(target, methods);
+      await App.notifyAsync?.({ audience: "USER", userId: target.id, title: "Bank account rejected", message: method.rejectReason || "Your bank account verification was rejected.", type: "PAYMENT_METHOD", linkPage: "payments", referenceId: `pm_no_${method.id}` });
       App.toast("Payment method rejected successfully.");
       render();
     },
-    deletePaymentMethod(userId, methodId, button) {
+    async deletePaymentMethod(userId, methodId, button) {
       const target = allUsers().find(u => u.id === userId);
       if (!target) return;
       const methods = paymentMethodsFor(target);
@@ -3414,11 +4805,33 @@
 
       markButton(button, "Deleting...");
       const next = methods.filter(m => m.id !== methodId);
-      savePaymentMethods(target, next);
+      await logAdminActionAsync("PAYMENT_METHOD_DELETE", "PAYMENT_METHOD", method.id, { userId: target.id, user: displayNameFor(target), label });
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.deletePaymentMethod) {
+        await window.AITradeXDB.deletePaymentMethod(method.id);
+        App.state.paymentMethods = (App.state.paymentMethods || []).filter(m => m.id !== method.id);
+        App.saveState();
+      } else {
+        await savePaymentMethods(target, next);
+      }
       App.toast("Payment method deleted.");
       render();
     }
   };
 
-  render();
+  async function bootAdminApp(){
+    try{
+      if(App.session?.userId && window.AITradeXDB?.ready){
+        await window.AITradeXDB.loadAll();
+      }
+    }catch(err){ console.warn("AITradeX admin boot DB load skipped", err?.message||err); }
+    render();
+    try{
+      App.registerLiveSyncRenderer?.(()=>render(), "admin");
+      App.startLiveSync?.({role:"admin"});
+    }catch(err){ console.warn("Admin Live Sync Lite start skipped", err?.message||err); }
+    startAiLiveBatchAutoCloseWatcher();
+    runAiLiveBatchAutoClose({ silent: true }).catch(err => console.warn("AI live initial auto-close check failed", err?.message || err));
+  }
+
+  bootAdminApp();
 })();

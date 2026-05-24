@@ -1,0 +1,16 @@
+AITradeX Phase 6.9.5 AI Live Close total_pnl Fix
+
+Fixes Supabase error:
+  column reference "total_pnl" is ambiguous
+
+What changed:
+- Internal PL/pgSQL variable total_pnl renamed to v_total_pnl.
+- ai_trade_batches.total_pnl update now uses v_total_pnl explicitly.
+- Added standalone SQL patch: supabase-ai-live-close-total-pnl-fix.sql
+
+What to do:
+1) Deploy this ZIP if you want future SQL files fixed.
+2) Run supabase-ai-live-close-total-pnl-fix.sql in Supabase SQL Editor once.
+3) Test Admin -> Live Position Trade -> close batch.
+
+No data deletion. No UI changes.

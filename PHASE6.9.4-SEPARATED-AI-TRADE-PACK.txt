@@ -1,0 +1,11 @@
+AITradeX Phase 6.9.4 - Separated Admin AI Trade Pack
+
+Changes:
+1. Instant AI Trade and Live Position Trade are now visually and logically separated in admin.
+2. Instant AI uses the daily AI trade limit and creates closed AI_AUTO entries only.
+3. Live Position Trade uses open-position limit, locks wallet amount on open, and settles on close only.
+4. Live eligibility no longer uses the Instant daily AI limit check. It checks max open positions per user instead.
+5. Added clear admin separation notice cards so the two sections cannot be confused.
+6. Added final CSS separation layer while preserving existing Phase 6.9.3 design.
+
+SQL: No new SQL required for this update if Phase 6.9.2 SQL was already run.

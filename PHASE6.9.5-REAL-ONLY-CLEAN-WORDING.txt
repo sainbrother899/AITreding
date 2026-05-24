@@ -1,0 +1,14 @@
+AITradeX Phase 6.9.5 Real-Only Clean Wording Update
+
+Base used: AITradeX-Phase6.9.5-RealOnly-StableBase.zip
+
+Scope kept intentionally small:
+- Removed user-facing Real/Demo/Real Wallet style wording after demo mode was removed.
+- Kept app single-account behavior internally as REAL for compatibility.
+- Removed the single Real account selector chip from the user hero.
+- Reworded labels to Account, Wallet, Available Balance, Active/Single account.
+- Updated admin-facing balance labels/messages from Real Balance/Real Wallet to Balance/Wallet where visible.
+
+No layout, chart, route, SQL, trade logic, KYC, wallet ledger, Telegram, or admin AI separation logic was changed.
+
+SQL required: No.

@@ -1,0 +1,14 @@
+AITradeX Phase 6.9.5 Final Check Notes
+
+Base: AITradeX-Phase6.9.5-DBFirstUserSettingsFix
+
+Final sanity updates applied:
+1. Updated index/admin cache-buster query string so mobile browsers load the latest JS/CSS instead of old cached files.
+2. Updated build markers to 6.9.5-dbfirst-finalcheck.
+3. Changed remaining user-facing Orders toast wording to Positions.
+4. JS syntax check passed for admin-app.js, auth.js, config.js, core.js, db-service.js, user-app.js.
+5. No SQL required for this final check ZIP.
+
+Important:
+- Do not run strict RLS yet.
+- For clean deploy, delete old hosted files first or purge cache after upload.

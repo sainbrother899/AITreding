@@ -1,0 +1,11 @@
+AITradeX Phase 6.9.5 Plan Catalog Safe Fix
+
+Base: Phase 6.9.5 FinalCheckedStable
+
+Fixes:
+1. Admin plan save now persists the full plan catalog, not only the edited plan.
+2. Database load now merges DB plans with the default/base catalog, so missing plans do not disappear after realtime reload.
+3. Core boot now restores missing default plan entries if a stale/local state has only one plan.
+4. No UI redesign, no trade/home/admin layout changes.
+
+No SQL required. If plans table currently has only one row, deploy this ZIP and open Admin > Plans. Missing base plans should appear again; saving any plan will upsert the full catalog back to Supabase.

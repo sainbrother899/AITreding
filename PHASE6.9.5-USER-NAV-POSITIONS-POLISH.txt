@@ -1,0 +1,17 @@
+AITradeX Phase 6.9.5 - User Navigation + Positions Polish
+
+Base: AITradeX-Phase6.9.5-HomeQuickActionsSingle.zip
+
+Changes made only on user-side UI wording/navigation polish:
+1. Bottom navigation changed to: Home | Trade | Positions | Wallet | History.
+2. Existing orders page kept as the same stable logic, but exposed to users as Positions.
+3. Added positions route alias so old orders links still work and new Positions nav works.
+4. Quick action card renamed Orders -> Positions with Open trades subtitle.
+5. Positions page hero and headings changed to positions/open-trade language.
+6. Security page hides technical debug text: Database mode / Supabase connected / Local fallback.
+7. Wallet labels lightly polished: Withdrawal -> Withdraw, History -> Requests, wallet records copy improved.
+8. History page wording simplified to completed trades.
+
+No SQL required.
+No admin-side logic changed.
+Trade chart/layout untouched.

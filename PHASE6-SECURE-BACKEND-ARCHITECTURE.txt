@@ -1,0 +1,44 @@
+AITradeX Phase6 Secure Backend/Auth Architecture
+
+Goal:
+Move sensitive money/admin actions from browser JavaScript to secure backend Edge Functions while preserving the existing UI/design.
+
+Current Phase6.2 status:
+- UI unchanged.
+- Legacy testing login remains active.
+- Supabase Auth foundation columns added.
+- Admin role table added.
+- Backend action queue table added.
+- Strict production RLS is NOT enabled yet.
+
+Future backend endpoints:
+1. admin-approve-deposit
+   - Verify admin role server-side.
+   - Validate pending deposit and duplicate UTR.
+   - Write immutable wallet ledger credit.
+   - Mark deposit approved.
+   - Send Telegram/notification.
+
+2. admin-approve-withdrawal
+   - Verify admin role server-side.
+   - Validate withdrawable balance.
+   - Mark payout status.
+   - Write immutable wallet ledger debit.
+
+3. admin-open-ai-live-batch
+   - Verify admin role.
+   - Create one batch and per-user AI positions.
+   - Lock margin server-side.
+
+4. admin-close-ai-live-batch
+   - Verify admin role.
+   - Close all batch positions together.
+   - Compute P/L server-side using margin x leverage x priceMovePercent.
+   - Write settlement ledger.
+
+5. send-telegram-alert
+   - Keep bot token in Edge Function secret.
+   - Never expose token to browser.
+
+Strict RLS timing:
+Only enable strict production RLS after deposit, withdrawal, wallet ledger and AI settlement are backend-only.

@@ -1,0 +1,41 @@
+AITradeX Phase 6.9.2 Final Money + Security Pack
+
+This pack is built on Phase 6.9.1 Clean Baseline.
+
+What changed:
+1) Build marker updated to 6.9.2-final-money-security-pack.
+2) DB state mappers now restore reviewedAt/approvedAt/rejectedAt for deposit and withdrawal after Supabase refresh.
+3) Wallet ledger mapper preserves raw audit metadata.
+4) Added single migration file: supabase-phase6.9.2-final-money-security.sql
+   - KYC approve/reject RPC refresh-stable
+   - Deposit approve/reject RPC idempotent and duplicate-UTR guarded
+   - Withdrawal approve/reject RPC idempotent and balance guarded
+   - Admin wallet adjustment RPC audited through ledger
+   - AI live batch close RPC idempotent and backend-settled
+   - Telegram audit/queue compatibility tables
+   - Runtime marker 6.9.2
+5) Added Telegram Edge Function folder:
+   supabase/functions/telegram-alert/index.ts
+6) Added Telegram setup guide:
+   TELEGRAM-EDGE-FUNCTION-SETUP.txt
+7) Added strict RLS note-only template:
+   supabase-phase6.9.2-strict-rls-readme-only.sql
+
+What to run now:
+- Run supabase-phase6.9.2-final-money-security.sql in Supabase SQL Editor.
+
+What NOT to run yet:
+- Do not run strict RLS lock files until Supabase Auth + service-role Edge Functions are fully migrated.
+
+Testing checklist after deploy + SQL:
+1) New KYC submit -> approve -> admin refresh -> user refresh.
+2) New deposit submit -> approve -> wallet credited once -> refresh twice.
+3) Try approving same deposit again -> should not double-credit.
+4) New withdrawal submit -> approve -> wallet debited once -> refresh twice.
+5) Try approving same withdrawal again -> should not double-debit.
+6) Open AI live batch -> close from admin -> wallet settles once.
+7) Telegram Admin Panel -> save Edge URL/chat ID -> Send Test Telegram Alert.
+
+Notes:
+- This is safer than previous legacy-testing builds, but strict production security still requires Supabase Auth migration and service-role Edge Function architecture.
+- Current SQL keeps anon RPC grants because current frontend runtime still depends on legacy/testing mode.

@@ -1,0 +1,24 @@
+AITradeX Phase 6.9.5 - AI Live Target Auto Close Fix
+
+Base: AITradeX-Phase6.9.5-AITradeLogicAuditFix
+
+Fixes:
+1. AI live target-hit detection is now more reliable:
+   - Checks raw P/L and settlement/capped P/L.
+   - Adds small tolerance for rounding issues.
+   - Works for profit target, loss target, and margin-risk close.
+
+2. Auto-close watcher frequency improved:
+   - Runs every 3 seconds while admin is logged in.
+   - Runs again when admin tab/window regains focus.
+   - Runs once shortly after opening a new AI live position.
+
+3. Backend close fallback improved:
+   - If secure RPC close fails, browser DB fallback will still close positions using writeTrade + wallet ledger.
+   - This prevents positions staying open only because backend RPC has an SQL/version issue.
+
+Notes:
+- No UI redesign.
+- No chart/home/wallet/admin page layout changes.
+- No new SQL required if the previous total_pnl patch has already been run.
+- Auto-close still needs an admin browser session open because live market prices are checked from the web app.

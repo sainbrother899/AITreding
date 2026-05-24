@@ -1,0 +1,23 @@
+AITradeX Phase 6.9.5 - AI Live Auto-Close Daemon Fix
+
+Root cause fixed:
+- The manual "Check Auto Close" button worked, but the automatic watcher did not run reliably.
+- The watcher was checking Auth.isAdmin(), but AITradeXAuth does not expose isAdmin().
+- Because that condition always failed, the interval watcher stayed silent and positions only closed when the button manually ran the same close function.
+
+Fixes:
+1. Added isAdminSessionActive() using the current logged-in admin user role.
+2. Replaced the watcher condition with isAdminSessionActive().
+3. Fixed duplicated visibilitychange listener block.
+4. Added a small render-time trigger on dashboard/liveAi pages when live positions exist.
+5. No UI/design changes.
+6. No SQL required if previous max-loss close SQL has already been run.
+
+Expected behavior:
+- Admin panel open: AI live positions are checked automatically every 3 seconds.
+- Admin tab focus/return: auto-close check runs immediately.
+- Dashboard/live AI page render with open live positions: auto-close check is queued.
+- Check Auto Close button still remains as a manual backup.
+
+Important:
+- This is still browser-session based automation. For true 24/7 close monitoring, a scheduled Supabase Edge Function/cron worker is required.

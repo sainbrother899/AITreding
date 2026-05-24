@@ -1,40 +1,50 @@
-AITradeX Stable Base — Phase 4.89
+AITradeX Phase6.9 - RLS Readiness Pack
 
-This ZIP is the cleaned stable base built from Phase 4.86 Admin Text Contrast Fix.
-
-Main files
-- index.html: user app entry
-- admin.html: admin/control panel entry
-- styles.css: shared user/admin styling
-- user-app.js: user-side app logic
-- admin-app.js: admin-side app logic
-- core.js: shared state/helpers
-- auth.js: auth/session helpers
-- config.js: configuration placeholder
-- supabase-schema.sql: database planning/schema reference
-
-Default control center login
-Email: control@aitradex.com
-Password: admin123
-
-Clean-base notes
-- No separate temporary, duplicate, backup, or hotfix files are included.
-- Old phase history notes were removed from this README.
-- CSS phase comments were removed while preserving the existing rule order.
-- User/admin JavaScript logic is kept in the main working files.
-
-Important
-This build is a frontend/static prototype baseline. Before real public use, move authentication, wallet ledger, deposits, withdrawals, trade settlement, and admin permissions to a secure backend such as Supabase/Firebase or a custom server.
+PHASE 6.9.1 CLEAN BASELINE NOTE
+- KYC approve/reject request-id bug fixed.
+- Telegram alerts now expect Supabase Edge Function URL; frontend bot-token fallback is disabled.
+- Fake TP/SL inputs removed from user trade form until full TP/SL backend logic is added.
+- Default admin DB auto-create fallback is disabled in config.
 
 
-Stable display setting:
-- Crypto prices are shown to users in INR-only mode.
-- Default USDT-INR conversion rate is ₹95 per USDT.
-- Admin can change this anytime from Payment Settings > USDT to INR Rate.
-- Internal trade P/L still uses raw crypto movement percentage, so wallet P/L remains INR-based.
+Base: Phase6.8 Wallet Telegram Backend.
+This build keeps the same UI/design and working flows, but adds RLS readiness files and clearer production-lock guidance.
+
+What is included:
+- Deposit approve/reject backend RPC from previous phases.
+- Withdrawal approve/reject backend RPC from previous phases.
+- AI Live backend settlement from previous phases.
+- Manual trade backend settlement and price-unit cleanup from previous phases.
+- KYC + payment method backend approval from previous phases.
+- Subscription backend control from previous phases.
+- Admin wallet adjustment backend RPC and Telegram audit logs from Phase6.8.
+- New safe audit file: supabase-rls-readiness-audit.sql
+- New production template: supabase-strict-rls-final-lock-template.sql
+
+Important deployment notes:
+1. For normal testing/deploy, run supabase-schema.sql only if you have not already applied Phase6.8 schema or if you want the latest runtime marker.
+2. You may safely run supabase-rls-readiness-audit.sql. It only reports RLS/function status and does not change data.
+3. Do NOT run supabase-strict-rls-final-lock-template.sql on the current legacy-testing app. It is a future production template only.
+4. Upload the ZIP files to hosting.
+5. Hard refresh browser with Ctrl + Shift + R.
+
+Why strict RLS is not enabled directly:
+The current app still supports legacy frontend testing mode. If strict production RLS is enabled before Supabase Auth/Edge Functions are fully active, user/admin panels can lose DB access. Strict RLS should be the last production-lock step.
+
+Current build:
+Phase6.9-RLSReadinessPack
+Cache version: phase695-dbfirst-finalcheck-20260524
 
 
-Phase 4.91 update:
-- Added premium read-only USDT-INR rate chip on user Trade page.
-- Added premium read-only USDT-INR rate chip on user Wallet hero.
-- Rate is controlled from Admin Payment Settings and defaults to ₹95 per USDT.
+Phase 6.9.2 update notes:
+- Run supabase-phase6.9.2-final-money-security.sql after deployment.
+- Use supabase/functions/telegram-alert/index.ts for Telegram alerts.
+- Do not run strict RLS lock files until Supabase Auth + service-role admin functions are ready.
+- See PHASE6.9.2-FINAL-MONEY-SECURITY-PACK.txt for the test checklist.
+
+
+Phase 6.9.3 update notes:
+- Final UI polish layer added to styles.css.
+- Dashboard cards, spacing, mobile layout, action rows and visible focus/hover states polished.
+- No new SQL is required if Phase 6.9.2 SQL is already run.
+- See PHASE6.9.3-FINAL-UI-POLISH-PACK.txt for the final test checklist.

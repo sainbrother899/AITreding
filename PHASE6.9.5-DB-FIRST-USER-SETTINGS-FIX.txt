@@ -1,0 +1,48 @@
+AITradeX Phase 6.9.5 DB-First User Settings Fix
+
+Base ZIP:
+- AITradeX-Phase6.9.5-TradePageFinalPolish.zip
+
+Scope:
+- No UI redesign.
+- No route/nav/chart changes.
+- Focused localStorage-to-database safety cleanup.
+
+Changes made:
+1. AI Settings are now DB-first
+   - Auto Trade ON/OFF no longer uses localStorage as the source of truth.
+   - Auto Trade allocation percentage no longer uses localStorage as the source of truth.
+   - Values are read from the current user row:
+     - users.ai_trade_on
+     - users.ai_trade_percent
+   - Saving AI Settings still writes through AITradeXDB.writeUser(user).
+
+2. Old local UI cache cleanup
+   - On user app boot, old keys are cleared:
+     - AITradeX_AUTO_PERCENT
+     - AITradeX_AUTO_ON
+     - AITradeX_ACCOUNT_MODE
+   - This prevents stale browser values from overriding database user settings.
+
+3. Database-only runtime preserved
+   - Business state remains database-first when Supabase is configured.
+   - App.saveState still does not full-sync from every UI action in DB mode.
+
+4. Internal REAL-only logic preserved
+   - Demo account UI remains hidden as in previous stable build.
+   - Internal account type stays REAL for compatibility with existing DB columns.
+
+No SQL required if your database already has users.ai_trade_on and users.ai_trade_percent.
+These columns already exist in the provided supabase-schema.sql.
+
+Recommended test:
+1. Login as user.
+2. Open AI Settings.
+3. Change allocation to 25/50/75/100 and toggle ON/OFF.
+4. Logout/login or open on another browser.
+5. Setting should remain the same because it comes from database, not localStorage.
+6. Clear mobile site data and login again; data should still restore from database.
+
+Important:
+- localStorage is still used for safe UI preferences like current page, selected pair, chart interval, draft steps, and session.
+- Wallet/KYC/deposit/withdrawal/trades/notifications are already database-backed through the existing DB service and SQL packs.

@@ -1,0 +1,13 @@
+AITradeX Phase 6.9.5 AI Settings Sidebar Update
+
+Base used: Phase 6.9.5 RealOnly CleanWording.
+
+Changes made only on user side:
+- Added new Side Menu item: AI Settings.
+- Shifted AI Trade Control / Auto Trade Amount controls from Home page to AI Settings page.
+- Home page now keeps only a compact AI Settings summary card with Manage button.
+- Account readiness AI item now opens AI Settings.
+- Next Best Action AI Control button now opens AI Settings.
+
+No SQL required.
+No trade chart/layout/admin AI separation changes were made.

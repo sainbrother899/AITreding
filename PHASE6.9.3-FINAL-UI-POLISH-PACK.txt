@@ -1,0 +1,29 @@
+AITradeX Phase 6.9.3 Final UI Polish Pack
+
+Built on Phase 6.9.2 Final Money + Security Pack.
+
+What changed:
+1) Added a final CSS override layer at the end of styles.css.
+   - Preserves current UI/design baseline.
+   - Improves dashboard spacing, cards, hover/focus states, mobile responsiveness, admin/user dashboard consistency and finance/KYC request readability.
+   - Does not remove working logic or change money/security flows.
+
+2) Updated runtime build marker to:
+   6.9.3-final-ui-polish-pack
+
+3) No new SQL is required for this UI polish pack.
+   - If you already ran supabase-phase6.9.2-final-money-security.sql, do not run any new SQL for this update.
+   - Do not run supabase-phase6.9.2-strict-rls-readme-only.sql.
+
+4) Telegram Edge Function setup remains the same.
+   - Function URL stays: https://znpfqeibtgwzkwqdobwe.supabase.co/functions/v1/telegram-alert
+   - Bot token and chat id must stay in Supabase Secrets.
+
+Test checklist after deployment:
+- User dashboard mobile/desktop layout.
+- Admin dashboard metric cards and pending action panel.
+- KYC submit/approve/reject + refresh.
+- Deposit approve/reject + wallet credit once.
+- Withdrawal approve/reject + wallet debit once.
+- Manual/AI trade open/close and position count.
+- Telegram test alert and real alerts.

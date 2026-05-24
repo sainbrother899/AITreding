@@ -1,0 +1,26 @@
+AITradeX Phase 6.9.5 - AI Live Max Loss Auto-Close Fix
+
+Base: Phase 6.9.5 AiLiveTargetAutoCloseFix
+
+Changes:
+1. AI live position P/L is hard capped at locked AI amount/margin.
+   Example: AI amount ₹1,000 means max visible/settled loss is -₹1,000.
+2. Admin running batch text now clearly says max loss = AI amount.
+3. Existing watcher already checks every 3 seconds while admin is open; max-loss hit uses AUTO_RISK_CLOSE.
+4. User Positions page now shows Max Loss line for AI managed live positions.
+5. Added Supabase SQL patch:
+   supabase-ai-live-max-loss-cap-fix.sql
+
+Run SQL?
+- Recommended: YES, run supabase-ai-live-max-loss-cap-fix.sql in Supabase SQL Editor.
+- It replaces only aitradex_close_ai_live_batch and preserves the total_pnl ambiguity fix.
+- No data is deleted.
+
+Expected behavior:
+- Profit target hit -> auto-close.
+- Loss target hit -> auto-close.
+- Max loss/AI amount hit -> auto-close.
+- Loss displayed and settled cannot exceed locked AI amount.
+
+Note:
+- Auto-close watcher runs from the admin browser/session. Keep admin panel open for live monitoring until a server-side scheduled worker is added.

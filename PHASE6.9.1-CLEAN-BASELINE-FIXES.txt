@@ -1,0 +1,47 @@
+AITradeX Phase 6.9.1 Clean Baseline Fixes
+=========================================
+
+This package is an updated clean baseline made from AITradeX Phase 6.9 RLS Readiness Pack.
+
+What was fixed in this code package
+-----------------------------------
+1. KYC admin approve/reject request-id bug fixed.
+   - Admin RPC calls now use the actual KYC requestId instead of the KYC document object.
+   - This removes a common cause of KYC status failing or reverting after refresh.
+
+2. KYC DB reload mapping improved.
+   - Approved/rejected timestamps are now restored from reviewed_at when Supabase reloads rows.
+   - KYC cards now show Request ID and Last Review for easier debugging.
+
+3. Telegram alert safety and reliability improved.
+   - Telegram settings now include Telegram Edge Function URL.
+   - Frontend direct bot-token sending is disabled for safety.
+   - KYC/deposit/withdrawal/payment alerts should be sent through Supabase Edge Function.
+
+4. Default admin auto-create fallback disabled.
+   - The DB auto-create fallback for control@aitradex.com/admin123 is disabled via config.
+   - Existing admin users can still log in if they already exist in local state or Supabase.
+
+5. Fake TP/SL UI removed from user trade form.
+   - The previous Take Profit / Stop Loss inputs were only UI and had no backend calculation.
+   - They are replaced with a clear Order Risk Note explaining manual/admin close behavior.
+
+6. Build marker updated.
+   - Phase build marker moved to 6.9.1-clean-baseline.
+
+Important deployment notes
+--------------------------
+- This is safer than the previous ZIP, but it is still a legacy-testing frontend architecture.
+- For real public launch, Supabase Auth + Edge Functions + strict RLS must be completed.
+- Do not expose a Telegram bot token in frontend settings. Use Supabase Edge Function secrets.
+- Do not run strict RLS lock templates until frontend auth and backend Edge Functions are ready.
+
+Files changed
+-------------
+- admin-app.js
+- user-app.js
+- db-service.js
+- core.js
+- auth.js
+- config.js
+- PHASE6.9.1-CLEAN-BASELINE-FIXES.txt

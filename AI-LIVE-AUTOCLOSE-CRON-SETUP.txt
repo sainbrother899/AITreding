@@ -1,0 +1,61 @@
+AITradeX - AI Live Auto-Close 24/7 Cron Setup
+================================================
+
+This pack adds a Supabase Edge Function:
+
+  supabase/functions/ai-live-auto-close/index.ts
+
+Purpose:
+- Automatically closes AI Live Positions when:
+  1) Profit target is hit
+  2) Loss target is hit
+  3) Max loss reaches the locked AI amount
+- Works even when the admin browser is closed, if scheduled via Supabase Cron / scheduled function.
+
+Required secrets in Supabase:
+
+  SUPABASE_SERVICE_ROLE_KEY = your Supabase service role key
+
+Recommended secret:
+
+  AI_LIVE_AUTO_CLOSE_SECRET = any strong random password/string
+
+Deploy command:
+
+  supabase functions deploy ai-live-auto-close --no-verify-jwt
+
+If using the Supabase Dashboard editor:
+- Create function name: ai-live-auto-close
+- Paste index.ts code
+- Turn OFF JWT verification for this function
+- Deploy
+
+Function URL:
+
+  https://YOUR_PROJECT_REF.supabase.co/functions/v1/ai-live-auto-close
+
+Schedule:
+- Run every 1 minute.
+- If Supabase Dashboard has Scheduled Functions/Cron, create a schedule for the function.
+- Method: POST
+- Header:
+    x-aitradex-cron-secret: your AI_LIVE_AUTO_CLOSE_SECRET value
+
+Manual test after deploy:
+
+  Open the function invoke/test screen and send POST body:
+
+  {"source":"manual-test"}
+
+Expected success response:
+
+  {"ok":true,"mode":"ai-live-auto-close-cron", ...}
+
+Important:
+- This cron function currently fetches crypto prices from Binance for USDT pairs.
+- BTC/INR style display pairs are treated as BTC/USDT for live market price checking.
+- Browser-based admin auto-close remains as a fast backup while admin panel is open.
+- Cron auto-close is the reliable 24/7 backup when admin panel is closed.
+
+Do NOT expose SUPABASE_SERVICE_ROLE_KEY in website code.
+It must be stored only in Supabase Edge Function secrets.

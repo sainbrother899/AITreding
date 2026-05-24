@@ -6,11 +6,11 @@
   let page = localStorage.getItem("AITradeX_ACTIVE_PAGE") || "home";
   let authMode = "login";
   const referralParam = new URLSearchParams(window.location.search).get("ref") || "";
-  let accountMode = localStorage.getItem("AITradeX_ACCOUNT_MODE") || "REAL";
+  let accountMode = "REAL";
+  localStorage.setItem("AITradeX_ACCOUNT_MODE", "REAL");
   let drawerOpen = false;
-  let autoPercent = Number(localStorage.getItem("AITradeX_AUTO_PERCENT") || 75);
-  const savedAutoTradeState = localStorage.getItem("AITradeX_AUTO_ON");
-  let autoTradeOn = savedAutoTradeState === null ? true : savedAutoTradeState === "true";
+  let autoPercent = 75;
+  let autoTradeOn = true;
   let selectedMarket = localStorage.getItem("AITradeX_SELECTED_MARKET") || "CRYPTO";
   let selectedPair = localStorage.getItem("AITradeX_SELECTED_PAIR") || "BTC/USDT";
   let tradeAmountPreview = Number(localStorage.getItem("AITradeX_TRADE_AMOUNT_PREVIEW") || 1000);
@@ -22,7 +22,7 @@
   let chartInterval = localStorage.getItem("AITradeX_CHART_INTERVAL") || "15";
   let chartStyle = localStorage.getItem("AITradeX_CHART_STYLE") || "1";
   let chartTheme = localStorage.getItem("AITradeX_CHART_THEME") || "dark";
-  let chartToolbar = localStorage.getItem("AITradeX_CHART_TOOLBAR") !== "false";
+  let chartToolbar = localStorage.getItem("AITradeX_CHART_TOOLBAR") === "true";
   let kycStep = Number(localStorage.getItem("AITradeX_KYC_STEP") || 1);
     let walletMode = localStorage.getItem("AITradeX_WALLET_MODE") || "DEPOSIT";
   let walletRequestPage = Number(localStorage.getItem("AITradeX_WALLET_REQUEST_PAGE") || 0);
@@ -46,6 +46,19 @@
 
   const marketPairs = App.marketPairs || { CRYPTO: [], FOREX: [] };
   const activeMarket = "CRYPTO";
+  function normalizedAccountMode(value = accountMode) {
+    return "REAL";
+  }
+  function sameAccountType(rowAccountType, selected = accountMode) {
+    return String(rowAccountType || "REAL").toUpperCase() !== "DEMO";
+  }
+  function normalizeTradeRowForDisplay(t) {
+    if (!t) return t;
+    t.tradeType = String(t.tradeType || t.trade_type || "").toUpperCase();
+    t.status = String(t.status || "").toUpperCase();
+    t.accountType = normalizedAccountMode(t.accountType || t.account_type || accountMode);
+    return t;
+  }
   function isTradeActivePair(pair) {
     return App.isCryptoPair ? App.isCryptoPair(pair) : (marketPairs.CRYPTO || []).some(item => item.pair === pair);
   }
@@ -128,30 +141,52 @@
   function currentBalance() {
     const u = user();
     if (!u) return 0;
-    return accountMode === "DEMO" ? App.demoBalance(u.id) : App.realBalance(u.id);
+    return App.realBalance(u.id);
   }
 
   function manualOpenPositions() {
     const u = user();
     if (!u) return [];
-    return App.state.trades.filter(t =>
-      t.userId === u.id &&
-      t.tradeType === "MANUAL" &&
-      t.status === "OPEN" &&
-      (t.accountType || accountMode) === accountMode
-    );
+    return (App.state.trades || [])
+      .map(normalizeTradeRowForDisplay)
+      .filter(t =>
+        t.userId === u.id &&
+        String(t.tradeType || "").toUpperCase() === "MANUAL" &&
+        String(t.status || "").toUpperCase() === "OPEN" &&
+        sameAccountType(t.accountType, accountMode)
+      );
   }
 
 
 
-  function aiOpenPositions() {
+  function aiTradeTypeOf(row) {
+    return String(row?.tradeType || row?.trade_type || "").toUpperCase();
+  }
+
+  function tradeStatusOf(row) {
+    return String(row?.status || "").toUpperCase();
+  }
+
+  function aiTradeRows({ status = "", liveOnly = false, instantOnly = false } = {}) {
     const u = user();
     if (!u) return [];
-    return (App.state.trades || []).filter(t =>
-      t.userId === u.id &&
-      t.tradeType === "AI_LIVE" &&
-      String(t.status || "").toUpperCase() === "OPEN"
-    );
+    const wantedStatus = String(status || "").toUpperCase();
+    return (App.state.trades || [])
+      .map(normalizeTradeRowForDisplay)
+      .filter(t => {
+        if (t.userId !== u.id) return false;
+        const type = aiTradeTypeOf(t);
+        if (liveOnly && type !== "AI_LIVE") return false;
+        if (instantOnly && type !== "AI_AUTO") return false;
+        if (!liveOnly && !instantOnly && !["AI_AUTO", "AI_LIVE"].includes(type)) return false;
+        if (wantedStatus && tradeStatusOf(t) !== wantedStatus) return false;
+        return true;
+      })
+      .sort((a, b) => Date.parse(b.closedAt || b.createdAt || b.openedAt || 0) - Date.parse(a.closedAt || a.createdAt || a.openedAt || 0));
+  }
+
+  function aiOpenPositions() {
+    return aiTradeRows({ status: "OPEN", liveOnly: true });
   }
 
   function aiLiveMarginLockExists(position) {
@@ -163,20 +198,27 @@
     }));
   }
 
-  function reconcileUserAiLiveMarginLocks() {
+  async function reconcileUserAiLiveMarginLocks() {
     const u = user();
     if (!u) return 0;
     let fixed = 0;
-    aiOpenPositions().forEach(position => {
+    for (const position of aiOpenPositions()) {
       if (aiLiveMarginLockExists(position)) {
         position.marginLocked = true;
-        return;
+        continue;
       }
       const margin = Number(Number(position.marginAmount || 0).toFixed(2));
-      if (!Number.isFinite(margin) || margin <= 0) return;
+      if (!Number.isFinite(margin) || margin <= 0) continue;
       try {
         const before = App.realBalance(u.id);
-        const added = App.addLedger({
+        const added = App.addLedgerAsync ? await App.addLedgerAsync({
+          userId: u.id,
+          accountType: "REAL",
+          type: "AI_LIVE_MARGIN_LOCK",
+          amount: -margin,
+          referenceId: position.id,
+          note: `${position.pair} AI live ${position.side || "BUY"} amount locked`
+        }) : App.addLedger({
           userId: u.id,
           accountType: "REAL",
           type: "AI_LIVE_MARGIN_LOCK",
@@ -189,11 +231,14 @@
         position.balanceBefore = Number(before.toFixed(2));
         position.balanceAfterOpen = Number(App.realBalance(u.id).toFixed(2));
         position.marginLockedAt = position.marginLockedAt || new Date().toISOString();
+        if (App.isDatabaseMode?.() && window.AITradeXDB?.writeTrade) {
+          await window.AITradeXDB.writeTrade(position);
+        }
         fixed += 1;
       } catch (error) {
         position.marginLockError = error.message || "AI amount lock failed";
       }
-    });
+    }
     if (fixed) App.saveState();
     return fixed;
   }
@@ -201,12 +246,14 @@
   function pendingManualOrders() {
     const u = user();
     if (!u) return [];
-    return (App.state.trades || []).filter(t =>
-      t.userId === u.id &&
-      t.tradeType === "MANUAL" &&
-      ["PENDING", "LIMIT_PENDING"].includes(String(t.status || "").toUpperCase()) &&
-      (t.accountType || accountMode) === accountMode
-    );
+    return (App.state.trades || [])
+      .map(normalizeTradeRowForDisplay)
+      .filter(t =>
+        t.userId === u.id &&
+        String(t.tradeType || "").toUpperCase() === "MANUAL" &&
+        ["PENDING", "LIMIT_PENDING"].includes(String(t.status || "").toUpperCase()) &&
+        sameAccountType(t.accountType, accountMode)
+      );
   }
 
   function numericPriceFromText(value) {
@@ -215,20 +262,43 @@
     return Number.isFinite(num) && num > 0 ? num : 0;
   }
 
+  function tradeRawPrice(pair, value, opts = {}) {
+    if (App.tradeRawPrice) return App.tradeRawPrice(pair, value, opts);
+    const n = Number(value || 0);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  function normalizeTradePriceRow(pair, row, reference = 0) {
+    if (!row) return null;
+    const cleanPair = pair || row.pair || selectedPair;
+    // If a data row already has rawPrice or came from a live API/cache, trust row.price as raw.
+    // Display text can be INR, so passing raw+INR display into tradeRawPrice would double-convert.
+    const trustedRaw = Number(row.rawPrice || 0) || (row.sourceType || row.source || row.fetchedAt ? Number(row.price || 0) : 0);
+    const raw = trustedRaw > 0
+      ? tradeRawPrice(cleanPair, trustedRaw, { raw: true })
+      : tradeRawPrice(cleanPair, row.price, { display: row.display || "", reference });
+    if (!Number.isFinite(raw) || raw <= 0) return null;
+    return { ...row, price: raw, rawPrice: raw };
+  }
+
   function visiblePairCardPrice(pair) {
     const clean = String(pair || "").toUpperCase();
     if (!clean || typeof document === "undefined") return null;
-    const escapedPair = window.CSS && CSS.escape ? CSS.escape(pair) : String(pair).replace(/"/g, '\\"');
+    const escapedPair = window.CSS && CSS.escape ? CSS.escape(pair) : String(pair).replace(/"/g, '\"');
     const node = document.querySelector(`[data-price-card="true"][data-live-pair="${escapedPair}"]`);
     if (!node) return null;
-    const raw = Number(node.dataset.rawPrice || 0) || numericPriceFromText(node.textContent);
+    const displayText = node.dataset.displayPrice || node.textContent.trim() || "";
+    const datasetRaw = Number(node.dataset.rawPrice || 0);
+    const rawCandidate = datasetRaw || numericPriceFromText(displayText);
+    const raw = datasetRaw ? tradeRawPrice(pair, rawCandidate, { raw: true }) : tradeRawPrice(pair, rawCandidate, { display: displayText });
     if (!Number.isFinite(raw) || raw <= 0) return null;
     const meta = [...marketPairs.CRYPTO, ...marketPairs.FOREX].find(item => item.pair === pair);
     return {
       ok: true,
       pair,
       price: raw,
-      display: node.dataset.displayPrice || node.textContent.trim() || formatPairPrice(pair, raw),
+      rawPrice: raw,
+      display: displayText || formatPairPrice(pair, raw),
       change: node.dataset.priceChange || "Card",
       mood: node.dataset.priceMood || meta?.mood || "up",
       source: node.dataset.priceSource || "Price Card",
@@ -238,12 +308,20 @@
     };
   }
 
+  function normalizeManualPositionPriceRow(position, row) {
+    if (!position || !row) return row || null;
+    const pair = position.pair || row.pair || selectedPair;
+    const reference = Number(position.entryPrice || position.currentPriceAtOrder || position.limitPrice || 0);
+    return normalizeTradePriceRow(pair, row, reference);
+  }
+
   function positionPriceRow(position) {
     const visible = visiblePairCardPrice(position.pair);
-    if (visible) return visible;
+    if (visible) return normalizeManualPositionPriceRow(position, visible);
     const fresh = App.getCachedPairPrice ? App.getCachedPairPrice(position.pair) : null;
+    if (fresh) return normalizeManualPositionPriceRow(position, fresh);
     const last = App.getLastPairPrice ? App.getLastPairPrice(position.pair) : null;
-    return fresh || last || null;
+    return last ? normalizeManualPositionPriceRow(position, last) : null;
   }
 
   function positionCurrentPrice(position) {
@@ -251,6 +329,30 @@
     const fallback = Number(position.entryPrice || 0);
     const current = Number(cached?.price || fallback);
     return Number.isFinite(current) && current > 0 ? current : fallback;
+  }
+
+  function normalizeLimitComparisonPrice(order, row) {
+    if (!order || !row) return null;
+    const pair = order.pair || row.pair || selectedPair;
+    const reference = Math.max(
+      Number(order.limitPrice || 0),
+      Number(order.currentPriceAtOrder || 0),
+      Number(order.entryPrice || 0)
+    );
+    return normalizeTradePriceRow(pair, row, reference);
+  }
+
+  function pendingOrderPriceRow(order) {
+    // Limit orders must only trigger from an actual live/cached market price.
+    // Never fall back to the order limit price, otherwise a SELL limit can self-trigger
+    // when the user navigates away from the orders page and no price card is visible.
+    const row = positionPriceRow({ pair: order?.pair });
+    return normalizeLimitComparisonPrice(order, row);
+  }
+
+  function pendingOrderLiveDisplay(order) {
+    const row = pendingOrderPriceRow(order);
+    return row?.display || "Waiting live price";
   }
 
   function positionCurrentDisplay(position) {
@@ -287,88 +389,68 @@
 
 
 
+  function aiLiveMarginAmount(position) {
+    const margin = Math.max(0, Number(position?.marginAmount || position?.amount || 0));
+    return Number.isFinite(margin) ? margin : 0;
+  }
+
+  function aiLiveLeverageAmount(position) {
+    const lev = Math.max(1, Number(position?.leverage || 1));
+    return Number.isFinite(lev) ? lev : 1;
+  }
+
+  function aiLiveSafeExposure(position) {
+    const margin = aiLiveMarginAmount(position);
+    const leverage = aiLiveLeverageAmount(position);
+    const formulaExposure = margin * leverage;
+    const storedExposure = Math.max(0, Number(position?.positionSize || 0));
+    if (formulaExposure > 0) return Number(formulaExposure.toFixed(2));
+    return Number(storedExposure.toFixed(2));
+  }
+
   function aiPositionRawPnl(position) {
     const entry = Number(position.entryPrice || 0);
     const current = positionCurrentPrice(position);
-    const exposure = Number(position.positionSize || 0);
+    const exposure = aiLiveSafeExposure(position);
     if (!entry || !current || !exposure) return 0;
     const direction = String(position.side || "BUY").toUpperCase() === "SELL" ? -1 : 1;
     return exposure * ((current - entry) / entry) * direction;
   }
 
-  function aiPositionPnl(position) {
-    const raw = aiPositionRawPnl(position);
-    if (raw < 0) {
-      const margin = Math.max(0, Number(position.marginAmount || 0));
-      const maxLoss = position.marginLocked ? margin : Math.max(0, App.realBalance(position.userId));
-      return Math.max(raw, -maxLoss);
-    }
-    return raw;
-  }
-
   function aiPositionTargetAmount(position) {
-    return Math.max(0, Number(position.positionSize || 0) * Number(position.targetPercent || 0) / 100);
+    return Math.max(0, aiLiveSafeExposure(position) * Number(position.targetPercent || 0) / 100);
   }
 
-  function settleAiLivePosition(position, reason = "TARGET_HIT") {
-    if (!position || String(position.status || "").toUpperCase() !== "OPEN") return false;
-    const current = positionCurrentPrice(position);
-    let pnl = aiPositionPnl(position);
-    const balanceBefore = App.realBalance(position.userId);
-    const margin = Math.max(0, Number(position.marginAmount || 0));
-    if (position.marginLocked && pnl < -margin) pnl = -margin;
-    if (!position.marginLocked && pnl < 0 && Math.abs(pnl) > balanceBefore) pnl = -balanceBefore;
-    const settlementAmount = position.marginLocked ? Math.max(0, margin + pnl) : pnl;
-    const now = new Date().toISOString();
-    position.tradeType = "AI_AUTO";
-    position.status = "CLOSED";
-    position.exitPrice = current;
-    position.exitPriceDisplay = positionCurrentDisplay(position);
-    position.exitPriceSource = (App.getCachedPairPrice && App.getCachedPairPrice(position.pair)?.source) || position.priceSource || "Live market";
-    position.closedAt = now;
-    position.closeReason = reason;
-    position.resultType = pnl >= 0 ? "PROFIT" : "LOSS";
-    position.resultPercent = Number(position.targetPercent || 0);
-    position.pnl = Number(pnl.toFixed(2));
-    position.settlementAmount = Number(settlementAmount.toFixed(2));
-    position.balanceAfter = Number((balanceBefore + position.settlementAmount).toFixed(2));
-    position.source = "AI_LIVE_AUTO_CLOSE";
-    if (position.settlementAmount !== 0) {
-      App.addLedger({
-        userId: position.userId,
-        accountType: "REAL",
-        type: position.marginLocked ? "AI_LIVE_SETTLEMENT" : (position.pnl >= 0 ? "AI_LIVE_PROFIT" : "AI_LIVE_LOSS"),
-        amount: position.settlementAmount,
-        referenceId: position.id,
-        note: position.marginLocked
-          ? `${position.pair} AI live ${position.side} closed · AI amount ${App.money(margin)} · P/L ${position.pnl >= 0 ? "+" : ""}${App.money(position.pnl)}`
-          : `${position.pair} AI live ${position.side} closed · ${reason}`
-      });
-    } else {
-      App.saveState();
+  function aiPositionPnl(position) {
+    let pnl = aiPositionRawPnl(position);
+    const target = aiPositionTargetAmount(position);
+    const targetType = String(position.targetType || "PROFIT").toUpperCase();
+    if (target > 0) {
+      if (targetType === "LOSS") pnl = Math.max(pnl, -Math.min(aiLiveMarginAmount(position) || target, target));
+      else pnl = Math.min(pnl, target);
     }
-    return true;
+    if (pnl < 0) {
+      const margin = aiLiveMarginAmount(position);
+      // Hard safety cap: AI live loss display can never exceed the locked AI amount/margin.
+      const maxLoss = Math.max(0, margin);
+      return Number(Math.max(pnl, -maxLoss).toFixed(2));
+    }
+    return Number(pnl.toFixed(2));
   }
 
-  function autoCloseAiLivePositions() {
-    const positions = aiOpenPositions();
-    if (!positions.length) return 0;
-    let closed = 0;
-    positions.forEach(position => {
-      const pnl = aiPositionPnl(position);
-      const target = aiPositionTargetAmount(position);
-      const targetType = String(position.targetType || "PROFIT").toUpperCase();
-      const hit = target > 0 && (targetType === "LOSS" ? pnl <= -target : pnl >= target);
-      if (hit) {
-        if (settleAiLivePosition(position, "TARGET_HIT")) closed += 1;
-      }
-    });
-    if (closed) {
-      App.toast(`${closed} AI live ${closed === 1 ? "position" : "positions"} closed automatically.`);
-      setTimeout(() => render(), 0);
-    }
-    return closed;
+  async function settleAiLivePosition(position, reason = "TARGET_HIT") {
+    console.warn("User-side AI live auto settlement is disabled. Admin batch close is required.");
+    return false;
   }
+
+
+  async function autoCloseAiLivePositions() {
+    // AI Live positions are batch-controlled from admin side only.
+    // User-side auto-close caused same-batch positions to close for one user while remaining open for others.
+    return 0;
+  }
+
+
 
   function manualReservedMargin(account = accountMode) {
     return manualOpenPositions()
@@ -397,7 +479,7 @@
   function limitInputToRaw(pair, value) {
     const n = Number(value || 0);
     if (!Number.isFinite(n) || n <= 0) return 0;
-    return App.isCryptoPair && App.isCryptoPair(pair) && App.cryptoInrToRaw ? App.cryptoInrToRaw(n) : n;
+    return App.isCryptoPair?.(pair) ? tradeRawPrice(pair, n, { display: `₹${n}` }) : n;
   }
 
   function totalManualLivePnl() {
@@ -407,12 +489,28 @@
   function positionBalance(position) {
     const u = user();
     if (!u) return 0;
-    return position.accountType === "DEMO" ? App.demoBalance(u.id) : App.realBalance(u.id);
+    return App.realBalance(u.id);
   }
 
-  function settleManualPosition(position, reason = "USER_CLOSE") {
+  async function settleManualPosition(position, reason = "USER_CLOSE") {
     const u = user();
     if (!u || !position || position.status !== "OPEN") return false;
+    if (App.isDatabaseMode?.() && window.AITradeXDB?.closeManualTradeSecure) {
+      const current = positionCurrentPrice(position);
+      const display = positionCurrentDisplay(position);
+      const source = (App.getCachedPairPrice && App.getCachedPairPrice(position.pair)?.source) || position.priceSource || "Live price cache";
+      await window.AITradeXDB.closeManualTradeSecure({
+        tradeId: position.id,
+        userId: u.id,
+        exitPrice: current,
+        exitPriceDisplay: display,
+        exitPriceSource: source,
+        reason
+      });
+      try { await window.AITradeXDB.loadAll?.(); } catch {}
+      return true;
+    }
+    const original = { ...position };
     const current = positionCurrentPrice(position);
     let pnl = manualPositionPnl(position);
     const margin = Math.max(0, Number(position.marginAmount || 0));
@@ -430,35 +528,50 @@
     position.settlementAmount = settlementAmount;
     position.closeReason = reason;
     position.status = "CLOSED";
-    if (settlementAmount !== 0) {
-      App.addLedger({
-        userId: u.id,
-        accountType: position.accountType || accountMode,
-        type: position.marginLocked ? "MANUAL_TRADE_SETTLEMENT" : (pnl >= 0 ? "MANUAL_TRADE_PROFIT" : "MANUAL_TRADE_LOSS"),
-        amount: settlementAmount,
-        referenceId: position.id,
-        note: position.marginLocked
-          ? `${position.pair} manual ${position.side} closed · margin ${App.money(margin)} · P/L ${pnl >= 0 ? "+" : ""}${App.money(pnl)}`
-          : `${position.pair} manual ${position.side} closed`
-      });
-    } else {
+    let settlementAdded = false;
+    try {
+      if (settlementAmount !== 0) {
+        const row = App.addLedgerAsync ? await App.addLedgerAsync({
+          userId: u.id,
+          accountType: normalizedAccountMode(position.accountType || accountMode),
+          type: position.marginLocked ? "MANUAL_TRADE_SETTLEMENT" : (pnl >= 0 ? "MANUAL_TRADE_PROFIT" : "MANUAL_TRADE_LOSS"),
+          amount: settlementAmount,
+          referenceId: position.id,
+          note: position.marginLocked ? `${position.pair} manual ${position.side} closed · margin ${App.money(margin)} · P/L ${pnl >= 0 ? "+" : ""}${App.money(pnl)}` : `${position.pair} manual ${position.side} closed`
+        }) : App.addLedger({
+          userId: u.id,
+          accountType: normalizedAccountMode(position.accountType || accountMode),
+          type: position.marginLocked ? "MANUAL_TRADE_SETTLEMENT" : (pnl >= 0 ? "MANUAL_TRADE_PROFIT" : "MANUAL_TRADE_LOSS"),
+          amount: settlementAmount,
+          referenceId: position.id,
+          note: position.marginLocked ? `${position.pair} manual ${position.side} closed · margin ${App.money(margin)} · P/L ${pnl >= 0 ? "+" : ""}${App.money(pnl)}` : `${position.pair} manual ${position.side} closed`
+        });
+        settlementAdded = !!row;
+      }
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.writeTrade) await window.AITradeXDB.writeTrade(position);
       App.saveState();
+      return true;
+    } catch (err) {
+      if (settlementAdded && settlementAmount) {
+        try { await (App.addLedgerAsync ? App.addLedgerAsync({ userId: u.id, accountType: normalizedAccountMode(position.accountType || accountMode), type: "MANUAL_TRADE_SETTLEMENT_ROLLBACK", amount: -settlementAmount, referenceId: `${position.id}_close_rollback`, note: "Rollback: manual close save failed" }) : App.addLedger({ userId: u.id, accountType: normalizedAccountMode(position.accountType || accountMode), type: "MANUAL_TRADE_SETTLEMENT_ROLLBACK", amount: -settlementAmount, referenceId: `${position.id}_close_rollback`, note: "Rollback: manual close save failed" })); } catch {}
+      }
+      Object.assign(position, original);
+      throw err;
     }
-    return true;
   }
 
-  function autoCloseRiskPositions() {
+  async function autoCloseRiskPositions() {
     if (manualRiskCloseLock) return 0;
     manualRiskCloseLock = true;
     let closed = 0;
     try {
-      manualOpenPositions().forEach(position => {
+      for (const position of manualOpenPositions()) {
         const rawPnl = manualPositionRawPnl(position);
         const maxLoss = manualPositionMaxLoss(position);
         if (rawPnl < 0 && maxLoss > 0 && Math.abs(rawPnl) >= maxLoss) {
-          if (settleManualPosition(position, "AUTO_RISK_CLOSE")) closed += 1;
+          try { if (await settleManualPosition(position, "AUTO_RISK_CLOSE")) closed += 1; } catch (err) { console.warn("manual auto close failed", err); }
         }
-      });
+      }
     } finally {
       manualRiskCloseLock = false;
     }
@@ -469,36 +582,58 @@
     return closed;
   }
 
-  function openPositionFromPendingOrder(order, currentPrice, currentDisplay) {
+  function limitOrderDirectionError(side, limitPrice, currentPrice) {
+    const normalizedSide = String(side || "BUY").toUpperCase() === "SELL" ? "SELL" : "BUY";
+    const limit = Number(limitPrice || 0);
+    const current = Number(currentPrice || 0);
+    if (!Number.isFinite(limit) || limit <= 0 || !Number.isFinite(current) || current <= 0) return "";
+    if (normalizedSide === "BUY" && limit >= current) {
+      return `BUY limit price must be below current price (${formatPairPrice(selectedPair, current)}). Use Market order for instant buy.`;
+    }
+    if (normalizedSide === "SELL" && limit <= current) {
+      return `SELL limit price must be above current price (${formatPairPrice(selectedPair, current)}). Use Market order for instant sell.`;
+    }
+    return "";
+  }
+
+  async function openPositionFromPendingOrder(order, currentPrice, currentDisplay) {
     if (!order || !["PENDING", "LIMIT_PENDING"].includes(String(order.status || "").toUpperCase())) return false;
-    const price = Number(currentPrice || 0);
-    if (!Number.isFinite(price) || price <= 0) return false;
+    const current = Number(currentPrice || 0);
+    if (!Number.isFinite(current) || current <= 0) return false;
+    const fillPrice = Number(order.limitPrice || current);
+    if (!Number.isFinite(fillPrice) || fillPrice <= 0) return false;
     order.status = "OPEN";
-    order.entryPrice = price;
-    order.entryPriceDisplay = currentDisplay || formatPairPrice(order.pair, price);
+    order.entryPrice = fillPrice;
+    order.entryPriceDisplay = order.limitPriceDisplay || formatPairPrice(order.pair, fillPrice);
+    order.triggerPrice = current;
+    order.triggerPriceDisplay = currentDisplay || formatPairPrice(order.pair, current);
     order.priceSource = (App.getCachedPairPrice && App.getCachedPairPrice(order.pair)?.source) || order.priceSource || "Live price cache";
     order.priceSourceType = (App.getCachedPairPrice && App.getCachedPairPrice(order.pair)?.sourceType) || order.priceSourceType || "LIVE_PRICE";
     order.priceLockedAt = new Date().toISOString();
     order.triggeredAt = new Date().toISOString();
     order.orderTriggered = true;
     order.pnl = 0;
+    if (App.isDatabaseMode?.() && window.AITradeXDB?.writeTrade) {
+      await window.AITradeXDB.writeTrade(order);
+    }
     return true;
   }
 
-  function checkPendingLimitOrders() {
+  async function checkPendingLimitOrders() {
     const pending = pendingManualOrders();
     if (!pending.length) return 0;
     let triggered = 0;
-    pending.forEach(order => {
-      const current = positionCurrentPrice({ pair: order.pair, entryPrice: order.limitPrice });
+    for (const order of pending) {
+      const liveRow = pendingOrderPriceRow(order);
+      const current = Number(liveRow?.price || 0);
       const limit = Number(order.limitPrice || 0);
-      if (!current || !limit) return;
+      if (!Number.isFinite(current) || current <= 0 || !Number.isFinite(limit) || limit <= 0) continue;
       const side = String(order.side || "BUY").toUpperCase() === "SELL" ? "SELL" : "BUY";
       const shouldTrigger = side === "BUY" ? current <= limit : current >= limit;
-      if (!shouldTrigger) return;
-      const display = positionCurrentDisplay({ pair: order.pair, entryPrice: current });
-      if (openPositionFromPendingOrder(order, current, display)) triggered += 1;
-    });
+      if (!shouldTrigger) continue;
+      const display = liveRow?.display || formatPairPrice(order.pair, current);
+      try { if (await openPositionFromPendingOrder(order, current, display)) triggered += 1; } catch (err) { console.warn("limit order trigger DB sync failed", err); }
+    }
     if (triggered) {
       App.saveState();
       App.toast(`${triggered} limit ${triggered === 1 ? "order" : "orders"} triggered.`);
@@ -544,7 +679,7 @@
             <span id="aiLivePositionMeta">Locked ${App.money(locked)} · Live <em class="${pnl >= 0 ? "profit-text" : "loss-text"}">${pnl >= 0 ? "+" : ""}${App.money(pnl)}</em> ${label}</span>
           </div>
         </div>
-        <button onclick="AITradeXUser.go('orders')">View</button>
+        <button onclick="AITradeXUser.go('positions')">View</button>
       </section>`;
   }
 
@@ -596,8 +731,8 @@
   }
 
   function updateManualLiveViews() {
-    if (checkPendingLimitOrders()) return;
-    if (autoCloseRiskPositions()) return;
+    Promise.resolve(checkPendingLimitOrders()).then(triggered => { if (triggered) render(); });
+    Promise.resolve(autoCloseRiskPositions()).then(closed => { if (closed) render(); });
     const positions = manualOpenPositions();
     const pnl = positions.reduce((sum, position) => sum + manualPositionPnl(position), 0);
     const label = pnl >= 0 ? "Profit" : "Loss";
@@ -669,7 +804,7 @@
   function updateManualLiveBar() {
     updateManualLiveViews();
     updateAiLiveViews();
-    autoCloseAiLivePositions();
+    // User side only updates live P/L display. AI Live settlement is handled from admin batch close.
   }
 
   function updateTradeAmountPreviewDom() {
@@ -697,7 +832,7 @@
     localStorage.removeItem("AITradeX_TRADE_LIMIT_PRICE");
     tradeOrderNotice = {
       title: message || "Order placed successfully",
-      detail: detail || "Your order has been moved to Orders. Fill fresh details to place another trade."
+      detail: detail || "Your order has been moved to Positions. Fill fresh details to place another trade."
     };
   }
 
@@ -714,8 +849,11 @@
   function currentAiSettings() {
     const u = user();
     if (!u) return { enabled: autoTradeOn, percent: autoPercent };
+    // DB-first AI settings: values come from users.ai_trade_on / users.ai_trade_percent.
+    // localStorage is no longer used as the source of truth for AI auto-trade settings.
     if (typeof u.aiTradeOn === "undefined") u.aiTradeOn = true;
-    if (!u.aiTradePercent) u.aiTradePercent = 75;
+    const pct = Number(u.aiTradePercent);
+    if (![25, 50, 75, 100].includes(pct)) u.aiTradePercent = 75;
     autoTradeOn = !!u.aiTradeOn;
     autoPercent = Number(u.aiTradePercent || 75);
     return { enabled: autoTradeOn, percent: autoPercent };
@@ -736,21 +874,19 @@
     return aiOpenPositions().reduce((sum, position) => sum + aiPositionPnl(position), 0);
   }
 
+  function aiClosedRows() {
+    return aiTradeRows({ status: "CLOSED" });
+  }
+
   function todayAiClosedPnl() {
-    const u = user();
-    if (!u) return 0;
     const today = App.todayKey ? App.todayKey() : new Date().toISOString().slice(0, 10);
-    return (App.state.trades || [])
-      .filter(t => t.userId === u.id && t.tradeType === "AI_AUTO" && String(t.createdDate || String(t.createdAt || "").slice(0, 10)) === today)
+    return aiClosedRows()
+      .filter(t => String(t.closedAt || t.createdAt || t.createdDate || "").slice(0, 10) === today)
       .reduce((sum, t) => sum + Number(t.pnl || 0), 0);
   }
 
   function totalAiClosedPnl() {
-    const u = user();
-    if (!u) return 0;
-    return (App.state.trades || [])
-      .filter(t => t.userId === u.id && t.tradeType === "AI_AUTO")
-      .reduce((sum, t) => sum + Number(t.pnl || 0), 0);
+    return aiClosedRows().reduce((sum, t) => sum + Number(t.pnl || 0), 0);
   }
 
   function isAiLimitComplete() {
@@ -759,11 +895,7 @@
   }
 
   function latestAiAutoTrade() {
-    const u = user();
-    if (!u) return null;
-    return (App.state.trades || [])
-      .filter(t => t.userId === u.id && t.tradeType === "AI_AUTO")
-      .sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0))[0] || null;
+    return aiTradeRows()[0] || null;
   }
 
 
@@ -785,7 +917,7 @@
             <h2>${App.escapeHtml(plan.name || "Free")} · ${ai.enabled ? "AI Active" : "AI OFF"}</h2>
             <h4>Daily limit, live AI positions and profit/loss in one place.</h4>
           </div>
-          <button class="change-pair-btn" onclick="AITradeXUser.go('orders')">View Orders</button>
+          <button class="change-pair-btn" onclick="AITradeXUser.go('positions')">View Positions</button>
         </div>
         <div class="compact-grid ai-summary-grid">
           <article><span>Used Today</span><b>${usage.used}/${usage.limit}</b><small>${remaining} remaining</small></article>
@@ -940,17 +1072,20 @@
 
   function tradeRows(type) {
     const u = user();
+    const cleanType = String(type || "").toUpperCase();
     if (!u) return [];
     return (App.state.trades || [])
-      .filter(t => t.userId === u.id && t.accountType === accountMode && t.tradeType === type)
+      .map(normalizeTradeRowForDisplay)
+      .filter(t => t.userId === u.id && sameAccountType(t.accountType, accountMode) && String(t.tradeType || "").toUpperCase() === cleanType)
       .sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
   }
 
   function pnlValue() {
     const u = user();
     if (!u) return 0;
-    return App.state.trades
-      .filter(t => t.userId === u.id && t.accountType === accountMode && t.status === "CLOSED")
+    return (App.state.trades || [])
+      .map(normalizeTradeRowForDisplay)
+      .filter(t => t.userId === u.id && sameAccountType(t.accountType, accountMode) && String(t.status || "").toUpperCase() === "CLOSED")
       .reduce((sum, t) => sum + Number(t.pnl || 0), 0);
   }
 
@@ -1153,6 +1288,7 @@
         enable_publishing: false,
         hide_top_toolbar: !chartToolbar,
         hide_side_toolbar: !chartToolbar,
+        hide_legend: !chartToolbar,
         allow_symbol_change: false,
         save_image: false,
         withdateranges: chartToolbar,
@@ -1191,17 +1327,40 @@
 
   function avatar(name) {
     const u = user();
-    const avatarData = u ? localStorage.getItem(`AITradeX_AVATAR_${u.id}`) : "";
+    const avatarData = u ? (u.avatarUrl || "") : "";
     if (avatarData) {
-      return `<span class="avatar image-avatar"><img src="${avatarData}" alt="Avatar"/></span>`;
+      return `<span class="avatar image-avatar"><img src="${App.escapeHtml(avatarData)}" alt="Avatar"/></span>`;
     }
     return `<span class="avatar">${String(name || "A").trim().charAt(0).toUpperCase()}</span>`;
+  }
+
+  function storageReady() {
+    return !!(window.AITradeXDB && window.AITradeXDB.ready && window.AITradeXDB.uploadUserFile);
+  }
+
+  async function uploadStorageFile({ bucket, folder, label, file }) {
+    const u = user();
+    if (!u) throw new Error("Login required.");
+    if (!storageReady()) throw new Error("Supabase storage is not ready. Check config.js and storage policies.");
+    return await window.AITradeXDB.uploadUserFile({ bucket, folder, label, file, userId: u.id });
+  }
+
+  function uploadStatusText(meta, fallbackName) {
+    const name = meta?.name || fallbackName || "-";
+    const stored = meta?.path ? " · Storage saved" : "";
+    return `${name}${stored}`;
+  }
+
+  function fileViewLink(meta, label = "View") {
+    const url = meta?.url || "";
+    if (!url) return "";
+    return `<a class="kyc-file-link" href="${App.escapeHtml(url)}" target="_blank" rel="noopener">${App.escapeHtml(label)}</a>`;
   }
 
   function displayName() {
     const u = user();
     if (!u) return "User";
-    return localStorage.getItem(`AITradeX_DISPLAY_NAME_${u.id}`) || u.name || "User";
+    return u.name || "User";
   }
 
   function profileNameChip() {
@@ -1236,7 +1395,20 @@
       depositBankName: "AITradeX Bank",
       depositAccountName: "AITradeX Private Wallet",
       depositAccountNumber: "123456789012",
-      depositIfsc: "AITX0001234"
+      depositIfsc: "AITX0001234",
+      depositEnabled: true,
+      withdrawalEnabled: true,
+      manualTradingEnabled: true,
+      aiTradingEnabled: true,
+      maintenanceMode: false,
+      maxDeposit: 1000000,
+      maxWithdrawal: 500000,
+      minManualTrade: 100,
+      maxManualTrade: 250000,
+      minAiTrade: 100,
+      maxAiTrade: 250000,
+      maxLeverage: 2000,
+      maxOpenPositionsPerUser: 10
     };
     App.state.settings = { ...defaults, ...(App.state.settings || {}) };
     return App.state.settings;
@@ -1246,10 +1418,32 @@
     return JSON.stringify(String(value ?? ""));
   }
 
+  function kycRecordTime(row) {
+    return new Date(row?.updatedAt || row?.approvedAt || row?.rejectedAt || row?.submittedAt || row?.createdAt || 0).getTime() || 0;
+  }
+
+  function kycStatusRank(row) {
+    const status = String(row?.status || "").toUpperCase();
+    if (status === "APPROVED") return 4;
+    if (status === "PENDING") return 3;
+    if (status === "REJECTED") return 2;
+    return 1;
+  }
+
+  function bestKycRowFor(userId) {
+    const rows = (App.state.kycRequests || []).filter(x => x.userId === userId);
+    if (!rows.length) return {};
+    return rows.sort((a, b) => {
+      const rankDiff = kycStatusRank(b) - kycStatusRank(a);
+      if (rankDiff) return rankDiff;
+      return kycRecordTime(b) - kycRecordTime(a);
+    })[0] || {};
+  }
+
   function currentKyc() {
     const u = user();
     if (!u) return null;
-    const saved = readJson(userKey("KYC"), null) || {};
+    const saved = bestKycRowFor(u.id);
     const personal = {
       fullName: saved.personal?.fullName || displayName(),
       mobile: u.mobile || saved.personal?.mobile || "",
@@ -1260,37 +1454,27 @@
       state: saved.personal?.state || "",
       pincode: saved.personal?.pincode || ""
     };
-    const id = {
-      type: "Aadhaar Card",
-      number: saved.id?.number || saved.idDetails?.number || ""
-    };
+    const idDetails = (saved.idDetails && typeof saved.idDetails === "object")
+      ? saved.idDetails
+      : (saved.id && typeof saved.id === "object")
+        ? saved.id
+        : { type: "Aadhaar Card", number: saved.id_number || "" };
+    const id = { type: "Aadhaar Card", number: idDetails.number || "" };
     const uploads = {
-      frontName: saved.uploads?.frontName || "",
-      backName: saved.uploads?.backName || "",
-      selfieName: saved.uploads?.selfieName || ""
+      frontName: saved.uploads?.frontName || "", frontPath: saved.uploads?.frontPath || "", frontBucket: saved.uploads?.frontBucket || "", frontUrl: saved.uploads?.frontUrl || "", frontSize: saved.uploads?.frontSize || 0, frontType: saved.uploads?.frontType || "",
+      backName: saved.uploads?.backName || "", backPath: saved.uploads?.backPath || "", backBucket: saved.uploads?.backBucket || "", backUrl: saved.uploads?.backUrl || "", backSize: saved.uploads?.backSize || 0, backType: saved.uploads?.backType || "",
+      selfieName: saved.uploads?.selfieName || "", selfiePath: saved.uploads?.selfiePath || "", selfieBucket: saved.uploads?.selfieBucket || "", selfieUrl: saved.uploads?.selfieUrl || "", selfieSize: saved.uploads?.selfieSize || 0, selfieType: saved.uploads?.selfieType || ""
     };
-    return {
-      status: saved.status || "NOT_SUBMITTED",
-      personal,
-      id,
-      uploads,
-      declarationAccepted: !!saved.declarationAccepted,
-      finalAccepted: !!saved.finalAccepted,
-      submittedAt: saved.submittedAt || "",
-      approvedAt: saved.approvedAt || "",
-      rejectedAt: saved.rejectedAt || "",
-      rejectReason: saved.rejectReason || ""
-    };
+    return { requestId: typeof saved.id === "string" ? saved.id : "", status: saved.status || "NOT_SUBMITTED", personal, id, uploads, declarationAccepted: !!saved.declarationAccepted, finalAccepted: !!saved.finalAccepted, submittedAt: saved.submittedAt || "", approvedAt: saved.approvedAt || "", rejectedAt: saved.rejectedAt || "", rejectReason: saved.rejectReason || "" };
   }
 
-  function saveKycData(data) {
-    writeJson(userKey("KYC"), data);
-    syncKycToState(data);
+  async function saveKycData(data) {
+    return syncKycToState(data);
   }
 
-  function syncKycToState(data) {
+  async function syncKycToState(data) {
     const u = user();
-    if (!u || !App.state.kycRequests) return;
+    if (!u || !App.state.kycRequests) return null;
 
     const existing = App.state.kycRequests.find(x => x.userId === u.id);
     const row = {
@@ -1304,29 +1488,32 @@
       approvedAt: data.approvedAt || "",
       rejectedAt: data.rejectedAt || "",
       rejectReason: data.rejectReason || "",
+      declarationAccepted: !!data.declarationAccepted,
+      finalAccepted: !!data.finalAccepted,
       updatedAt: App.now()
     };
 
+    if (App.isDatabaseMode?.() && window.AITradeXDB?.writeKycRequest) {
+      await window.AITradeXDB.writeKycRequest(row);
+    }
     if (existing) Object.assign(existing, row);
     else App.state.kycRequests.push(row);
-
     App.saveState();
+    return row;
   }
 
-  function syncPaymentMethodsToState(methods) {
+  async function syncPaymentMethodsToState(methods) {
     const u = user();
-    if (!u || !App.state.paymentMethods) return;
+    if (!u || !App.state.paymentMethods) return [];
 
+    const rows = methods.filter(m => m.type === "BANK").map(m => ({ ...m, userId: u.id, userEmail: u.email, source: "USER_BANK_ACCOUNT" }));
+    if (App.isDatabaseMode?.() && window.AITradeXDB?.writePaymentMethod) {
+      for (const row of rows) await window.AITradeXDB.writePaymentMethod(row);
+    }
     App.state.paymentMethods = App.state.paymentMethods.filter(m => m.userId !== u.id);
-    methods.filter(m => m.type === "BANK").forEach(m => {
-      App.state.paymentMethods.push({
-        ...m,
-        userId: u.id,
-        source: "USER_BANK_ACCOUNT"
-      });
-    });
-
+    rows.forEach(row => App.state.paymentMethods.push(row));
     App.saveState();
+    return rows;
   }
 
   function verifiedKycName() {
@@ -1335,12 +1522,12 @@
   }
 
   function paymentMethods() {
-    return readJson(userKey("PAYMENT_METHODS"), []);
+    const u = user();
+    return (App.state.paymentMethods || []).filter(m => m.userId === u?.id).map(m => ({ ...m }));
   }
 
-  function savePaymentMethods(methods) {
-    writeJson(userKey("PAYMENT_METHODS"), methods);
-    syncPaymentMethodsToState(methods);
+  async function savePaymentMethods(methods) {
+    return syncPaymentMethodsToState(methods);
   }
 
   function paymentCounts() {
@@ -1355,7 +1542,8 @@
   }
 
   function depositRequests() {
-    return readJson(userKey("DEPOSIT_REQUESTS"), []);
+    const u = user();
+    return (App.state.depositRequests || []).filter(r => r.userId === u?.id).sort((a,b)=>Date.parse(b.createdAt||0)-Date.parse(a.createdAt||0));
   }
 
   function normalizeUtr(value) {
@@ -1372,36 +1560,45 @@
     return localDuplicate || stateDuplicate;
   }
 
-  function saveDepositRequests(requests) {
-    writeJson(userKey("DEPOSIT_REQUESTS"), requests);
-    syncDepositRequestsToState(requests);
+  async function saveDepositRequests(requests) {
+    return syncDepositRequestsToState(requests);
   }
 
   function withdrawalRequests() {
-    return readJson(userKey("WITHDRAWAL_REQUESTS"), []);
-  }
-
-  function saveWithdrawalRequests(requests) {
-    writeJson(userKey("WITHDRAWAL_REQUESTS"), requests);
-    syncWithdrawalRequestsToState(requests);
-  }
-
-  function syncDepositRequestsToState(requests) {
     const u = user();
-    if (!u || !App.state.depositRequests) return;
+    return (App.state.withdrawalRequests || []).filter(r => r.userId === u?.id).sort((a,b)=>Date.parse(b.createdAt||0)-Date.parse(a.createdAt||0));
+  }
 
+  async function saveWithdrawalRequests(requests) {
+    return syncWithdrawalRequestsToState(requests);
+  }
+
+  async function syncDepositRequestsToState(requests) {
+    const u = user();
+    if (!u || !App.state.depositRequests) return [];
+
+    const rows = requests.map(r => ({ ...r, userId: u.id, userEmail: u.email }));
+    if (App.isDatabaseMode?.() && window.AITradeXDB?.writeDepositRequest) {
+      for (const row of rows) await window.AITradeXDB.writeDepositRequest(row);
+    }
     App.state.depositRequests = App.state.depositRequests.filter(r => r.userId !== u.id);
-    requests.forEach(r => App.state.depositRequests.push({ ...r, userId: u.id }));
+    rows.forEach(row => App.state.depositRequests.push(row));
     App.saveState();
+    return rows;
   }
 
-  function syncWithdrawalRequestsToState(requests) {
+  async function syncWithdrawalRequestsToState(requests) {
     const u = user();
-    if (!u || !App.state.withdrawalRequests) return;
+    if (!u || !App.state.withdrawalRequests) return [];
 
+    const rows = requests.map(r => ({ ...r, userId: u.id, userEmail: u.email }));
+    if (App.isDatabaseMode?.() && window.AITradeXDB?.writeWithdrawalRequest) {
+      for (const row of rows) await window.AITradeXDB.writeWithdrawalRequest(row);
+    }
     App.state.withdrawalRequests = App.state.withdrawalRequests.filter(r => r.userId !== u.id);
-    requests.forEach(r => App.state.withdrawalRequests.push({ ...r, userId: u.id }));
+    rows.forEach(row => App.state.withdrawalRequests.push(row));
     App.saveState();
+    return rows;
   }
 
   function pendingDepositAmount() {
@@ -1485,9 +1682,9 @@
           <article><span>Pincode</span><b>${App.escapeHtml(kyc.personal.pincode || "-")}</b></article>
           <article><span>Document</span><b>Aadhaar Card</b></article>
           <article><span>Aadhaar No.</span><b>${App.escapeHtml(maskAadhaar(kyc.id.number))}</b></article>
-          <article><span>Aadhaar Front</span><b>${App.escapeHtml(kyc.uploads.frontName || "-")}</b></article>
-          <article><span>Aadhaar Back</span><b>${App.escapeHtml(kyc.uploads.backName || "-")}</b></article>
-          <article><span>Selfie</span><b>${App.escapeHtml(kyc.uploads.selfieName || "-")}</b></article>
+          <article><span>Aadhaar Front</span><b>${App.escapeHtml(uploadStatusText({ name: kyc.uploads.frontName, path: kyc.uploads.frontPath }, "-"))}</b>${fileViewLink({ url: kyc.uploads.frontUrl }, "View")}</article>
+          <article><span>Aadhaar Back</span><b>${App.escapeHtml(uploadStatusText({ name: kyc.uploads.backName, path: kyc.uploads.backPath }, "-"))}</b>${fileViewLink({ url: kyc.uploads.backUrl }, "View")}</article>
+          <article><span>Selfie</span><b>${App.escapeHtml(uploadStatusText({ name: kyc.uploads.selfieName, path: kyc.uploads.selfiePath }, "-"))}</b>${fileViewLink({ url: kyc.uploads.selfieUrl }, "View")}</article>
           ${kyc.submittedAt ? `<article><span>Submitted On</span><b>${new Date(kyc.submittedAt).toLocaleString()}</b></article>` : ""}
           ${kyc.approvedAt ? `<article><span>Approved On</span><b>${new Date(kyc.approvedAt).toLocaleString()}</b></article>` : ""}
           ${kyc.rejectedAt ? `<article><span>Rejected On</span><b>${new Date(kyc.rejectedAt).toLocaleString()}</b></article>` : ""}
@@ -1496,11 +1693,7 @@
   }
 
   function accountSwitch(compact = false) {
-    return `
-      <div class="account-segment ${compact ? "compact" : ""}" aria-label="Account mode">
-        <button class="${accountMode === "REAL" ? "active" : ""}" onclick="AITradeXUser.setAccountMode('REAL')">Real</button>
-        <button class="${accountMode === "DEMO" ? "active" : ""}" onclick="AITradeXUser.setAccountMode('DEMO')">Demo</button>
-      </div>`;
+    return "";
   }
 
   function userNotifications() {
@@ -1586,11 +1779,13 @@
           ${drawerItem({ pageKey: "kyc", icon: "🛡️", title: "KYC Verification", subtitle: "Required for verified withdrawals", badge: kycBadge })}
           ${drawerItem({ pageKey: "payments", icon: "🏦", title: "Bank Accounts", subtitle: "Approved payout methods", badge: bankBadge })}
           ${drawerItem({ pageKey: "notifications", icon: "🔔", title: "Notifications", subtitle: "Wallet, AI and support updates", badge: unread ? { label: `${unread} New`, tone: "warn" } : { label: "Clear", tone: "good" } })}
+          ${drawerItem({ pageKey: "security", icon: "🔐", title: "Security", subtitle: "Session, password and login safety", badge: { label: "Protected", tone: "good" } })}
         </div>
 
         <div class="drawer-group rich-group">
           <span>Growth</span>
           ${drawerItem({ pageKey: "subscription", icon: "⭐", title: "Subscription", subtitle: "AI trade limit and plan control", badge: planBadge })}
+          ${drawerItem({ pageKey: "ai-settings", icon: "🤖", title: "AI Settings", subtitle: "Auto trade amount and AI controls" })}
           ${drawerItem({ pageKey: "referral", icon: "🎁", title: "Referral", subtitle: "Invite friends and earn credits" })}
         </div>
 
@@ -1610,6 +1805,7 @@
       home: `<svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 11.2 12 4.7l7.5 6.5v7.6a1.7 1.7 0 0 1-1.7 1.7h-3.4v-5.8H9.6v5.8H6.2a1.7 1.7 0 0 1-1.7-1.7v-7.6Z"/><path d="M3 12.4 12 4l9 8.4"/></svg>`,
       trade: `<svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14"/><path d="M4.5 7.5 7 5l2.5 2.5"/><path d="M4.5 16.5 7 19l2.5-2.5"/><path d="M17 5v14"/><path d="M14.5 7.5 17 5l2.5 2.5"/><path d="M14.5 16.5 17 19l2.5-2.5"/></svg>`,
       orders: `<svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5h10a2 2 0 0 1 2 2v13H5v-13a2 2 0 0 1 2-2Z"/><path d="M9 3h6v4H9V3Z"/><path d="M8 11h8"/><path d="M8 15h8"/></svg>`,
+      positions: `<svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 6.8h15"/><path d="M7 4v5.5"/><path d="M17 4v5.5"/><path d="M4.5 17.2h15"/><path d="M10 14.5V20"/><path d="M14 14.5V20"/><path d="M8 12h8"/></svg>`,
       wallet: `<svg class="nav-svg wallet-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.7h15.2a2 2 0 0 1 2 2v8.1a2 2 0 0 1-2 2H4.8a2 2 0 0 1-2-2V6.9c0-1 .7-1.8 1.7-2l10.7-1.7c1-.2 1.9.6 1.9 1.6v2.9"/><path d="M16.1 12.2h5.1v4.3h-5.1a2.1 2.1 0 1 1 0-4.3Z"/><path d="M16.3 14.4h.1"/><path d="M6.4 7.5 15.1 6"/></svg>`,
       history: `<svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.6 11.2a7.6 7.6 0 1 1 2.2 6.1"/><path d="M4 6.5v4.9h4.9"/><path d="M12 8v4.4l3 1.8"/></svg>`
     };
@@ -1620,7 +1816,7 @@
     const nav = [
       ["home", "Home"],
       ["trade", "Trade"],
-      ["orders", "Orders"],
+      ["positions", "Positions"],
       ["wallet", "Wallet"],
       ["history", "History"]
     ];
@@ -1763,7 +1959,7 @@
         </section>
 
         <section class="landing-grid landing-feature-grid">
-          <article><i>📈</i><h3>Manual Trading</h3><p>Place market or limit orders, lock entry price, track live P/L and close positions from the Orders flow.</p></article>
+          <article><i>📈</i><h3>Manual Trading</h3><p>Place market or limit orders, lock entry price, track live P/L and close positions from the Positions flow.</p></article>
           <article><i>🤖</i><h3>AI Auto Trading</h3><p>AI trading starts ON with 75% allocation by default. Users can change allocation anytime.</p></article>
           <article><i>💳</i><h3>INR Wallet</h3><p>Deposit requests, bank-only withdrawals, wallet ledger and admin approval flow are built in.</p></article>
         </section>
@@ -1856,13 +2052,17 @@
       .filter(t => t.userId === u.id)
       .sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0))
       .slice(0, 4)
-      .forEach(t => rows.push({
-        icon: t.tradeType === "AI_AUTO" ? "🤖" : "📈",
-        title: `${t.tradeType === "AI_AUTO" ? "AI" : "Manual"} ${t.status || "Trade"}`,
-        detail: `${t.pair || "Trade"} · ${Number(t.pnl || 0) >= 0 ? "+" : ""}${App.money(Number(t.pnl || 0))}`,
-        time: t.createdAt,
-        page: "orders"
-      }));
+      .forEach(t => {
+        const type = aiTradeTypeOf(t);
+        const label = type === "AI_AUTO" ? "AI Instant" : type === "AI_LIVE" ? "AI Live" : "Manual";
+        rows.push({
+          icon: type.startsWith("AI_") ? "🤖" : "📈",
+          title: `${label} ${t.status || "Trade"}`,
+          detail: `${t.pair || "Trade"} · ${Number(t.pnl || 0) >= 0 ? "+" : ""}${App.money(Number(t.pnl || 0))}`,
+          time: t.createdAt || t.openedAt || t.closedAt,
+          page: "positions"
+        });
+      });
     return rows
       .sort((a, b) => Date.parse(b.time || 0) - Date.parse(a.time || 0))
       .slice(0, limit);
@@ -1900,7 +2100,7 @@
         title: "AI Auto",
         value: ai.enabled ? "Active" : "OFF",
         ok: !!ai.enabled,
-        page: "home"
+        page: "ai-settings"
       }
     ];
   }
@@ -1908,10 +2108,10 @@
   function dashboardHeroCard({ balance, pnl, activeManualCount, activeAiCount }) {
     const unread = userUnreadNotifications();
     const totalActive = Number(activeManualCount || 0) + Number(activeAiCount || 0);
-    const modeLabel = accountMode === "REAL" ? "Real Account" : "Demo Account";
-    const modeHint = accountMode === "REAL" ? "Real wallet selected" : "Practice balance selected";
+    const modeLabel = "Account";
+    const modeHint = "Wallet ready";
     return `
-      <section class="user-command-hero clean-home-hero ${accountMode.toLowerCase()}">
+      <section class="user-command-hero clean-home-hero real">
         <div class="hero-glow-orb"></div>
         <div class="hero-mode-row">
           <span class="hero-mode-chip">${modeLabel}</span>
@@ -1925,11 +2125,6 @@
             <b>${App.money(balance)}</b>
             <em class="${pnl >= 0 ? "profit-text" : "loss-text"}">${pnl >= 0 ? "+" : ""}${App.money(pnl)} today</em>
           </div>
-        </div>
-        <div class="user-command-actions premium-hero-actions">
-          <button onclick="AITradeXUser.go('trade')">Trade Now</button>
-          <button onclick="AITradeXUser.go('wallet')">${accountMode === "REAL" ? "Add Funds" : "Wallet"}</button>
-          <button onclick="AITradeXUser.go('orders')">${totalActive ? `View ${totalActive} Position${totalActive > 1 ? "s" : ""}` : "View Orders"}</button>
         </div>
         <div class="user-command-meta clean-home-meta">
           <article><span>Manual</span><b>${activeManualCount}</b></article>
@@ -1966,7 +2161,7 @@
       : !bankReady
         ? { title: "Add bank account", detail: "Approved bank account is required for payout requests.", page: "payments", cta: "Add Bank" }
         : !ai.enabled
-          ? { title: "Turn on AI Auto Trading", detail: "AI is OFF. Turn it ON from dashboard controls.", page: "home", cta: "AI Control" }
+          ? { title: "Turn on AI Auto Trading", detail: "AI is OFF. Turn it ON from AI Settings.", page: "ai-settings", cta: "AI Settings" }
           : { title: "Ready for trading", detail: `${usage.used}/${usage.limit} AI trades used today.`, page: "trade", cta: "Open Trade" };
     return `
       <section class="premium-card dashboard-action-center">
@@ -2016,7 +2211,7 @@
       <section class="compact-grid home-summary-grid polished-home-summary clean-home-summary">
         <article><span>AI Status</span><b>${ai.enabled ? "Active" : "OFF"}</b><small>${usage.used}/${usage.limit} AI trades today</small></article>
         <article><span>Active Positions</span><b>${activeTotal}</b><small>${activeManualCount} manual · ${activeAiCount} AI</small></article>
-        <article><span>Real Wallet</span><b>${App.money(real)}</b><small>${accountMode === "REAL" ? "Selected" : "Switch to Real for wallet"}</small></article>
+        <article><span>Wallet</span><b>${App.money(real)}</b><small>Available balance</small></article>
         <article><span>Selected Pair</span><b>${selectedPair}</b><small>${pair.signal} bias</small></article>
       </section>
 
@@ -2027,12 +2222,12 @@
           <div>
             <p>QUICK ACTIONS</p>
             <h2>Everything in one tap</h2>
-            <span>Trade, check orders, manage wallet or raise support quickly.</span>
+            <span>Trade, track positions, manage wallet or raise support quickly.</span>
           </div>
         </div>
         <div class="quick-action-grid">
           <button onclick="AITradeXUser.go('trade')"><i>📈</i><b>Trade</b><span>Crypto market</span></button>
-          <button onclick="AITradeXUser.go('orders')"><i>📋</i><b>Orders</b><span>Positions</span></button>
+          <button onclick="AITradeXUser.go('positions')"><i>📊</i><b>Positions</b><span>Open trades</span></button>
           <button onclick="AITradeXUser.go('wallet')"><i>💳</i><b>Wallet</b><span>Deposit / Withdraw</span></button>
           <button onclick="AITradeXUser.go('support')"><i>🎧</i><b>Support</b><span>Tickets</span></button>
         </div>
@@ -2050,9 +2245,30 @@
         </div>
       </section>
 
-      <section class="premium-card auto-card polished-auto-card clean-ai-control-card">
+      <section class="premium-card ai-settings-mini-card clean-ai-settings-summary">
         <div class="card-row">
-          <div><p>AI TRADE CONTROL</p><h2>Auto Trade Amount</h2><h4>Choose how much real balance AI can use for future automatic trades.</h4></div>
+          <div><p>AI SETTINGS</p><h2>${ai.enabled ? "AI Auto Trading ON" : "AI Auto Trading OFF"}</h2><h4>${usage.used}/${usage.limit} AI auto trades used today · Allocation ${ai.percent}% · Pool ${App.money(tradeAmount)}</h4></div>
+          <button class="change-pair-btn" onclick="AITradeXUser.go('ai-settings')">Manage</button>
+        </div>
+      </section>
+    `);
+    refreshVisiblePrices([selectedPair]);
+  }
+
+  function aiSettingsPage() {
+    const ai = currentAiSettings();
+    const usage = aiDailyUsage();
+    const balance = realBalance();
+    const tradeAmount = balance * Number(ai.percent || 0) / 100;
+
+    shell(`
+      <section class="premium-card auto-card polished-auto-card clean-ai-control-card ai-settings-page-card">
+        <div class="card-row">
+          <div>
+            <p>AI SETTINGS</p>
+            <h2>Auto Trade Control</h2>
+            <h4>Manage AI auto trading and choose how much wallet balance AI can use for future automatic trades.</h4>
+          </div>
           <button class="ai-power ${ai.enabled ? "on" : ""}" onclick="AITradeXUser.toggleAutoTrade()">${ai.enabled ? "ON" : "OFF"}</button>
         </div>
         <div class="percent-grid">
@@ -2066,8 +2282,16 @@
         ${!ai.enabled ? `<div class="ai-status-banner off"><b>AI Auto Trading is OFF.</b><span>Turn it ON to receive AI auto trades.</span></div>` : ""}
         ${ai.enabled && isAiLimitComplete() ? `<div class="ai-status-banner limit"><b>Daily AI trade limit completed.</b><span>Upgrade your plan to unlock more AI auto trades.</span><button onclick="AITradeXUser.go('subscription')">Upgrade Plan</button></div>` : ""}
       </section>
+
+      <section class="premium-card dashboard-action-center ai-settings-help-card">
+        <div>
+          <p>AI CONTROL NOTE</p>
+          <h2>Home stays clean now</h2>
+          <h4>AI settings are kept here, while Home shows only account summary and quick actions.</h4>
+        </div>
+        <button class="ghost-action" onclick="AITradeXUser.go('home')">Back Home</button>
+      </section>
     `);
-    refreshVisiblePrices([selectedPair]);
   }
 
   function tradePage() {
@@ -2087,7 +2311,7 @@
           <span data-price-card="${tradeIsActive ? "true" : "false"}" data-live-pair="${pair.pair}" data-live-type="line">${pair.price} · <em class="${tradeIsActive ? changeClass(pair.change) : "upcoming-text"}">${pair.change}</em></span>
         </div>
         <div class="trade-hero-side">
-          <span class="trade-mode-badge ${accountMode.toLowerCase()}">${accountMode} Account</span>
+          <span class="trade-mode-badge account-only">Account</span>
           ${usdtRateChip("trade-rate-chip")}
           <button class="change-pair-btn" onclick="AITradeXUser.openSheet('pair')">Change Pair</button>
         </div>
@@ -2115,8 +2339,15 @@
         `; }).join("")}
       </section>
 
-      <section class="chart-shell tradingview-shell">
-        <div class="chart-toolbar working-timeframes">
+      <section class="chart-shell tradingview-shell premium-native-chart-shell">
+        <div class="native-chart-head">
+          <div>
+            <p>LIVE CHART</p>
+            <h3>${displayPair(selectedPair)}</h3>
+          </div>
+          <span class="native-chart-price" data-price-card="${tradeIsActive ? "true" : "false"}" data-live-pair="${pair.pair}" data-live-type="line">${pair.price} · <em class="${tradeIsActive ? changeClass(pair.change) : "upcoming-text"}">${pair.change}</em></span>
+        </div>
+        <div class="chart-toolbar working-timeframes native-timeframe-row">
           ${[
             ["1", "1m"],
             ["5", "5m"],
@@ -2128,8 +2359,12 @@
           ].map(([value, label]) => `<button class="${chartInterval === value ? "active" : ""}" onclick="AITradeXUser.setChartInterval('${value}')">${label}</button>`).join("")}
           <button class="chart-settings-btn" onclick="AITradeXUser.openSheet('chart-settings')">⚙</button>
         </div>
-        <div class="responsive-chart tradingview-widget-frame">
+        <div class="responsive-chart tradingview-widget-frame native-chart-frame">
           <div id="tradingview_chart_container" class="tradingview-chart-container"></div>
+        </div>
+        <div class="native-chart-foot">
+          <span>TradingView market chart</span>
+          <b>${chartToolbar ? "Tools on" : "Clean mode"}</b>
         </div>
       </section>
 
@@ -2138,7 +2373,7 @@
           <div>
             <p>ORDER TICKET</p>
             <h2>${displayPair(selectedPair)}</h2>
-            <span>${accountMode} Account · ${tradeOrderType === "LIMIT" ? "Limit" : "Market"} Order</span>
+            <span>${tradeOrderType === "LIMIT" ? "Limit" : "Market"} Order</span>
           </div>
           <span class="ticket-chip">${tradeIsActive ? selectedMarket : "UPCOMING"}</span>
         </div>
@@ -2160,10 +2395,10 @@
         <div class="compact-trade-summary top-action-summary">
           <span><b>Margin</b>${App.money(tradeAmountPreview)}</span>
           <span><b>Position</b>${App.money(positionSize)}</span>
-          <span><b>Mode</b>${accountMode}</span>
+          <span><b>Leverage</b>${leverageValue}x</span>
         </div>
 
-        ${marginWarning ? `<div class="order-warning-bar compact">Margin is higher than available ${accountMode} balance. Reduce amount before placing trade.</div>` : ""}
+        ${marginWarning ? `<div class="order-warning-bar compact">Insufficient balance. Please reduce the amount or add funds.</div>` : ""}
 
         <div class="compact-ticket-grid after-action-fields">
           <label>Amount
@@ -2198,43 +2433,41 @@
         </div>
 
         <details class="compact-risk-details">
-          <summary>Advanced TP/SL Options</summary>
+          <summary>Order Risk Note</summary>
           <div class="risk-preset-row compact">
-            <span>No TP/SL</span><span>Safe</span><span>Balanced</span><span>High Risk</span>
+            <span>Manual close</span><span>Admin close</span><span>Live P/L</span><span>Ledger on close</span>
           </div>
-          <div class="form-row compact-risk-inputs">
-            <label>Take Profit Optional<input placeholder="TP price"/></label>
-            <label>Stop Loss Optional<input placeholder="SL price"/></label>
-          </div>
+          <div class="limit-order-note compact"><b>TP/SL hidden:</b> automatic take-profit/stop-loss is not enabled in this build, so orders remain open until user/admin close or limit cancellation.</div>
           ${tradeOrderType === "LIMIT" ? `<div class="limit-order-note compact"><b>Limit order:</b> BUY triggers at or below your price. SELL triggers at or above your price.</div>` : ""}
         </details>
       </section>
 
-      <section class="premium-card market-feed-card">
-        <div class="card-row">
-          <div><p>MARKET FEED</p><h2>${tradeIsActive ? "Crypto Depth" : "Upcoming Market"}</h2></div>
+      <section class="premium-card market-feed-card clean-market-insight-card">
+        <div class="card-row compact-market-head">
+          <div><p>MARKET FEED</p><h2>${tradeIsActive ? "Market Depth" : "Upcoming Market"}</h2></div>
           <span class="mini-live ${tradeIsActive ? "" : "soon"}">${tradeIsActive ? "LIVE" : "SOON"}</span>
         </div>
-        <div class="depth-table pair-market-feed">
-          <span>Metric</span><span>Value</span><span>Signal</span>
-          ${marketFeedForPair().map(row => `
-            <b>${row.left}</b>
-            <b>${row.mid}</b>
-            <b class="${row.mood === "up" ? "profit-text" : "loss-text"}">${row.right}</b>
+        <div class="market-insight-row">
+          ${marketFeedForPair().slice(0, 3).map(row => `
+            <article>
+              <span>${row.left}</span>
+              <b>${row.mid}</b>
+              <em class="${row.mood === "up" ? "profit-text" : "loss-text"}">${row.right}</em>
+            </article>
           `).join("")}
         </div>
       </section>
 
-      <section class="premium-card trade-feed-card">
-        <div class="card-row">
-          <div><p>TRADE FEED</p><h2>${selectedPair} Activity</h2></div>
-          <span class="history-mode">${tradeIsActive ? selectedMarket : "UPCOMING"}</span>
+      <section class="premium-card trade-feed-card clean-trade-feed-card">
+        <div class="card-row compact-market-head">
+          <div><p>TRADE FEED</p><h2>${displayPair(selectedPair)} Activity</h2></div>
+          <button class="change-pair-btn small" onclick="AITradeXUser.go('history')">View More</button>
         </div>
-        <div class="trade-feed-list">
-          ${tradeFeedForMarket().map(item => `
+        <div class="trade-feed-list compact-trade-feed-list">
+          ${tradeFeedForMarket().slice(0, 2).map(item => `
             <article class="${item.pair === selectedPair ? "active" : ""}">
               <div>
-                <b>${item.pair}</b>
+                <b>${displayPair(item.pair)}</b>
                 <span>${item.action} · ${item.lev} · ${item.time}</span>
               </div>
               <div>
@@ -2252,25 +2485,6 @@
     scheduleTradingViewChart();
   }
   function walletPage() {
-    if (accountMode === "DEMO") {
-      shell(`
-        <section class="demo-wallet-center">
-          <div class="demo-wallet-card">
-            <div class="demo-wallet-icon">🧪</div>
-            <p>DEMO ACCOUNT MODE</p>
-            <h1>You are now in Demo Account Mode</h1>
-            <h4>Deposit and withdrawal features are not available in demo mode. Demo balance is only for practice trading.</h4>
-            <div class="demo-wallet-balance">
-              <span>Demo Balance</span>
-              <b>${App.money(demoBalance())}</b>
-            </div>
-            <button onclick="AITradeXUser.setAccountMode('REAL')">Switch to Real Account</button>
-          </div>
-        </section>
-      `);
-      return;
-    }
-
     depositStep = Math.min(3, Math.max(1, Number(depositStep || 1)));
     withdrawalStep = Math.min(3, Math.max(1, Number(withdrawalStep || 1)));
     const kyc = currentKyc();
@@ -2279,7 +2493,9 @@
     const withdrawals = withdrawalRequests();
     const settings = platformSettings();
     const minDeposit = Number(settings.minDeposit || 500);
+    const maxDeposit = Number(settings.maxDeposit || 1000000);
     const minWithdrawal = Number(settings.minWithdrawal || 1000);
+    const maxWithdrawal = Number(settings.maxWithdrawal || 500000);
     const selectedWithdrawalMethod = approvedMethods.find(m => m.id === withdrawalDraft.methodId) || approvedMethods[0] || null;
     const platformUpi = settings.depositUpiId || "aitradex@upi";
     const bankDetails = {
@@ -2288,8 +2504,10 @@
       accountNumber: settings.depositAccountNumber || "123456789012",
       ifsc: settings.depositIfsc || "AITX0001234"
     };
-    const upiDepositEnabled = settings.depositUpiEnabled !== false;
-    const bankDepositEnabled = settings.depositBankEnabled !== false;
+    const depositMasterEnabled = settings.depositEnabled !== false && settings.maintenanceMode !== true;
+    const withdrawalMasterEnabled = settings.withdrawalEnabled !== false && settings.maintenanceMode !== true;
+    const upiDepositEnabled = depositMasterEnabled && settings.depositUpiEnabled !== false;
+    const bankDepositEnabled = depositMasterEnabled && settings.depositBankEnabled !== false;
     const enabledDepositTypes = [
       ...(upiDepositEnabled ? ["UPI"] : []),
       ...(bankDepositEnabled ? ["BANK"] : [])
@@ -2324,21 +2542,21 @@
           <div>
             <p>FAST DEPOSIT</p>
             <h2>${depositStep === 1 ? "Amount & Method" : depositStep === 2 ? "Payment Details" : "Review Deposit"}</h2>
-            <span>Step ${depositStep}/3 · Minimum ${App.money(minDeposit)}</span>
+            <span>Step ${depositStep}/3 · ${App.money(minDeposit)} - ${App.money(maxDeposit)}</span>
           </div>
           <b class="wallet-mini-badge">${depositDraft.type || "UPI"}</b>
         </div>
 
         ${!depositMethodsAvailable ? `
           <div class="kyc-required-box deposit-disabled-box">
-            Deposit methods are temporarily disabled by admin. Please try again later or contact support.
+            Deposit is temporarily disabled by admin. Please try again later or contact support.
           </div>
         ` : ""}
 
         ${depositMethodsAvailable && depositStep === 1 ? `
           <div class="wallet-two-col">
             <label>Deposit Amount
-              <input id="depositAmountInput" type="number" min="${minDeposit}" value="${App.escapeHtml(depositDraft.amount)}" placeholder="Minimum ${App.money(minDeposit)}"/>
+              <input id="depositAmountInput" type="number" min="${minDeposit}" max="${maxDeposit}" value="${App.escapeHtml(depositDraft.amount)}" placeholder="${App.money(minDeposit)} - ${App.money(maxDeposit)}"/>
             </label>
             <div class="wallet-method-choice compact-method-choice premium-method-pills">
               ${upiDepositEnabled ? `<button class="${depositDraft.type === "UPI" ? "active" : ""}" onclick="AITradeXUser.setDepositType('UPI')">
@@ -2405,11 +2623,14 @@
           <div>
             <p>FAST WITHDRAWAL</p>
             <h2>${withdrawalStep === 1 ? "Amount" : withdrawalStep === 2 ? "Approved Bank" : "Review Withdrawal"}</h2>
-            <span>Step ${withdrawalStep}/3 · Minimum ${App.money(minWithdrawal)}</span>
+            <span>Step ${withdrawalStep}/3 · ${App.money(minWithdrawal)} - ${App.money(maxWithdrawal)}</span>
           </div>
           <b class="wallet-mini-badge danger">Bank Payout</b>
         </div>
-        ${kyc.status !== "APPROVED" ? `
+        ${!withdrawalMasterEnabled ? `
+          <div class="kyc-required-box">Withdrawal is temporarily disabled by admin.</div>
+          <button class="save-profile-btn" onclick="AITradeXUser.go('support')">Contact Support</button>
+        ` : kyc.status !== "APPROVED" ? `
           <div class="kyc-required-box">KYC approval is required before withdrawal.</div>
           <button class="save-profile-btn" onclick="AITradeXUser.go('kyc')">Go to KYC</button>
         ` : approvedMethods.length === 0 ? `
@@ -2418,7 +2639,7 @@
         ` : `
           ${withdrawalStep === 1 ? `
             <label>Withdrawal Amount
-              <input id="withdrawalAmountInput" type="number" min="${minWithdrawal}" value="${App.escapeHtml(withdrawalDraft.amount)}" placeholder="Minimum ${App.money(minWithdrawal)}"/>
+              <input id="withdrawalAmountInput" type="number" min="${minWithdrawal}" max="${maxWithdrawal}" value="${App.escapeHtml(withdrawalDraft.amount)}" placeholder="${App.money(minWithdrawal)} - ${App.money(maxWithdrawal)}"/>
             </label>
             <div class="profile-note">Available balance: ${App.money(availableRealBalance())}. Pending withdrawals are not included in available balance.</div>
           ` : ""}
@@ -2454,9 +2675,9 @@
       <section class="premium-card wallet-action-panel history-panel">
         <div class="wallet-panel-head">
           <div>
-            <p>WALLET HISTORY</p>
+            <p>WALLET RECORDS</p>
             <h2>Requests & Ledger</h2>
-            <span>Deposit, withdrawal and balance movement records</span>
+            <span>Deposit, withdrawal and balance movement records in one clean place.</span>
           </div>
           <b class="wallet-mini-badge">${requestFiltered.length} Requests</b>
         </div>
@@ -2505,7 +2726,7 @@
         <div class="wallet-hero-glow"></div>
         <div class="wallet-hero-content">
           <div>
-            <p>REAL WALLET</p>
+            <p>WALLET</p>
             <h1>${App.money(availableRealBalance())}</h1>
             <span>Available balance · ${statusPill(kyc.status)}</span>
             ${usdtRateChip("wallet-rate-chip")}
@@ -2522,10 +2743,10 @@
           <i>＋</i><b>Deposit</b><span>Add funds with UPI or bank</span>
         </button>
         <button class="${activePanel === "WITHDRAWAL" ? "active" : ""}" onclick="AITradeXUser.setWalletMode('WITHDRAWAL')">
-          <i>↗</i><b>Withdrawal</b><span>Send balance to approved bank</span>
+          <i>↗</i><b>Withdraw</b><span>Send balance to approved bank</span>
         </button>
         <button class="${activePanel === "HISTORY" ? "active" : ""}" onclick="AITradeXUser.setWalletMode('HISTORY')">
-          <i>≡</i><b>History</b><span>Requests and wallet ledger</span>
+          <i>≡</i><b>Requests</b><span>Requests and ledger</span>
         </button>
       </section>
 
@@ -2581,7 +2802,6 @@
 
   function aiPositionCard(position) {
     const pnl = aiPositionPnl(position);
-    const targetType = String(position.targetType || "PROFIT").toUpperCase();
     return ordersRowShell({
       kind: "AI",
       className: "ai-row",
@@ -2591,7 +2811,8 @@
       metaHtml: `
         <span>${Number(position.leverage || 1)}x</span>
         <span>AI Amount ${App.money(position.marginAmount || 0)}</span>
-        <span>Target ${targetType} ${Number(position.targetPercent || 0)}%</span>`,
+        <span>Max Loss ${App.money(aiLiveMarginAmount(position))}</span>
+        <span>Position ${App.money(aiLiveSafeExposure(position))}</span>`,
       priceHtml: `
         <span>Entry <b>${App.escapeHtml(position.entryPriceDisplay || String(position.entryPrice || "--"))}</b></span>
         <span>Live <b data-ai-current="${position.id}">${App.escapeHtml(positionCurrentDisplay(position))}</b></span>`,
@@ -2616,7 +2837,7 @@
         <span>${rule} ${App.escapeHtml(order.limitPriceDisplay || order.limitPrice || "-")}</span>`,
       priceHtml: `
         <span>Limit <b>${App.escapeHtml(order.limitPriceDisplay || order.limitPrice || "-")}</b></span>
-        <span>Live <b data-live-pair="${App.escapeHtml(order.pair || "")}" data-live-type="price">${App.escapeHtml(positionCurrentDisplay({ pair: order.pair, entryPrice: order.limitPrice }))}</b></span>`,
+        <span>Live <b data-live-pair="${App.escapeHtml(order.pair || "")}" data-live-type="price">${App.escapeHtml(pendingOrderLiveDisplay(order))}</b></span>`,
       pnlHtml: `<strong class="pending-text">Pending</strong>`,
       amountHtml: `<small>Waiting trigger</small>`,
       actionHtml: `<button class="orders-pill-action cancel" onclick="AITradeXUser.cancelPendingOrder('${order.id}')">Cancel</button>`
@@ -2647,11 +2868,11 @@
     const totalLivePnl = livePnl + aiLivePnl;
 
     shell(`
-      <section class="orders-app-hero">
+      <section class="orders-app-hero positions-app-hero">
         <div>
-          <p>ORDERS & POSITIONS</p>
-          <h2>Open trades, AI positions and pending orders</h2>
-          <span>Compact real-app view for quick tracking and action.</span>
+          <p>POSITIONS</p>
+          <h2>Open trades and running positions</h2>
+          <span>Manual trades, AI live positions and pending limit orders in one clean view.</span>
         </div>
         <button class="orders-hero-action" onclick="AITradeXUser.go('trade')">New Trade</button>
       </section>
@@ -2668,7 +2889,7 @@
         <div class="orders-app-head">
           <div>
             <p>POSITION BOOK</p>
-            <h2>${activeTab === "ALL" ? "All Active Orders" : `${activeTab.charAt(0)}${activeTab.slice(1).toLowerCase()} Orders`}</h2>
+            <h2>${activeTab === "ALL" ? "All Positions" : `${activeTab.charAt(0)}${activeTab.slice(1).toLowerCase()} Positions`}</h2>
           </div>
           <span>${filteredRows.length} item${filteredRows.length === 1 ? "" : "s"}</span>
         </div>
@@ -2680,7 +2901,7 @@
           `).join("")}
         </div>
         <div class="orders-app-list">
-          ${filteredRows.length ? filteredRows.map(row => row.html).join("") : `<div class="empty-state">No ${activeTab === "ALL" ? "active orders" : activeTab.toLowerCase()} records right now.</div>`}
+          ${filteredRows.length ? filteredRows.map(row => row.html).join("") : `<div class="empty-state">No ${activeTab === "ALL" ? "active positions" : activeTab.toLowerCase()} records right now.</div>`}
         </div>
       </section>
     `);
@@ -2734,9 +2955,7 @@
   }
 
   function historyFilteredRows() {
-    const aiRows = tradeRows("AI_AUTO")
-      .filter(t => String(t.status || "").toUpperCase() === "CLOSED")
-      .map(t => normalizeHistoryRow(t, "AI"));
+    const aiRows = aiClosedRows().map(t => normalizeHistoryRow(t, "AI"));
     const manualRows = tradeRows("MANUAL")
       .filter(t => String(t.status || "").toUpperCase() === "CLOSED")
       .map(t => normalizeHistoryRow(t, "MANUAL"));
@@ -2807,7 +3026,7 @@
   }
 
   function historyPage() {
-    const aiRows = tradeRows("AI_AUTO").filter(t => String(t.status || "").toUpperCase() === "CLOSED").map(t => normalizeHistoryRow(t, "AI"));
+    const aiRows = aiClosedRows().map(t => normalizeHistoryRow(t, "AI"));
     const manualRows = tradeRows("MANUAL").filter(t => String(t.status || "").toUpperCase() === "CLOSED").map(t => normalizeHistoryRow(t, "MANUAL"));
     const allRows = [...aiRows, ...manualRows].sort((a, b) => b.sortTime - a.sortTime);
     const filteredRows = historyFilteredRows();
@@ -2830,8 +3049,8 @@
       <section class="history-real-hero">
         <div>
           <p>TRADE HISTORY</p>
-          <h2>Closed trades in one clean timeline</h2>
-          <span>Manual and AI trades stay together, searchable and easy to review.</span>
+          <h2>Completed trades</h2>
+          <span>Manual and AI results in a searchable, easy-to-review timeline.</span>
         </div>
         <button onclick="AITradeXUser.go('wallet')">View Wallet Ledger</button>
       </section>
@@ -2840,7 +3059,7 @@
         ${historyStatCard("Total P/L", `${stats.totalPnl >= 0 ? "+" : ""}${App.money(stats.totalPnl)}`, `${allRows.length} closed trades`, stats.totalPnl >= 0 ? "profit" : "loss")}
         ${historyStatCard("Win Rate", `${stats.winRate}%`, `${stats.wins} profit trades`, "")}
         ${historyStatCard("Best Trade", `${stats.best >= 0 ? "+" : ""}${App.money(stats.best)}`, "Highest closed P/L", stats.best >= 0 ? "profit" : "loss")}
-        ${historyStatCard("Account", App.escapeHtml(accountMode), "Current account mode", "")}
+        ${historyStatCard("Account", "Active", "Single account", "")}
       </section>
 
       <section class="history-real-card">
@@ -2977,15 +3196,15 @@
             <label class="upload-box inline-upload">
               <span>Aadhaar Front Image</span>
               <input id="kycFront" type="file" accept="image/*,.pdf"/>
-              <b>${App.escapeHtml(kyc.uploads.frontName || "Upload clear front side")}</b>
+              <b>${App.escapeHtml(uploadStatusText({ name: kyc.uploads.frontName, path: kyc.uploads.frontPath }, "Upload clear front side"))}</b>
             </label>
             <label class="upload-box inline-upload">
               <span>Aadhaar Back Image</span>
               <input id="kycBack" type="file" accept="image/*,.pdf"/>
-              <b>${App.escapeHtml(kyc.uploads.backName || "Upload clear back side")}</b>
+              <b>${App.escapeHtml(uploadStatusText({ name: kyc.uploads.backName, path: kyc.uploads.backPath }, "Upload clear back side"))}</b>
             </label>
           </div>
-          <div class="profile-note">Aadhaar number must be exactly 12 digits. Front and back images are required for admin review.</div>
+          <div class="profile-note">Aadhaar number must be exactly 12 digits. Front and back images upload to Supabase Storage for admin review.</div>
         ` : ""}
 
         ${kycStep === 3 ? `
@@ -2995,7 +3214,7 @@
             <label class="upload-box">
               <span>Selfie Image</span>
               <input id="kycSelfie" type="file" accept="image/*"/>
-              <b>${App.escapeHtml(kyc.uploads.selfieName || "Upload clear selfie")}</b>
+              <b>${App.escapeHtml(uploadStatusText({ name: kyc.uploads.selfieName, path: kyc.uploads.selfiePath }, "Upload clear selfie"))}</b>
             </label>
           </div>
           <label class="kyc-check-row">
@@ -3118,7 +3337,7 @@
         <div>
           <p>SUBSCRIPTION</p>
           <h1>${App.escapeHtml(plan.name || "Free")}</h1>
-          <span>${usage.used}/${usage.limit} AI auto trades used today · Real Wallet ${App.money(balance)}</span>
+          <span>${usage.used}/${usage.limit} AI auto trades used today · Wallet ${App.money(balance)}</span>
         </div>
         <button onclick="AITradeXUser.go('wallet')">Add Balance</button>
       </section>
@@ -3135,7 +3354,7 @@
       </section>
 
       <section class="premium-card subscription-history-card">
-        <div class="card-row"><div><p>SUBSCRIPTION HISTORY</p><h2>Plan Purchases</h2></div><span class="history-mode">Real Wallet</span></div>
+        <div class="card-row"><div><p>SUBSCRIPTION HISTORY</p><h2>Plan Purchases</h2></div><span class="history-mode">Wallet</span></div>
         ${history.length ? `<div class="subscription-history-list">${history.map(row => `
           <article>
             <div><b>${App.escapeHtml(row.planName || row.planId)}</b><span>${new Date(row.createdAt).toLocaleString("en-IN")}</span></div>
@@ -3193,7 +3412,7 @@
         <article><span>Total Invited</span><b>${stats.totalInvited}</b><small>Registered users</small></article>
         <article><span>Deposit Bonus</span><b>${App.money(stats.depositBonus)}</b><small>${settings.referralDepositPercent || 0}% auto credit</small></article>
         <article><span>Subscription Bonus</span><b>${App.money(stats.subscriptionBonus)}</b><small>${settings.referralSubscriptionPercent || 0}% auto credit</small></article>
-        <article><span>Total Earned</span><b>${App.money(stats.totalBonus)}</b><small>Real wallet credited</small></article>
+        <article><span>Total Earned</span><b>${App.money(stats.totalBonus)}</b><small>Wallet credited</small></article>
       </section>
 
       <section class="premium-card">
@@ -3202,7 +3421,7 @@
           <article><span>First Deposit Bonus</span><b>${settings.referralDepositEnabled === false ? "Disabled" : `${Number(settings.referralDepositPercent || 0)}%`}</b></article>
           <article><span>Subscription Bonus</span><b>${settings.referralSubscriptionEnabled === false ? "Disabled" : `${Number(settings.referralSubscriptionPercent || 0)}%`}</b></article>
           <article><span>Credit Type</span><b>Automatic</b></article>
-          <article><span>Wallet</span><b>Real Balance</b></article>
+          <article><span>Wallet</span><b>Available Balance</b></article>
         </div>
       </section>
 
@@ -3251,7 +3470,7 @@
         </div>
         <div class="profile-form compact-inner-form">
           <label>Display Name<input id="profileNameInput" value="${App.escapeHtml(savedName)}" placeholder="Your display name"/></label>
-          <label>Avatar Image<input id="profileAvatarInput" type="file" accept="image/*"/></label>
+          <label>Avatar Image<input id="profileAvatarInput" type="file" accept="image/*"/><small>Uploads to user-avatars bucket when Supabase Storage is ready.</small></label>
           <button class="save-profile-btn" onclick="AITradeXUser.saveProfile()">Save Profile</button>
         </div>
       </section>
@@ -3261,8 +3480,72 @@
         <div class="profile-info-grid compact-info-grid">
           <article><span>Email</span><b>${App.escapeHtml(u.email)}</b></article>
           <article><span>Mobile</span><b>${App.escapeHtml(u.mobile || "-")}</b></article>
-          <article><span>Account Mode</span><b>${accountMode}</b></article>
           <article><span>Referral Code</span><b>${App.escapeHtml(u.referralCode || "-")}</b></article>
+        </div>
+      </section>
+    `);
+  }
+
+
+  function sessionMinutesLeft() {
+    const ms = App.sessionTimeLeft ? App.sessionTimeLeft() : 0;
+    return Math.max(0, Math.ceil(ms / 60000));
+  }
+
+  function securityTimelineRows() {
+    const u = user();
+    const rows = [];
+    if (u?.createdAt) rows.push({ label: "Account created", value: new Date(u.createdAt).toLocaleString(), tone: "good" });
+    if (u?.lastLoginAt) rows.push({ label: "Last login", value: new Date(u.lastLoginAt).toLocaleString(), tone: "good" });
+    rows.push({ label: "Session expiry", value: `${sessionMinutesLeft()} min left`, tone: sessionMinutesLeft() <= 30 ? "warn" : "good" });
+    rows.push({ label: "Login protection", value: "6 wrong attempts = 10 min lock", tone: "neutral" });
+    return rows;
+  }
+
+  function securityPage() {
+    const u = user();
+    const minutes = sessionMinutesLeft();
+    const timeline = securityTimelineRows();
+    shell(`
+      <section class="inner-hero-card security-hero-card">
+        <div>
+          <p>ACCOUNT SECURITY</p>
+          <h1>Keep your AITradeX account safe</h1>
+          <span>Session, password and login protection for this device.</span>
+        </div>
+        <span class="history-mode">${minutes} min left</span>
+      </section>
+
+      <section class="inner-status-strip security-status-strip">
+        <article><span>Session</span><b>${minutes} min</b></article>
+        <article><span>Login Lock</span><b>6 Attempts</b></article>
+        <article><span>Account</span><b>${App.escapeHtml(String(u?.status || "ACTIVE"))}</b></article>
+      </section>
+
+      <section class="premium-card security-control-card">
+        <div class="card-row"><div><p>SESSION CONTROL</p><h2>Current login session</h2></div><button class="mini-action" onclick="AITradeXUser.extendSession()">Extend Session</button></div>
+        <div class="profile-info-grid compact-info-grid">
+          <article><span>Signed in as</span><b>${App.escapeHtml(u?.email || "-")}</b></article>
+          <article><span>Role</span><b>User</b></article>
+          <article><span>Session time left</span><b>${minutes} min</b></article>
+          <article><span>Auto logout</span><b>After 24 hours</b></article>
+        </div>
+      </section>
+
+      <section class="premium-card security-password-card">
+        <div class="card-row"><div><p>PASSWORD</p><h2>Change password</h2></div><span class="history-mode">Protected</span></div>
+        <div class="profile-form compact-inner-form security-form-grid">
+          <label>Current Password<input id="securityCurrentPassword" type="password" placeholder="Current password" autocomplete="current-password"/></label>
+          <label>New Password<input id="securityNewPassword" type="password" placeholder="Minimum 4 characters" autocomplete="new-password"/></label>
+          <label>Confirm New Password<input id="securityConfirmPassword" type="password" placeholder="Repeat new password" autocomplete="new-password"/></label>
+          <button class="save-profile-btn" onclick="AITradeXUser.changePassword()">Update Password</button>
+        </div>
+      </section>
+
+      <section class="premium-card security-timeline-card">
+        <div class="card-row"><div><p>SECURITY TIMELINE</p><h2>Recent account safety</h2></div><button class="ghost-action" onclick="AITradeXUser.logout()">Logout</button></div>
+        <div class="security-timeline-list">
+          ${timeline.map(row => `<article class="security-timeline-row ${row.tone}"><span>${App.escapeHtml(row.label)}</span><b>${App.escapeHtml(row.value)}</b></article>`).join("")}
         </div>
       </section>
     `);
@@ -3422,25 +3705,27 @@
 
   function render() {
     if (App.reloadState) App.reloadState();
-    reconcileUserAiLiveMarginLocks();
+    reconcileUserAiLiveMarginLocks().catch(err => console.warn("User AI live margin reconcile failed", err));
     ensurePairForMarket();
     const u = user();
     if (!u || u.role !== "user") return landing();
 
     if (page === "home") return homePage();
     if (page === "pnl") {
-      page = "orders";
+      page = "positions";
       localStorage.setItem("AITradeX_ACTIVE_PAGE", page);
     }
     if (page === "trade") return tradePage();
-    if (page === "orders") return ordersPage();
+    if (page === "positions" || page === "orders") return ordersPage();
     if (page === "wallet") return walletPage();
     if (page === "history") return historyPage();
     if (page === "kyc") return kycPage();
     if (page === "payments") return paymentPage();
     if (page === "subscription") return subscriptionPage();
+    if (page === "ai-settings") return aiSettingsPage();
     if (page === "referral") return referralPage();
     if (page === "profile") return profilePage();
+    if (page === "security") return securityPage();
     if (page === "support") return supportPage();
     if (page === "notifications") return notificationPage();
     return homePage();
@@ -3455,10 +3740,10 @@
     scrollAuth() {
       document.getElementById("authBox")?.scrollIntoView({ behavior: "smooth" });
     },
-    register(event) {
+    async register(event) {
       event.preventDefault();
       try {
-        Auth.registerUser({
+        await Auth.registerUser({
           name: regName.value,
           email: regEmail.value,
           mobile: regMobile.value,
@@ -3474,10 +3759,10 @@
         App.toast(err.message);
       }
     },
-    login(event) {
+    async login(event) {
       event.preventDefault();
       try {
-        Auth.loginUser({ email: loginEmail.value, password: loginPassword.value });
+        await Auth.loginUser({ email: loginEmail.value, password: loginPassword.value });
         page = "home";
         localStorage.setItem("AITradeX_ACTIVE_PAGE", page);
         App.toast("Logged in successfully.");
@@ -3611,8 +3896,8 @@
       }
     },
     setAccountMode(mode) {
-      accountMode = mode === "DEMO" ? "DEMO" : "REAL";
-      localStorage.setItem("AITradeX_ACCOUNT_MODE", accountMode);
+      accountMode = "REAL";
+      localStorage.setItem("AITradeX_ACCOUNT_MODE", "REAL");
       render();
     },
     setWalletMode(mode) {
@@ -3659,7 +3944,12 @@
     nextDepositStep() {
       const settings = platformSettings();
       const minDeposit = Number(settings.minDeposit || 500);
+      const maxDeposit = Number(settings.maxDeposit || 1000000);
       const depositType = depositDraft.type === "BANK" ? "BANK" : "UPI";
+      if (settings.depositEnabled === false || settings.maintenanceMode === true) {
+        App.toast("Deposit is temporarily disabled by admin.");
+        return;
+      }
       if ((depositType === "UPI" && settings.depositUpiEnabled === false) || (depositType === "BANK" && settings.depositBankEnabled === false)) {
         App.toast("Selected deposit method is currently disabled.");
         return;
@@ -3669,6 +3959,10 @@
         const amount = Number(document.getElementById("depositAmountInput")?.value || 0);
         if (!amount || amount < minDeposit) {
           App.toast(`Minimum deposit is ${App.money(minDeposit)}.`);
+          return;
+        }
+        if (amount > maxDeposit) {
+          App.toast(`Maximum deposit is ${App.money(maxDeposit)}.`);
           return;
         }
         depositDraft.amount = amount;
@@ -3697,18 +3991,23 @@
       localStorage.setItem("AITradeX_DEPOSIT_STEP", String(depositStep));
       render();
     },
-    submitDepositRequest() {
+    async submitDepositRequest() {
       const settings = platformSettings();
       const amount = Number(depositDraft.amount || 0);
       const minDeposit = Number(settings.minDeposit || 500);
+      const maxDeposit = Number(settings.maxDeposit || 1000000);
       const depositType = depositDraft.type === "BANK" ? "BANK" : "UPI";
+      if (settings.depositEnabled === false || settings.maintenanceMode === true) {
+        App.toast("Deposit is temporarily disabled by admin.");
+        return;
+      }
       const utr = normalizeUtr(depositDraft.utr);
       if ((depositType === "UPI" && settings.depositUpiEnabled === false) || (depositType === "BANK" && settings.depositBankEnabled === false)) {
         App.toast("Selected deposit method is currently disabled.");
         return;
       }
-      if (!amount || amount < minDeposit || !/^\d{12}$/.test(utr)) {
-        App.toast("Complete deposit details with exactly 12 digit UTR.");
+      if (!amount || amount < minDeposit || amount > maxDeposit || !/^\d{12}$/.test(utr)) {
+        App.toast(`Deposit amount must be between ${App.money(minDeposit)} and ${App.money(maxDeposit)} with exactly 12 digit UTR.`);
         return;
       }
       if (isDuplicateDepositUtr(utr)) {
@@ -3727,8 +4026,8 @@
         createdAt: new Date().toISOString(),
         rejectReason: ""
       });
-      saveDepositRequests(requests);
-      App.addNotification?.({ audience: "ADMIN", title: "New deposit request", message: `${displayName()} requested ${App.money(amount)} deposit. UTR ${utr}.`, type: "DEPOSIT", linkPage: "deposits", referenceId: requestId });
+      await saveDepositRequests(requests);
+      await App.addNotificationAsync?.({ audience: "ADMIN", title: "New deposit request", message: `${displayName()} requested ${App.money(amount)} deposit. UTR ${utr}.`, type: "DEPOSIT", linkPage: "deposits", referenceId: requestId });
 
       depositDraft = { amount: "", type: settings.depositUpiEnabled !== false ? "UPI" : "BANK", utr: "" };
       depositStep = 1;
@@ -3743,8 +4042,14 @@
       render();
     },
     nextWithdrawalStep() {
-      const minWithdrawal = Number(platformSettings().minWithdrawal || 1000);
+      const settings = platformSettings();
+      const minWithdrawal = Number(settings.minWithdrawal || 1000);
+      const maxWithdrawal = Number(settings.maxWithdrawal || 500000);
       const approved = approvedPaymentMethods();
+      if (settings.withdrawalEnabled === false || settings.maintenanceMode === true) {
+        App.toast("Withdrawal is temporarily disabled by admin.");
+        return;
+      }
 
       if (currentKyc().status !== "APPROVED") {
         App.toast("KYC approval required.");
@@ -3760,6 +4065,10 @@
         const amount = Number(document.getElementById("withdrawalAmountInput")?.value || 0);
         if (!amount || amount < minWithdrawal) {
           App.toast(`Minimum withdrawal is ${App.money(minWithdrawal)}.`);
+          return;
+        }
+        if (amount > maxWithdrawal) {
+          App.toast(`Maximum withdrawal is ${App.money(maxWithdrawal)}.`);
           return;
         }
         if (amount > availableRealBalance()) {
@@ -3787,10 +4096,17 @@
       localStorage.setItem("AITradeX_WITHDRAWAL_STEP", String(withdrawalStep));
       render();
     },
-    submitWithdrawalRequest() {
+    async submitWithdrawalRequest() {
+      const settings = platformSettings();
       const amount = Number(withdrawalDraft.amount || 0);
+      const minWithdrawal = Number(settings.minWithdrawal || 1000);
+      const maxWithdrawal = Number(settings.maxWithdrawal || 500000);
       const method = approvedPaymentMethods().find(m => m.id === withdrawalDraft.methodId) || approvedPaymentMethods()[0];
-      if (!amount || amount < 1000 || !method) {
+      if (settings.withdrawalEnabled === false || settings.maintenanceMode === true) {
+        App.toast("Withdrawal is temporarily disabled by admin.");
+        return;
+      }
+      if (!amount || amount < minWithdrawal || amount > maxWithdrawal || !method) {
         App.toast("Complete withdrawal details first.");
         return;
       }
@@ -3811,8 +4127,8 @@
         createdAt: new Date().toISOString(),
         rejectReason: ""
       });
-      saveWithdrawalRequests(requests);
-      App.addNotification?.({ audience: "ADMIN", title: "New withdrawal request", message: `${displayName()} requested ${App.money(amount)} withdrawal.`, type: "WITHDRAWAL", linkPage: "withdrawals", referenceId: requestId });
+      await saveWithdrawalRequests(requests);
+      await App.addNotificationAsync?.({ audience: "ADMIN", title: "New withdrawal request", message: `${displayName()} requested ${App.money(amount)} withdrawal.`, type: "WITHDRAWAL", linkPage: "withdrawals", referenceId: requestId });
 
       withdrawalDraft = { amount: "", methodId: "" };
       withdrawalStep = 1;
@@ -3821,13 +4137,13 @@
       App.toast("Withdrawal request submitted.");
       render();
     },
-    resubmitKyc() {
+    async resubmitKyc() {
       const kyc = currentKyc();
       kyc.status = "NOT_SUBMITTED";
       kyc.rejectReason = "";
       kyc.rejectedAt = "";
       kyc.approvedAt = "";
-      saveKycData(kyc);
+      await saveKycData(kyc);
       kycStep = 1;
       localStorage.setItem("AITradeX_KYC_STEP", "1");
       App.toast("You can resubmit KYC now.");
@@ -3843,7 +4159,7 @@
       localStorage.setItem("AITradeX_KYC_STEP", String(kycStep));
       render();
     },
-    saveKycStep() {
+    async saveKycStep() {
       const kyc = currentKyc();
       if (kyc.status === "PENDING" || kyc.status === "APPROVED") {
         App.toast("KYC already submitted.");
@@ -3874,8 +4190,31 @@
         kyc.id.number = digitsOnly(document.getElementById("kycAadhaar")?.value || "", 12);
         const front = document.getElementById("kycFront")?.files?.[0];
         const back = document.getElementById("kycBack")?.files?.[0];
-        if (front) kyc.uploads.frontName = front.name;
-        if (back) kyc.uploads.backName = back.name;
+        try {
+          if (front) {
+            App.toast("Uploading Aadhaar front...");
+            const uploaded = await uploadStorageFile({ bucket: "kyc-documents", folder: "aadhaar-front", label: "aadhaar-front", file: front });
+            kyc.uploads.frontName = uploaded.name;
+            kyc.uploads.frontPath = uploaded.path;
+            kyc.uploads.frontBucket = uploaded.bucket;
+            kyc.uploads.frontUrl = uploaded.url;
+            kyc.uploads.frontSize = uploaded.size;
+            kyc.uploads.frontType = uploaded.type;
+          }
+          if (back) {
+            App.toast("Uploading Aadhaar back...");
+            const uploaded = await uploadStorageFile({ bucket: "kyc-documents", folder: "aadhaar-back", label: "aadhaar-back", file: back });
+            kyc.uploads.backName = uploaded.name;
+            kyc.uploads.backPath = uploaded.path;
+            kyc.uploads.backBucket = uploaded.bucket;
+            kyc.uploads.backUrl = uploaded.url;
+            kyc.uploads.backSize = uploaded.size;
+            kyc.uploads.backType = uploaded.type;
+          }
+        } catch (err) {
+          App.toast(`KYC document upload failed: ${err.message || err}`);
+          return;
+        }
         if (!/^\d{12}$/.test(kyc.id.number)) {
           App.toast("Please enter a valid 12-digit Aadhaar number.");
           return;
@@ -3892,7 +4231,21 @@
 
       if (kycStep === 3) {
         const selfie = document.getElementById("kycSelfie")?.files?.[0];
-        if (selfie) kyc.uploads.selfieName = selfie.name;
+        try {
+          if (selfie) {
+            App.toast("Uploading selfie...");
+            const uploaded = await uploadStorageFile({ bucket: "kyc-documents", folder: "selfies", label: "selfie", file: selfie });
+            kyc.uploads.selfieName = uploaded.name;
+            kyc.uploads.selfiePath = uploaded.path;
+            kyc.uploads.selfieBucket = uploaded.bucket;
+            kyc.uploads.selfieUrl = uploaded.url;
+            kyc.uploads.selfieSize = uploaded.size;
+            kyc.uploads.selfieType = uploaded.type;
+          }
+        } catch (err) {
+          App.toast(`Selfie upload failed: ${err.message || err}`);
+          return;
+        }
         kyc.declarationAccepted = !!document.getElementById("kycDeclaration")?.checked;
         if (!kyc.uploads.selfieName) {
           App.toast("Selfie image is required.");
@@ -3904,12 +4257,12 @@
         }
       }
 
-      saveKycData(kyc);
+      await saveKycData(kyc);
       kycStep = Math.min(4, kycStep + 1);
       localStorage.setItem("AITradeX_KYC_STEP", String(kycStep));
       render();
     },
-    submitKyc() {
+    async submitKyc() {
       const kyc = currentKyc();
       kyc.finalAccepted = !!document.getElementById("kycFinalConfirm")?.checked;
       if (!kyc.personal.fullName || !kyc.personal.dob || !kyc.personal.gender || !kyc.personal.mobile || !kyc.personal.email || !kyc.personal.city || !kyc.personal.state || !/^\d{6}$/.test(String(kyc.personal.pincode || ""))) {
@@ -3938,11 +4291,12 @@
       kyc.rejectReason = "";
       kyc.rejectedAt = "";
       kyc.approvedAt = "";
-      saveKycData(kyc);
+      await saveKycData(kyc);
+      await App.notifyAsync?.({ audience: "ADMIN", title: "New KYC request", message: `${displayName()} submitted KYC for verification.`, type: "KYC", linkPage: "kyc", referenceId: `kyc_submit_${user()?.id || "user"}_${kyc.submittedAt}` });
       App.toast("KYC submitted for verification.");
       render();
     },
-    addBankMethod() {
+    async addBankMethod() {
       const kyc = currentKyc();
       if (kyc.status !== "APPROVED") {
         App.toast("KYC approval required.");
@@ -3971,8 +4325,9 @@
         return;
       }
 
-      methods.unshift({
-        id: `PM-${Date.now()}`,
+      const methodId = `PM-${Date.now()}`;
+      const bankMethod = {
+        id: methodId,
         type: "BANK",
         holderName: verifiedKycName(),
         bankName,
@@ -3981,8 +4336,10 @@
         accountType,
         status: "PENDING",
         createdAt: new Date().toISOString()
-      });
-      savePaymentMethods(methods);
+      };
+      methods.unshift(bankMethod);
+      await savePaymentMethods(methods);
+      await App.notifyAsync?.({ audience: "ADMIN", title: "New bank account request", message: `${displayName()} submitted ${bankName} bank account ending ${String(accountNumber).slice(-4)} for verification.`, type: "PAYMENT_METHOD", linkPage: "payments", referenceId: `pm_submit_${user()?.id || "user"}_${methodId}` });
       App.toast("Bank account submitted for verification.");
       render();
     },
@@ -4067,12 +4424,15 @@
     async placeManualTrade(side) {
       const u = user();
       if (!u) return;
+      const settings = platformSettings();
+      if (settings.maintenanceMode === true) { App.toast("Trading is paused during maintenance mode."); return; }
+      if (settings.manualTradingEnabled === false) { App.toast("Manual trading is currently disabled by admin."); return; }
       if (!isTradeActivePair(selectedPair)) {
         App.toast("This market is coming soon. Crypto trading is active now.");
         return;
       }
       const margin = Number(tradeAmountPreview || 0);
-      const leverage = Math.max(1, Number(tradeLeveragePreview || 1));
+      const leverage = Math.min(Number(settings.maxLeverage || 2000), Math.max(1, Number(tradeLeveragePreview || 1)));
       const normalizedSide = String(side || "BUY").toUpperCase() === "SELL" ? "SELL" : "BUY";
       const orderType = tradeOrderType === "LIMIT" ? "LIMIT" : "MARKET";
 
@@ -4080,6 +4440,9 @@
         App.toast("Enter valid margin amount.");
         return;
       }
+      if (margin < Number(settings.minManualTrade || 100)) { App.toast(`Minimum manual trade is ${App.money(settings.minManualTrade || 100)}.`); return; }
+      if (margin > Number(settings.maxManualTrade || 250000)) { App.toast(`Maximum manual trade is ${App.money(settings.maxManualTrade || 250000)}.`); return; }
+      if (manualOpenPositions().filter(p => p.accountType === accountMode).length >= Number(settings.maxOpenPositionsPerUser || 10)) { App.toast(`Maximum ${Number(settings.maxOpenPositionsPerUser || 10)} open positions allowed per user.`); return; }
       const availableMargin = availableForNewManualTrade();
       if (margin > availableMargin) {
         App.toast(`Available manual margin is ${App.money(availableMargin)}. Close a position or reduce amount.`);
@@ -4088,7 +4451,69 @@
 
       const tradeId = App.uid(orderType === "LIMIT" ? "lmt" : "trd");
       const pair = selectedPairData();
-      const marketNow = visiblePairCardPrice(selectedPair) || (App.getCachedPairPrice ? App.getCachedPairPrice(selectedPair) : null);
+      const marketNow = visiblePairCardPrice(selectedPair) || normalizeTradePriceRow(selectedPair, App.getCachedPairPrice ? App.getCachedPairPrice(selectedPair) : null);
+
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.openManualTradeSecure) {
+        try {
+          let entryPrice = 0;
+          let entryDisplay = "";
+          let limitPrice = 0;
+          let limitDisplay = "";
+          let priceSource = marketNow?.source || pair.priceSource || "Live price cache";
+          if (orderType === "LIMIT") {
+            const limitPriceDisplayInput = Number(tradeLimitPrice || 0);
+            limitPrice = limitInputToRaw(selectedPair, limitPriceDisplayInput);
+            if (!Number.isFinite(limitPrice) || limitPrice <= 0) {
+              App.toast("Enter valid limit price.");
+              return;
+            }
+            limitDisplay = formatPairPrice(selectedPair, limitPrice);
+            entryPrice = Number(marketNow?.rawPrice || marketNow?.price || pair.rawPrice || 0);
+            entryDisplay = marketNow?.display || pair.price || "--";
+            const directionError = limitOrderDirectionError(normalizedSide, limitPrice, entryPrice);
+            if (directionError) { App.toast(directionError); return; }
+          } else {
+            let lockedPrice = visiblePairCardPrice(selectedPair);
+            if (!lockedPrice) {
+              try { lockedPrice = App.getLivePairPrice ? await App.getLivePairPrice(selectedPair) : null; }
+              catch { lockedPrice = normalizeTradePriceRow(selectedPair, App.getCachedPairPrice ? App.getCachedPairPrice(selectedPair) : null); }
+            }
+            entryPrice = Number(lockedPrice?.rawPrice || lockedPrice?.price || pair.rawPrice || 0);
+            if (!Number.isFinite(entryPrice) || entryPrice <= 0) {
+              App.toast("Live entry price unavailable. Please try again.");
+              return;
+            }
+            entryDisplay = lockedPrice?.display || pair.price || String(entryPrice);
+            priceSource = lockedPrice?.source || pair.priceSource || "Live price cache";
+          }
+          await window.AITradeXDB.openManualTradeSecure({
+            tradeId,
+            userId: u.id,
+            accountType: normalizedAccountMode(accountMode),
+            orderType,
+            market: selectedMarket,
+            pair: selectedPair,
+            side: normalizedSide,
+            margin,
+            leverage,
+            entryPrice,
+            entryPriceDisplay: entryDisplay,
+            limitPrice,
+            limitPriceDisplay: limitDisplay,
+            priceSource
+          });
+          try { await window.AITradeXDB.loadAll?.(); } catch {}
+          resetTradeTicketAfterOrder(orderType === "LIMIT" ? "Limit order placed" : "Market order opened", orderType === "LIMIT" ? `${selectedPair} ${normalizedSide} limit placed at ${limitDisplay}.` : `${normalizedSide} ${selectedPair} opened at ${entryDisplay}.`);
+          page = "positions";
+          orderViewTab = orderType === "LIMIT" ? "PENDING" : "MANUAL";
+          localStorage.setItem("AITradeX_ACTIVE_PAGE", page);
+          localStorage.setItem("AITradeX_ORDER_VIEW_TAB", orderViewTab);
+          render();
+        } catch (error) {
+          App.toast(error.message || "Manual trade could not be opened.");
+        }
+        return;
+      }
 
       if (orderType === "LIMIT") {
         const limitPriceDisplayInput = Number(tradeLimitPrice || 0);
@@ -4097,10 +4522,21 @@
           App.toast("Enter valid limit price.");
           return;
         }
+        const currentForLimit = Number(marketNow?.rawPrice || marketNow?.price || pair.rawPrice || 0);
+        const directionError = limitOrderDirectionError(normalizedSide, limitPrice, currentForLimit);
+        if (directionError) { App.toast(directionError); return; }
+        let limitLedgerRow = null;
         try {
-          App.addLedger({
+          limitLedgerRow = App.isDatabaseMode?.() && App.addLedgerAsync ? await App.addLedgerAsync({
             userId: u.id,
-            accountType: accountMode,
+            accountType: normalizedAccountMode(accountMode),
+            type: "MANUAL_LIMIT_MARGIN_LOCK",
+            amount: -margin,
+            referenceId: tradeId,
+            note: `${selectedPair} manual ${normalizedSide} limit margin locked`
+          }) : App.addLedger({
+            userId: u.id,
+            accountType: normalizedAccountMode(accountMode),
             type: "MANUAL_LIMIT_MARGIN_LOCK",
             amount: -margin,
             referenceId: tradeId,
@@ -4114,14 +4550,14 @@
           id: tradeId,
           userId: u.id,
           tradeType: "MANUAL",
-          accountType: accountMode,
+          accountType: normalizedAccountMode(accountMode),
           orderType: "LIMIT",
           market: selectedMarket,
           pair: selectedPair,
           side: normalizedSide,
           limitPrice,
           limitPriceDisplay: formatPairPrice(selectedPair, limitPrice),
-          currentPriceAtOrder: Number(marketNow?.price || pair.rawPrice || 0),
+          currentPriceAtOrder: Number(marketNow?.rawPrice || marketNow?.price || pair.rawPrice || 0),
           currentPriceAtOrderDisplay: marketNow?.display || pair.price || "--",
           priceSource: marketNow?.source || pair.priceSource || "Live price cache",
           leverage,
@@ -4134,9 +4570,21 @@
           createdAt: new Date().toISOString(),
           createdDate: App.todayKey()
         };
+        try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeTrade) await window.AITradeXDB.writeTrade(order); }
+        catch (err) {
+          if (limitLedgerRow) {
+            try { await (App.addLedgerAsync ? App.addLedgerAsync({ userId: u.id, accountType: normalizedAccountMode(accountMode), type: "MANUAL_LIMIT_MARGIN_ROLLBACK", amount: margin, referenceId: `${tradeId}_rollback`, note: `Rollback: ${selectedPair} limit order save failed` }) : App.addLedger({ userId: u.id, accountType: normalizedAccountMode(accountMode), type: "MANUAL_LIMIT_MARGIN_ROLLBACK", amount: margin, referenceId: `${tradeId}_rollback`, note: `Rollback: ${selectedPair} limit order save failed` })); } catch {}
+          }
+          App.toast(`Trade save failed: ${err.message || err}`);
+          return;
+        }
         App.state.trades.unshift(order);
         App.saveState();
         resetTradeTicketAfterOrder("Limit order placed", `${selectedPair} ${normalizedSide} limit placed at ${order.limitPriceDisplay}.`);
+        page = "positions";
+        orderViewTab = "PENDING";
+        localStorage.setItem("AITradeX_ACTIVE_PAGE", page);
+        localStorage.setItem("AITradeX_ORDER_VIEW_TAB", orderViewTab);
         render();
         return;
       }
@@ -4146,18 +4594,26 @@
         try {
           lockedPrice = App.getLivePairPrice ? await App.getLivePairPrice(selectedPair) : null;
         } catch (error) {
-          lockedPrice = App.getCachedPairPrice ? App.getCachedPairPrice(selectedPair) : null;
+          lockedPrice = normalizeTradePriceRow(selectedPair, App.getCachedPairPrice ? App.getCachedPairPrice(selectedPair) : null);
         }
       }
-      const entryPrice = Number(lockedPrice?.price || pair.rawPrice || 0);
+      const entryPrice = Number(lockedPrice?.rawPrice || lockedPrice?.price || pair.rawPrice || 0);
       if (!Number.isFinite(entryPrice) || entryPrice <= 0) {
         App.toast("Live entry price unavailable. Please try again.");
         return;
       }
+      let marketLedgerRow = null;
       try {
-        App.addLedger({
+        marketLedgerRow = App.isDatabaseMode?.() && App.addLedgerAsync ? await App.addLedgerAsync({
           userId: u.id,
-          accountType: accountMode,
+          accountType: normalizedAccountMode(accountMode),
+          type: "MANUAL_TRADE_MARGIN_LOCK",
+          amount: -margin,
+          referenceId: tradeId,
+          note: `${selectedPair} manual ${normalizedSide} margin locked`
+        }) : App.addLedger({
+          userId: u.id,
+          accountType: normalizedAccountMode(accountMode),
           type: "MANUAL_TRADE_MARGIN_LOCK",
           amount: -margin,
           referenceId: tradeId,
@@ -4171,7 +4627,7 @@
         id: tradeId,
         userId: u.id,
         tradeType: "MANUAL",
-        accountType: accountMode,
+        accountType: normalizedAccountMode(accountMode),
         orderType: "MARKET",
         market: selectedMarket,
         pair: selectedPair,
@@ -4191,15 +4647,27 @@
         createdAt: new Date().toISOString(),
         createdDate: App.todayKey()
       };
+        try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeTrade) await window.AITradeXDB.writeTrade(trade); }
+      catch (err) {
+        if (marketLedgerRow) {
+          try { await (App.addLedgerAsync ? App.addLedgerAsync({ userId: u.id, accountType: normalizedAccountMode(accountMode), type: "MANUAL_TRADE_MARGIN_ROLLBACK", amount: margin, referenceId: `${tradeId}_rollback`, note: `Rollback: ${selectedPair} market trade save failed` }) : App.addLedger({ userId: u.id, accountType: normalizedAccountMode(accountMode), type: "MANUAL_TRADE_MARGIN_ROLLBACK", amount: margin, referenceId: `${tradeId}_rollback`, note: `Rollback: ${selectedPair} market trade save failed` })); } catch {}
+        }
+        App.toast(`Trade save failed: ${err.message || err}`);
+        return;
+      }
       App.state.trades.unshift(trade);
       App.saveState();
       resetTradeTicketAfterOrder("Market order opened", `${trade.side} ${selectedPair} opened at ${trade.entryPriceDisplay}.`);
+      page = "positions";
+      orderViewTab = "MANUAL";
+      localStorage.setItem("AITradeX_ACTIVE_PAGE", page);
+      localStorage.setItem("AITradeX_ORDER_VIEW_TAB", orderViewTab);
       render();
     },
     showAiManagedNotice() {
       App.toast("AI auto trades are managed by AI and cannot be closed manually.");
     },
-    closeManualLivePositions() {
+    async closeManualLivePositions() {
       const positions = manualOpenPositions();
       if (!positions.length) {
         App.toast("No manual position is active.");
@@ -4207,7 +4675,7 @@
       }
       if (positions.length === 1) {
         try {
-          settleManualPosition(positions[0], "USER_CLOSE");
+          await settleManualPosition(positions[0], "USER_CLOSE");
           App.toast("Manual position closed.");
           render();
         } catch (error) {
@@ -4222,7 +4690,7 @@
       manualCloseSelectorOpen = false;
       render();
     },
-    closeManualPositionById(positionId) {
+    async closeManualPositionById(positionId) {
       const target = manualOpenPositions().find(position => position.id === positionId);
       if (!target) {
         App.toast("Position not found.");
@@ -4231,7 +4699,7 @@
         return;
       }
       try {
-        settleManualPosition(target, "USER_CLOSE");
+        await settleManualPosition(target, "USER_CLOSE");
         manualCloseSelectorOpen = false;
         App.toast("Manual position closed.");
         render();
@@ -4239,32 +4707,62 @@
         App.toast(error.message || "Position close failed.");
       }
     },
-    cancelPendingOrder(orderId) {
+    async cancelPendingOrder(orderId) {
       const target = pendingManualOrders().find(order => order.id === orderId);
       if (!target) {
         App.toast("Pending order not found.");
         render();
         return;
       }
-      const margin = Math.max(0, Number(target.marginAmount || 0));
-      if (target.marginLocked && margin > 0) {
-        App.addLedger({
-          userId: user().id,
-          accountType: target.accountType || accountMode,
-          type: "MANUAL_LIMIT_MARGIN_RELEASE",
-          amount: margin,
-          referenceId: target.id,
-          note: `${target.pair} manual ${target.side} limit order cancelled · margin released`
-        });
-        target.marginReleased = true;
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.cancelManualLimitSecure) {
+        try {
+          await window.AITradeXDB.cancelManualLimitSecure({ tradeId: target.id, userId: user().id });
+          try { await window.AITradeXDB.loadAll?.(); } catch {}
+          App.toast("Pending limit order cancelled.");
+        } catch (err) {
+          App.toast(err.message || "Unable to cancel pending order.");
+        }
+        render();
+        return;
       }
-      target.status = "CANCELLED";
-      target.cancelledAt = new Date().toISOString();
-      App.saveState();
-      App.toast("Pending limit order cancelled.");
+      const margin = Math.max(0, Number(target.marginAmount || 0));
+      const previous = { ...target };
+      let releaseAdded = false;
+      try {
+        if (target.marginLocked && margin > 0) {
+          const row = App.addLedgerAsync ? await App.addLedgerAsync({
+            userId: user().id,
+            accountType: normalizedAccountMode(target.accountType || accountMode),
+            type: "MANUAL_LIMIT_MARGIN_RELEASE",
+            amount: margin,
+            referenceId: target.id,
+            note: `${target.pair} manual ${target.side} limit order cancelled · margin released`
+          }) : App.addLedger({
+            userId: user().id,
+            accountType: normalizedAccountMode(target.accountType || accountMode),
+            type: "MANUAL_LIMIT_MARGIN_RELEASE",
+            amount: margin,
+            referenceId: target.id,
+            note: `${target.pair} manual ${target.side} limit order cancelled · margin released`
+          });
+          releaseAdded = !!row;
+          target.marginReleased = true;
+        }
+        target.status = "CANCELLED";
+        target.cancelledAt = new Date().toISOString();
+        if (App.isDatabaseMode?.() && window.AITradeXDB?.writeTrade) await window.AITradeXDB.writeTrade(target);
+        App.saveState();
+        App.toast("Pending limit order cancelled.");
+      } catch (err) {
+        if (releaseAdded && margin > 0) {
+          try { await (App.addLedgerAsync ? App.addLedgerAsync({ userId: user().id, accountType: normalizedAccountMode(target.accountType || accountMode), type: "MANUAL_LIMIT_CANCEL_ROLLBACK", amount: -margin, referenceId: `${target.id}_cancel_rollback`, note: "Rollback: limit cancel save failed" }) : App.addLedger({ userId: user().id, accountType: normalizedAccountMode(target.accountType || accountMode), type: "MANUAL_LIMIT_CANCEL_ROLLBACK", amount: -margin, referenceId: `${target.id}_cancel_rollback`, note: "Rollback: limit cancel save failed" })); } catch {}
+        }
+        Object.assign(target, previous);
+        App.toast(err.message || "Unable to cancel pending order.");
+      }
       render();
     },
-    buyPlan(planId) {
+    async buyPlan(planId) {
       const u = user();
       const plan = App.planById(planId);
       if (!u || !plan) {
@@ -4281,48 +4779,66 @@
         return;
       }
       if (App.realBalance(u.id) < price) {
-        App.toast("Insufficient real wallet balance. Please deposit funds first.");
+        App.toast("Insufficient wallet balance. Please deposit funds first.");
         return;
       }
-      const ok = confirm(`Buy ${plan.name} for ${App.money(price)} from your real wallet?`);
+      const ok = confirm(`Buy ${plan.name} for ${App.money(price)} from your wallet?`);
       if (!ok) return;
       const subId = App.uid("sub");
-      const startedAt = new Date();
-      const durationDays = Math.max(0, Number(plan.durationDays || 30));
-      const expiresAt = durationDays ? new Date(startedAt.getTime() + durationDays * 86400000).toISOString() : "";
       try {
-        App.addLedger({
-          userId: u.id,
-          accountType: "REAL",
-          type: "SUBSCRIPTION_PURCHASE",
-          amount: -price,
-          referenceId: subId,
-          note: `${plan.name} subscription purchased`
-        });
-        (App.state.subscriptions || []).forEach(row => {
-          if (row.userId === u.id && row.status === "ACTIVE") {
-            row.status = "REPLACED";
-            row.replacedAt = new Date().toISOString();
-          }
-        });
-        if (!App.state.subscriptions) App.state.subscriptions = [];
-        App.state.subscriptions.unshift({
-          id: subId,
-          userId: u.id,
-          planId: plan.id,
-          planName: plan.name,
-          price,
-          aiTradeLimit: Number(plan.signals || 0),
-          signals: Number(plan.signals || 0),
-          durationDays,
-          status: "ACTIVE",
-          createdAt: startedAt.toISOString(),
-          startsAt: startedAt.toISOString(),
-          expiresAt,
-          ledgerReferenceId: subId
-        });
-        App.saveState();
-        App.creditReferralBonus?.({ referredUserId: u.id, eventType: "SUBSCRIPTION", amount: price, referenceId: subId, sourceLabel: plan.name });
+        if (App.isDatabaseMode?.() && window.AITradeXDB?.purchasePlanSecure) {
+          await window.AITradeXDB.purchasePlanSecure({ subscriptionId: subId, userId: u.id, planId: plan.id, source: "USER_PURCHASE" });
+          // Referral subscription bonus is now credited inside the secure backend RPC.
+          await window.AITradeXDB.loadAll?.();
+        } else {
+          const startedAt = new Date();
+          const durationDays = Math.max(0, Number(plan.durationDays || 30));
+          const expiresAt = durationDays ? new Date(startedAt.getTime() + durationDays * 86400000).toISOString() : "";
+          await (App.addLedgerAsync ? App.addLedgerAsync({
+            userId: u.id,
+            accountType: "REAL",
+            type: "SUBSCRIPTION_PURCHASE",
+            amount: -price,
+            referenceId: subId,
+            note: `${plan.name} subscription purchased`
+          }) : App.addLedger({
+            userId: u.id,
+            accountType: "REAL",
+            type: "SUBSCRIPTION_PURCHASE",
+            amount: -price,
+            referenceId: subId,
+            note: `${plan.name} subscription purchased`
+          }));
+          const changedSubscriptions = [];
+          (App.state.subscriptions || []).forEach(row => {
+            if (row.userId === u.id && row.status === "ACTIVE") {
+              row.status = "REPLACED";
+              row.replacedAt = new Date().toISOString();
+              changedSubscriptions.push(row);
+            }
+          });
+          if (!App.state.subscriptions) App.state.subscriptions = [];
+          const newSubscription = {
+            id: subId,
+            userId: u.id,
+            planId: plan.id,
+            planName: plan.name,
+            price,
+            amount: price,
+            aiTradeLimit: Number(plan.signals || 0),
+            signals: Number(plan.signals || 0),
+            durationDays,
+            status: "ACTIVE",
+            createdAt: startedAt.toISOString(),
+            startsAt: startedAt.toISOString(),
+            expiresAt,
+            ledgerReferenceId: subId
+          };
+          App.state.subscriptions.unshift(newSubscription);
+          App.saveState();
+          const referralResult = await (App.creditReferralBonusAsync ? App.creditReferralBonusAsync({ referredUserId: u.id, eventType: "SUBSCRIPTION", amount: price, referenceId: subId, sourceLabel: plan.name }) : Promise.resolve(App.creditReferralBonus?.({ referredUserId: u.id, eventType: "SUBSCRIPTION", amount: price, referenceId: subId, sourceLabel: plan.name })));
+          if (referralResult?.credited) console.info("Referral subscription bonus credited", referralResult);
+        }
         App.toast(`${plan.name} activated successfully.`);
         render();
       } catch (error) {
@@ -4337,7 +4853,7 @@
       render();
     },
     setAiHistoryPage(index) {
-      const rows = tradeRows("AI_AUTO").filter(t => String(t.status || "").toUpperCase() === "CLOSED");
+      const rows = aiClosedRows();
       const maxIndex = Math.max(0, rows.length - 1);
       aiHistoryPageIndex = Math.min(Math.max(0, Number(index || 0)), maxIndex);
       localStorage.setItem("AITradeX_AI_HISTORY_PAGE", String(aiHistoryPageIndex));
@@ -4374,17 +4890,17 @@
       else localStorage.removeItem("AITradeX_HISTORY_EXPANDED");
       render();
     },
-    setAutoPercent(value) {
+    async setAutoPercent(value) {
       const u = user();
       autoPercent = Number(value);
-      localStorage.setItem("AITradeX_AUTO_PERCENT", autoPercent);
       if (u) {
         u.aiTradePercent = autoPercent;
+        try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeUser) await window.AITradeXDB.writeUser(u); } catch (err) { App.toast(`AI setting save failed: ${err.message || err}`); return; }
         App.saveState();
       }
       render();
     },
-    toggleAutoTrade() {
+    async toggleAutoTrade() {
       const u = user();
       if (autoTradeOn) {
         aiOffConfirmOpen = true;
@@ -4392,10 +4908,10 @@
         return;
       }
       autoTradeOn = true;
-      localStorage.setItem("AITradeX_AUTO_ON", "true");
       if (u) {
         u.aiTradeOn = true;
         if (!u.aiTradePercent) u.aiTradePercent = autoPercent || 75;
+        try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeUser) await window.AITradeXDB.writeUser(u); } catch (err) { App.toast(`AI setting save failed: ${err.message || err}`); return; }
         App.saveState();
       }
       App.toast("AI Auto Trading turned on.");
@@ -4405,20 +4921,20 @@
       aiOffConfirmOpen = false;
       render();
     },
-    confirmAiOff() {
+    async confirmAiOff() {
       const u = user();
       aiOffConfirmOpen = false;
       autoTradeOn = false;
-      localStorage.setItem("AITradeX_AUTO_ON", "false");
       if (u) {
         u.aiTradeOn = false;
         if (!u.aiTradePercent) u.aiTradePercent = autoPercent || 75;
+        try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeUser) await window.AITradeXDB.writeUser(u); } catch (err) { App.toast(`AI setting save failed: ${err.message || err}`); return; }
         App.saveState();
       }
       App.toast("AI Auto Trading turned off.");
       render();
     },
-    createSupportTicket(event) {
+    async createSupportTicket(event) {
       event.preventDefault();
       const u = user();
       if (!u) return;
@@ -4431,7 +4947,7 @@
       }
       App.state.supportTickets = App.state.supportTickets || [];
       const id = App.uid("ticket");
-      App.state.supportTickets.unshift({
+      const ticket = {
         id,
         userId: u.id,
         userName: displayName(),
@@ -4444,13 +4960,48 @@
         replies: [],
         createdAt: App.now(),
         updatedAt: App.now()
-      });
+      };
+      App.state.supportTickets.unshift(ticket);
+      if (App.isDatabaseMode?.() && window.AITradeXDB?.writeSupportTicket) {
+        try { await window.AITradeXDB.writeSupportTicket(ticket); } catch (err) { App.toast(`Support ticket save failed: ${err.message || err}`); return; }
+      }
       App.addNotification?.({ audience: "ADMIN", title: "New support ticket", message: `${displayName()} opened: ${subject}`, type: "SUPPORT", linkPage: "support", referenceId: id });
       App.saveState();
       App.toast("Support ticket submitted.");
       render();
     },
-    saveProfile() {
+    extendSession() {
+      if (App.touchSession && App.touchSession()) {
+        App.toast("Session extended.");
+        render();
+      } else {
+        App.toast("Session expired. Please login again.");
+        App.clearSession();
+        landing();
+      }
+    },
+    async changePassword() {
+      const u = user();
+      if (!u) return;
+      const current = document.getElementById("securityCurrentPassword")?.value || "";
+      const next = document.getElementById("securityNewPassword")?.value || "";
+      const confirm = document.getElementById("securityConfirmPassword")?.value || "";
+      if (!window.AITradeXAuth?.verifyPassword) return App.toast("Secure password service is not loaded.");
+      const verification = await window.AITradeXAuth.verifyPassword(u, current);
+      if (!verification.ok) return App.toast("Current password is incorrect.");
+      if (String(next).length < 4) return App.toast("New password must be at least 4 characters.");
+      if (next !== confirm) return App.toast("New password confirmation does not match.");
+      try {
+        if (!window.AITradeXAuth?.setPassword) throw new Error("Secure password service is not loaded.");
+        await window.AITradeXAuth.setPassword(u, next, { updatedBy: "user" });
+        if (App.isDatabaseMode?.() && window.AITradeXDB?.writeUser) await window.AITradeXDB.writeUser(u);
+      } catch (err) { App.toast(`Password save failed: ${err.message || err}`); return; }
+      await App.addNotificationAsync?.({ audience: "USER", userId: u.id, title: "Password updated", message: "Your account password was changed successfully.", type: "SECURITY", linkPage: "security", referenceId: `password_${Date.now()}` });
+      App.saveState();
+      App.toast("Password updated successfully.");
+      render();
+    },
+    async saveProfile() {
       const u = user();
       if (!u) return;
 
@@ -4463,18 +5014,28 @@
         return;
       }
 
-      localStorage.setItem(`AITradeX_DISPLAY_NAME_${u.id}`, nextName);
+      u.name = nextName;
 
       const file = fileInput?.files?.[0];
       if (file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          localStorage.setItem(`AITradeX_AVATAR_${u.id}`, reader.result);
+        try {
+          App.toast("Uploading avatar...");
+          const uploaded = await uploadStorageFile({ bucket: "user-avatars", folder: "avatars", label: "avatar", file });
+          u.avatarName = uploaded.name;
+          u.avatarBucket = uploaded.bucket;
+          u.avatarPath = uploaded.path;
+          u.avatarUrl = uploaded.url;
+          u.avatarUploadedAt = uploaded.uploadedAt;
+          try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeUser) await window.AITradeXDB.writeUser(u); } catch (err) { App.toast(`Profile database update failed: ${err.message || err}`); return; }
+          App.saveState();
           App.toast("Profile updated.");
           render();
-        };
-        reader.readAsDataURL(file);
+        } catch (err) {
+          App.toast(`Avatar upload failed: ${err.message || err}`);
+        }
       } else {
+        try { if (App.isDatabaseMode?.() && window.AITradeXDB?.writeUser) await window.AITradeXDB.writeUser(u); } catch (err) { App.toast(`Profile database update failed: ${err.message || err}`); return; }
+        App.saveState();
         App.toast("Profile updated.");
         render();
       }
@@ -4488,12 +5049,24 @@
     }
   };
 
-  window.addEventListener("storage", event => {
-    if (event.key === (App.storageKey || "AITradeX_STATE_V1")) {
-      if (App.reloadState) App.reloadState();
-      render();
-    }
-  });
+  async function bootUserApp(){
+    try{
+      if(localStorage.getItem("AITradeX_NATIVE_CHART_POLISH") !== "1"){
+        localStorage.setItem("AITradeX_CHART_TOOLBAR", "false");
+        localStorage.setItem("AITradeX_CHART_THEME", "dark");
+        localStorage.setItem("AITradeX_NATIVE_CHART_POLISH", "1");
+      }
+      App.clearOldUiCache?.();
+      if(App.session?.userId && window.AITradeXDB?.ready){
+        await window.AITradeXDB.loadAll();
+      }
+    }catch(err){ console.warn("AITradeX user boot DB load skipped", err?.message||err); }
+    render();
+    try{
+      App.registerLiveSyncRenderer?.(()=>render(), "user");
+      App.startLiveSync?.({role:"user"});
+    }catch(err){ console.warn("User Live Sync Lite start skipped", err?.message||err); }
+  }
 
-  render();
+  bootUserApp();
 })();

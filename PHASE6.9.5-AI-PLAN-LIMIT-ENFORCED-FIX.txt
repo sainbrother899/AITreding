@@ -1,0 +1,15 @@
+AITradeX Phase 6.9.5 - AI Plan Limit Enforced Fix
+
+Base: ReferralBackendSecureFix pack.
+
+Fixes:
+1. Live AI Position now also respects the user's daily AI trade limit from plan/subscription.
+2. Instant AI Trade keeps using daily plan AI limit, with an additional last-second recheck before writing each trade.
+3. Live AI Position now rechecks daily AI limit immediately before opening each live position.
+4. Admin Live AI preview now shows plan-limit and max-open-position blocks separately.
+5. No UI redesign. No SQL required.
+
+Rule after this fix:
+- Plan AI Trades / Day applies to both Instant AI Trade and Live AI Position creation.
+- If a user has used the plan limit, admin AI trade will skip that user.
+- Manual user trades are separate and are not counted as plan AI trades.

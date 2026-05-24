@@ -1,0 +1,18 @@
+AITradeX Phase6.9 - RLS Readiness Pack
+
+What changed:
+- Added a safe RLS readiness audit SQL file.
+- Added a strict RLS final-lock template that is intentionally not for current testing mode.
+- Updated admin security copy and runtime labels to Phase6.9.
+- Kept the current UI/design and existing working frontend/testing flows unchanged.
+
+Important:
+- Do not run supabase-strict-rls-final-lock-template.sql on the current legacy-testing frontend app.
+- Strict production RLS needs Supabase Auth/Edge Functions fully active first.
+- You may run supabase-rls-readiness-audit.sql safely; it only reports status.
+
+Current production path:
+1. Test Phase6.8/6.9 flows fully.
+2. Move remaining direct browser writes to Edge Functions where needed.
+3. Link users to Supabase Auth auth_user_id.
+4. Then use strict RLS template after review.

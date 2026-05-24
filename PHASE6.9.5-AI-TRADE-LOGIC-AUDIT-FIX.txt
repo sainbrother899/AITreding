@@ -1,0 +1,22 @@
+AITradeX Phase 6.9.5 AI Trade Logic Audit Fix
+
+Base: AITradeX-Phase6.9.5-AiLiveClosePnlFix.zip
+
+Fixes included:
+1. Instant AI Trade execution now uses aiEligibilityReport() instead of aiLiveEligibilityReport().
+   - Before: Instant AI was incorrectly checking live-position max-open rules.
+   - Before: Instant AI could ignore the daily AI trade limit because it was using the live eligibility report.
+   - After: Instant AI checks AI ON, wallet pool, minimum balance, and daily AI trade limit only.
+
+2. Live Position Trade still uses aiLiveEligibilityReport().
+   - Live logic remains separate: AI ON, wallet pool, minimum balance, max open live positions.
+
+3. No UI/design/chart changes.
+4. No SQL required for this specific JS logic fix if the previous total_pnl SQL patch was already run.
+
+Test checklist:
+- Instant AI Trade should skip users whose daily AI trade limit is complete.
+- Instant AI Trade should not be blocked just because user has max live positions.
+- Live Position Trade should still respect max open live positions.
+- Instant AI creates closed AI_AUTO entries and wallet P/L immediately.
+- Live AI creates AI_LIVE open positions and settles on admin close.
