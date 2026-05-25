@@ -1,0 +1,46 @@
+AITradeX Phase 6.9.5 Wallet Clean Premium
+
+Base:
+- User uploaded AITradeX-Phase6.9.5-NativeChartCleanForce(1).zip
+
+Scope:
+- Wallet page only.
+- No SQL changes.
+- No admin, AI trade, cron, referral, plan, chart, login, or database logic changes.
+
+What changed:
+1. Wallet hero made compact:
+   - Available Balance
+   - Pending Deposit
+   - Pending Withdraw
+   - Latest request status
+
+2. Deposit / Withdraw / Records changed into simple banking-app style tabs.
+
+3. Deposit flow simplified:
+   - Amount
+   - UPI / Bank method
+   - Payment details / copy buttons
+   - 12-digit UTR
+   - Submit Deposit
+   Core submit logic is still the same.
+
+4. Withdraw flow simplified:
+   - Available balance
+   - Amount
+   - Approved bank selector
+   - Submit Withdraw
+   Core submit logic is still the same.
+
+5. Records split into:
+   - Requests
+   - Ledger
+   with compact filters and pagination.
+
+Files changed:
+- user-app.js
+- styles.css
+- index.html cache version only
+
+SQL:
+- No SQL required.

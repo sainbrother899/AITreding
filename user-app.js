@@ -28,6 +28,7 @@
   let walletRequestPage = Number(localStorage.getItem("AITradeX_WALLET_REQUEST_PAGE") || 0);
   let walletLedgerPage = Number(localStorage.getItem("AITradeX_WALLET_LEDGER_PAGE") || 0);
   let walletHistoryFilter = localStorage.getItem("AITradeX_WALLET_HISTORY_FILTER") || "ALL";
+  let walletRecordsTab = localStorage.getItem("AITradeX_WALLET_RECORDS_TAB") || "REQUESTS";
   let depositStep = Number(localStorage.getItem("AITradeX_DEPOSIT_STEP") || 1);
   let withdrawalStep = Number(localStorage.getItem("AITradeX_WITHDRAWAL_STEP") || 1);
   let depositDraft = readJson("AITradeX_DEPOSIT_DRAFT", { amount: "", type: "UPI", utr: "" });
@@ -2500,8 +2501,6 @@
     scheduleTradingViewChart();
   }
   function walletPage() {
-    depositStep = Math.min(3, Math.max(1, Number(depositStep || 1)));
-    withdrawalStep = Math.min(3, Math.max(1, Number(withdrawalStep || 1)));
     const kyc = currentKyc();
     const approvedMethods = approvedPaymentMethods();
     const deposits = depositRequests();
@@ -2519,6 +2518,7 @@
       accountNumber: settings.depositAccountNumber || "123456789012",
       ifsc: settings.depositIfsc || "AITX0001234"
     };
+
     const depositMasterEnabled = settings.depositEnabled !== false && settings.maintenanceMode !== true;
     const withdrawalMasterEnabled = settings.withdrawalEnabled !== false && settings.maintenanceMode !== true;
     const upiDepositEnabled = depositMasterEnabled && settings.depositUpiEnabled !== false;
@@ -2527,56 +2527,62 @@
       ...(upiDepositEnabled ? ["UPI"] : []),
       ...(bankDepositEnabled ? ["BANK"] : [])
     ];
+
     if (!enabledDepositTypes.includes(depositDraft.type)) {
       depositDraft.type = enabledDepositTypes[0] || "UPI";
       localStorage.setItem("AITradeX_DEPOSIT_DRAFT", JSON.stringify(depositDraft));
     }
+
     const depositMethodsAvailable = enabledDepositTypes.length > 0;
     const activePanel = ["DEPOSIT", "WITHDRAWAL", "HISTORY"].includes(walletMode) ? walletMode : "DEPOSIT";
-    const requestRows = [...deposits.map(r => ({ ...r, kind: "Deposit" })), ...withdrawals.map(r => ({ ...r, kind: "Withdrawal" }))]
+    const recordsTab = walletRecordsTab === "LEDGER" ? "LEDGER" : "REQUESTS";
+    const requestRows = [...deposits.map(r => ({ ...r, kind: "Deposit" })), ...withdrawals.map(r => ({ ...r, kind: "Withdraw" }))]
       .sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
+
     const requestFiltered = requestRows.filter(r => {
       const f = walletHistoryFilter;
       if (f === "ALL") return true;
       if (f === "DEPOSIT") return r.kind === "Deposit";
-      if (f === "WITHDRAWAL") return r.kind === "Withdrawal";
+      if (f === "WITHDRAWAL") return r.kind === "Withdraw";
       return String(r.status || "").toUpperCase() === f;
     });
-    const pageSize = 5;
+
+    const pageSize = 6;
     const requestTotalPages = Math.max(1, Math.ceil(requestFiltered.length / pageSize));
     walletRequestPage = Math.min(walletRequestPage, requestTotalPages - 1);
     const requestPageRows = requestFiltered.slice(walletRequestPage * pageSize, walletRequestPage * pageSize + pageSize);
+
     const ledgerRows = userWalletLedger(100);
     const ledgerTotalPages = Math.max(1, Math.ceil(ledgerRows.length / pageSize));
     walletLedgerPage = Math.min(walletLedgerPage, ledgerTotalPages - 1);
     const ledgerPageRows = ledgerRows.slice(walletLedgerPage * pageSize, walletLedgerPage * pageSize + pageSize);
 
+    const recentStatus = requestRows[0];
     const depositPanel = `
-      <section class="premium-card wallet-action-panel deposit-panel">
-        <div class="wallet-panel-head">
+      <section class="wallet-clean-card wallet-form-card">
+        <div class="wallet-clean-head">
           <div>
-            <p>FAST DEPOSIT</p>
-            <h2>${depositStep === 1 ? "Amount & Method" : depositStep === 2 ? "Payment Details" : "Review Deposit"}</h2>
-            <span>Step ${depositStep}/3 · ${App.money(minDeposit)} - ${App.money(maxDeposit)}</span>
+            <p>DEPOSIT</p>
+            <h2>Add funds</h2>
+            <span>${App.money(minDeposit)} - ${App.money(maxDeposit)} · Admin approval required</span>
           </div>
-          <b class="wallet-mini-badge">${depositDraft.type || "UPI"}</b>
+          <b>${depositDraft.type || "UPI"}</b>
         </div>
 
         ${!depositMethodsAvailable ? `
           <div class="kyc-required-box deposit-disabled-box">
             Deposit is temporarily disabled by admin. Please try again later or contact support.
           </div>
-        ` : ""}
-
-        ${depositMethodsAvailable && depositStep === 1 ? `
-          <div class="wallet-two-col">
-            <label>Deposit Amount
-              <input id="depositAmountInput" type="number" min="${minDeposit}" max="${maxDeposit}" value="${App.escapeHtml(depositDraft.amount)}" placeholder="${App.money(minDeposit)} - ${App.money(maxDeposit)}"/>
+          <button class="btn ghost" onclick="AITradeXUser.go('support')">Contact Support</button>
+        ` : `
+          <div class="wallet-clean-form-grid">
+            <label>Amount
+              <input id="depositAmountInput" type="number" min="${minDeposit}" max="${maxDeposit}" value="${App.escapeHtml(depositDraft.amount)}" placeholder="Enter deposit amount"/>
             </label>
-            <div class="wallet-method-choice compact-method-choice premium-method-pills">
+            <div class="wallet-method-choice wallet-clean-methods">
               ${upiDepositEnabled ? `<button class="${depositDraft.type === "UPI" ? "active" : ""}" onclick="AITradeXUser.setDepositType('UPI')">
                 <b>UPI / QR</b>
-                <span>Fast UPI payment</span>
+                <span>Fast payment</span>
               </button>` : ""}
               ${bankDepositEnabled ? `<button class="${depositDraft.type === "BANK" ? "active" : ""}" onclick="AITradeXUser.setDepositType('BANK')">
                 <b>Bank Transfer</b>
@@ -2584,185 +2590,158 @@
               </button>` : ""}
             </div>
           </div>
-          <div class="profile-note">Enter amount and choose how you want to pay. Payment details open on next step.</div>
-        ` : ""}
 
-        ${depositMethodsAvailable && depositStep === 2 ? `
-          ${depositDraft.type === "UPI" ? `
-            <div class="upi-pay-card wallet-upi-premium">
-              <div class="qr-large-box">
+          <div class="wallet-payment-box">
+            ${depositDraft.type === "UPI" ? `
+              <div class="wallet-qr-wrap">
                 ${settings.depositQrImage ? `<img src="${App.escapeHtml(settings.depositQrImage)}" alt="Deposit QR"/>` : `<div class="qr-grid-mark">QR</div>`}
               </div>
-              <div class="upi-pay-info">
-                <p>PAY VIA UPI</p>
-                <h2>${platformUpi}</h2>
-                <span>Pay exact amount: ${App.money(depositDraft.amount || 0)}</span>
+              <div class="wallet-pay-lines">
                 <div class="copy-row"><b>UPI ID</b><span>${platformUpi}</span><button onclick="AITradeXUser.copyText(${jsArg(platformUpi)})">Copy</button></div>
                 <div class="copy-row"><b>Amount</b><span>${App.money(depositDraft.amount || 0)}</span><button onclick="AITradeXUser.copyText(${jsArg(depositDraft.amount || 0)})">Copy</button></div>
               </div>
-            </div>
-          ` : `
-            <div class="premium-bank-card wallet-bank-premium">
-              <div class="copy-row"><b>Account Name</b><span>${bankDetails.accountName}</span><button onclick="AITradeXUser.copyText(${jsArg(bankDetails.accountName)})">Copy</button></div>
-              <div class="copy-row"><b>Bank Name</b><span>${bankDetails.bankName}</span><button onclick="AITradeXUser.copyText(${jsArg(bankDetails.bankName)})">Copy</button></div>
-              <div class="copy-row"><b>Account Number</b><span>${bankDetails.accountNumber}</span><button onclick="AITradeXUser.copyText(${jsArg(bankDetails.accountNumber)})">Copy</button></div>
-              <div class="copy-row"><b>IFSC Code</b><span>${bankDetails.ifsc}</span><button onclick="AITradeXUser.copyText(${jsArg(bankDetails.ifsc)})">Copy</button></div>
-              <div class="copy-row"><b>Amount</b><span>${App.money(depositDraft.amount || 0)}</span><button onclick="AITradeXUser.copyText(${jsArg(depositDraft.amount || 0)})">Copy</button></div>
-            </div>
-          `}
-          <label class="utr-premium-input">UTR / Transaction ID
-            <input id="depositUtrInput" type="text" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" value="${App.escapeHtml(normalizeUtr(depositDraft.utr))}" placeholder="Enter 12 digit UTR" oninput="this.value=this.value.replace(/\D/g,'').slice(0,12)"/>
-          </label>
-          <div class="profile-note">Only a unique 12 digit UTR is accepted. Duplicate UTR will be blocked.</div>
-        ` : ""}
-
-        ${depositMethodsAvailable && depositStep === 3 ? `
-          <div class="review-grid compact-review premium-review-strip">
-            <article><span>Amount</span><b>${App.money(depositDraft.amount || 0)}</b></article>
-            <article><span>Method</span><b>${depositDraft.type}</b></article>
-            <article><span>UTR</span><b>${App.escapeHtml(depositDraft.utr || "-")}</b></article>
-            <article><span>Status</span><b>Pending Approval</b></article>
+            ` : `
+              <div class="wallet-pay-lines bank-lines">
+                <div class="copy-row"><b>Account Name</b><span>${bankDetails.accountName}</span><button onclick="AITradeXUser.copyText(${jsArg(bankDetails.accountName)})">Copy</button></div>
+                <div class="copy-row"><b>Bank Name</b><span>${bankDetails.bankName}</span><button onclick="AITradeXUser.copyText(${jsArg(bankDetails.bankName)})">Copy</button></div>
+                <div class="copy-row"><b>Account Number</b><span>${bankDetails.accountNumber}</span><button onclick="AITradeXUser.copyText(${jsArg(bankDetails.accountNumber)})">Copy</button></div>
+                <div class="copy-row"><b>IFSC Code</b><span>${bankDetails.ifsc}</span><button onclick="AITradeXUser.copyText(${jsArg(bankDetails.ifsc)})">Copy</button></div>
+                <div class="copy-row"><b>Amount</b><span>${App.money(depositDraft.amount || 0)}</span><button onclick="AITradeXUser.copyText(${jsArg(depositDraft.amount || 0)})">Copy</button></div>
+              </div>
+            `}
           </div>
-        ` : ""}
 
-        ${depositMethodsAvailable ? `<div class="wizard-actions wallet-actions-row">
-          <button class="btn ghost" onclick="AITradeXUser.prevDepositStep()" ${depositStep === 1 ? "disabled" : ""}>Back</button>
-          ${depositStep < 3 ? `<button class="btn" onclick="AITradeXUser.nextDepositStep()">Next</button>` : `<button class="btn" onclick="AITradeXUser.submitDepositRequest()">Submit Deposit</button>`}
-        </div>` : `<div class="wizard-actions wallet-actions-row"><button class="btn ghost" onclick="AITradeXUser.go('support')">Contact Support</button></div>`}
+          <label class="wallet-clean-utr">UTR / Transaction ID
+            <input id="depositUtrInput" type="text" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" value="${App.escapeHtml(normalizeUtr(depositDraft.utr))}" placeholder="Enter 12 digit UTR" oninput="this.value=this.value.replace(/\\D/g,'').slice(0,12)"/>
+          </label>
+
+          <div class="wallet-submit-strip">
+            <span>Submit after payment. Duplicate UTR will be blocked.</span>
+            <button class="btn" onclick="AITradeXUser.submitCleanDepositRequest()">Submit Deposit</button>
+          </div>
+        `}
       </section>
     `;
 
     const withdrawalPanel = `
-      <section class="premium-card wallet-action-panel withdraw-panel">
-        <div class="wallet-panel-head">
+      <section class="wallet-clean-card wallet-form-card">
+        <div class="wallet-clean-head">
           <div>
-            <p>FAST WITHDRAWAL</p>
-            <h2>${withdrawalStep === 1 ? "Amount" : withdrawalStep === 2 ? "Approved Bank" : "Review Withdrawal"}</h2>
-            <span>Step ${withdrawalStep}/3 · ${App.money(minWithdrawal)} - ${App.money(maxWithdrawal)}</span>
+            <p>WITHDRAW</p>
+            <h2>Bank payout</h2>
+            <span>${App.money(minWithdrawal)} - ${App.money(maxWithdrawal)} · Approved bank required</span>
           </div>
-          <b class="wallet-mini-badge danger">Bank Payout</b>
+          <b>Bank</b>
         </div>
+
         ${!withdrawalMasterEnabled ? `
           <div class="kyc-required-box">Withdrawal is temporarily disabled by admin.</div>
-          <button class="save-profile-btn" onclick="AITradeXUser.go('support')">Contact Support</button>
+          <button class="btn ghost" onclick="AITradeXUser.go('support')">Contact Support</button>
         ` : kyc.status !== "APPROVED" ? `
           <div class="kyc-required-box">KYC approval is required before withdrawal.</div>
-          <button class="save-profile-btn" onclick="AITradeXUser.go('kyc')">Go to KYC</button>
+          <button class="btn" onclick="AITradeXUser.go('kyc')">Go to KYC</button>
         ` : approvedMethods.length === 0 ? `
           <div class="kyc-required-box">No approved bank account found. Add a bank account and wait for admin approval.</div>
-          <button class="save-profile-btn" onclick="AITradeXUser.go('payments')">Go to Bank Accounts</button>
+          <button class="btn" onclick="AITradeXUser.go('payments')">Go to Bank Accounts</button>
         ` : `
-          ${withdrawalStep === 1 ? `
-            <label>Withdrawal Amount
-              <input id="withdrawalAmountInput" type="number" min="${minWithdrawal}" max="${maxWithdrawal}" value="${App.escapeHtml(withdrawalDraft.amount)}" placeholder="${App.money(minWithdrawal)} - ${App.money(maxWithdrawal)}"/>
-            </label>
-            <div class="profile-note">Available balance: ${App.money(availableRealBalance())}. Pending withdrawals are not included in available balance.</div>
-          ` : ""}
-          ${withdrawalStep === 2 ? `
-            <div class="approved-method-list premium-approved-list compact-bank-picker">
-              ${approvedMethods.map(m => `
-                <button class="${(withdrawalDraft.methodId || selectedWithdrawalMethod?.id) === m.id ? "active" : ""}" onclick="AITradeXUser.selectWithdrawalMethod('${m.id}')">
-                  <b>Bank Account</b>
-                  <span>${App.escapeHtml(methodLabel(m))}</span>
-                </button>
-              `).join("")}
-            </div>
-            <div class="profile-note">Only admin-approved bank accounts are available for withdrawals.</div>
-          ` : ""}
-          ${withdrawalStep === 3 ? `
-            <div class="review-grid compact-review premium-review-strip">
-              <article><span>Amount</span><b>${App.money(withdrawalDraft.amount || 0)}</b></article>
-              <article><span>Method</span><b>Bank Account</b></article>
-              <article><span>Pay To</span><b>${App.escapeHtml(methodLabel(selectedWithdrawalMethod))}</b></article>
-              <article><span>Status</span><b>Pending Approval</b></article>
-            </div>
-            <div class="profile-note">After submit, amount will remain pending until admin approval/rejection.</div>
-          ` : ""}
-          <div class="wizard-actions wallet-actions-row">
-            <button class="btn ghost" onclick="AITradeXUser.prevWithdrawalStep()" ${withdrawalStep === 1 ? "disabled" : ""}>Back</button>
-            ${withdrawalStep < 3 ? `<button class="btn" onclick="AITradeXUser.nextWithdrawalStep()">Next</button>` : `<button class="btn" onclick="AITradeXUser.submitWithdrawalRequest()">Submit Withdrawal</button>`}
+          <div class="wallet-withdraw-balance">
+            <span>Available Balance</span>
+            <b>${App.money(availableRealBalance())}</b>
+          </div>
+
+          <label>Withdraw Amount
+            <input id="withdrawalAmountInput" type="number" min="${minWithdrawal}" max="${maxWithdrawal}" value="${App.escapeHtml(withdrawalDraft.amount)}" placeholder="Enter withdrawal amount"/>
+          </label>
+
+          <div class="approved-method-list premium-approved-list wallet-clean-bank-list">
+            ${approvedMethods.map(m => `
+              <button class="${(withdrawalDraft.methodId || selectedWithdrawalMethod?.id) === m.id ? "active" : ""}" onclick="AITradeXUser.selectWithdrawalMethod('${m.id}')">
+                <b>Bank Account</b>
+                <span>${App.escapeHtml(methodLabel(m))}</span>
+              </button>
+            `).join("")}
+          </div>
+
+          <div class="wallet-submit-strip">
+            <span>Withdrawal remains pending until admin approval.</span>
+            <button class="btn" onclick="AITradeXUser.submitCleanWithdrawalRequest()">Submit Withdraw</button>
           </div>
         `}
       </section>
     `;
 
     const historyPanel = `
-      <section class="premium-card wallet-action-panel history-panel">
-        <div class="wallet-panel-head">
+      <section class="wallet-clean-card wallet-record-card">
+        <div class="wallet-clean-head">
           <div>
-            <p>WALLET RECORDS</p>
+            <p>RECORDS</p>
             <h2>Requests & Ledger</h2>
-            <span>Deposit, withdrawal and balance movement records in one clean place.</span>
+            <span>Track deposit, withdrawal and balance movements.</span>
           </div>
-          <b class="wallet-mini-badge">${requestFiltered.length} Requests</b>
+          <b>${recordsTab === "REQUESTS" ? requestFiltered.length : ledgerRows.length}</b>
         </div>
-        <div class="wallet-filter-chips">
-          ${["ALL", "DEPOSIT", "WITHDRAWAL", "PENDING", "APPROVED", "REJECTED"].map(f => `<button class="${walletHistoryFilter === f ? "active" : ""}" onclick="AITradeXUser.setWalletHistoryFilter('${f}')">${f}</button>`).join("")}
+
+        <div class="wallet-record-tabs">
+          <button class="${recordsTab === "REQUESTS" ? "active" : ""}" onclick="AITradeXUser.setWalletRecordsTab('REQUESTS')">Requests</button>
+          <button class="${recordsTab === "LEDGER" ? "active" : ""}" onclick="AITradeXUser.setWalletRecordsTab('LEDGER')">Ledger</button>
         </div>
-        <div class="wallet-history-columns">
-          <div>
-            <div class="wallet-subhead"><b>Requests</b><span>Page ${walletRequestPage + 1}/${requestTotalPages}</span></div>
-            <div class="wallet-request-list compact-request-list">
-              ${requestPageRows.map(r => `
-                <article class="${String(r.status || "").toLowerCase()}">
-                  <div>
-                    <b>${r.kind} · ${App.money(r.amount)}</b>
-                    <span>${r.kind === "Deposit" ? `${r.type} · UTR ${App.escapeHtml(r.utr || "-")}` : App.escapeHtml(methodLabel(r.methodSnapshot))}</span>
-                    <small>${r.createdAt ? new Date(r.createdAt).toLocaleString() : ""}</small>
-                  </div>
-                  ${statusPill(r.status)}
-                </article>
-              `).join("") || `<div class="empty-state">No matching wallet requests.</div>`}
-            </div>
-            <div class="mini-pager"><button onclick="AITradeXUser.walletRequestPage(-1)" ${walletRequestPage <= 0 ? "disabled" : ""}>Prev</button><button onclick="AITradeXUser.walletRequestPage(1)" ${walletRequestPage >= requestTotalPages - 1 ? "disabled" : ""}>Next</button></div>
+
+        ${recordsTab === "REQUESTS" ? `
+          <div class="wallet-filter-chips wallet-clean-filters">
+            ${["ALL", "DEPOSIT", "WITHDRAWAL", "PENDING", "APPROVED", "REJECTED"].map(f => `<button class="${walletHistoryFilter === f ? "active" : ""}" onclick="AITradeXUser.setWalletHistoryFilter('${f}')">${f === "WITHDRAWAL" ? "WITHDRAW" : f}</button>`).join("")}
           </div>
-          <div>
-            <div class="wallet-subhead"><b>Wallet Ledger</b><span>Page ${walletLedgerPage + 1}/${ledgerTotalPages}</span></div>
-            <div class="wallet-request-list compact-request-list ledger-list">
-              ${ledgerPageRows.map(row => `
-                <article class="approved">
-                  <div>
-                    <b>${App.money(Math.abs(Number(row.amount || 0)))} · ${App.escapeHtml(row.type || "Wallet Entry")}</b>
-                    <span>${App.escapeHtml(row.note || "Balance update")}</span>
-                    <small>${row.createdAt ? new Date(row.createdAt).toLocaleString() : ""}</small>
-                  </div>
-                  <b class="${Number(row.amount || 0) < 0 ? "loss-text" : "profit-text"}">${Number(row.amount || 0) < 0 ? "-" : "+"}${App.money(Math.abs(Number(row.amount || 0)))}</b>
-                </article>
-              `).join("") || `<div class="empty-state">No wallet ledger entries yet.</div>`}
-            </div>
-            <div class="mini-pager"><button onclick="AITradeXUser.walletLedgerPage(-1)" ${walletLedgerPage <= 0 ? "disabled" : ""}>Prev</button><button onclick="AITradeXUser.walletLedgerPage(1)" ${walletLedgerPage >= ledgerTotalPages - 1 ? "disabled" : ""}>Next</button></div>
+
+          <div class="wallet-request-list compact-request-list wallet-clean-records">
+            ${requestPageRows.map(r => `
+              <article class="${String(r.status || "").toLowerCase()}">
+                <div>
+                  <b>${r.kind} · ${App.money(r.amount)}</b>
+                  <span>${r.kind === "Deposit" ? `${r.type} · UTR ${App.escapeHtml(r.utr || "-")}` : App.escapeHtml(methodLabel(r.methodSnapshot))}</span>
+                  <small>${r.createdAt ? new Date(r.createdAt).toLocaleString() : ""}</small>
+                </div>
+                ${statusPill(r.status)}
+              </article>
+            `).join("") || `<div class="empty-state">No matching wallet requests.</div>`}
           </div>
-        </div>
+
+          <div class="mini-pager"><button onclick="AITradeXUser.walletRequestPage(-1)" ${walletRequestPage <= 0 ? "disabled" : ""}>Prev</button><span>Page ${walletRequestPage + 1}/${requestTotalPages}</span><button onclick="AITradeXUser.walletRequestPage(1)" ${walletRequestPage >= requestTotalPages - 1 ? "disabled" : ""}>Next</button></div>
+        ` : `
+          <div class="wallet-request-list compact-request-list ledger-list wallet-clean-records">
+            ${ledgerPageRows.map(row => `
+              <article class="approved">
+                <div>
+                  <b>${App.escapeHtml(row.type || "Wallet Entry")}</b>
+                  <span>${App.escapeHtml(row.note || "Balance update")}</span>
+                  <small>${row.createdAt ? new Date(row.createdAt).toLocaleString() : ""}</small>
+                </div>
+                <b class="${Number(row.amount || 0) < 0 ? "loss-text" : "profit-text"}">${Number(row.amount || 0) < 0 ? "-" : "+"}${App.money(Math.abs(Number(row.amount || 0)))}</b>
+              </article>
+            `).join("") || `<div class="empty-state">No wallet ledger entries yet.</div>`}
+          </div>
+
+          <div class="mini-pager"><button onclick="AITradeXUser.walletLedgerPage(-1)" ${walletLedgerPage <= 0 ? "disabled" : ""}>Prev</button><span>Page ${walletLedgerPage + 1}/${ledgerTotalPages}</span><button onclick="AITradeXUser.walletLedgerPage(1)" ${walletLedgerPage >= ledgerTotalPages - 1 ? "disabled" : ""}>Next</button></div>
+        `}
       </section>
     `;
 
     shell(`
-      <section class="wallet-premium-hero">
-        <div class="wallet-hero-glow"></div>
-        <div class="wallet-hero-content">
-          <div>
-            <p>WALLET</p>
-            <h1>${App.money(availableRealBalance())}</h1>
-            <span>Available balance · ${statusPill(kyc.status)}</span>
-            ${usdtRateChip("wallet-rate-chip")}
-          </div>
-          <div class="wallet-hero-stats">
-            <article><span>Pending Deposit</span><b>${App.money(pendingDepositAmount())}</b></article>
-            <article><span>Pending Withdrawal</span><b>${App.money(pendingWithdrawalAmount())}</b></article>
-          </div>
+      <section class="wallet-clean-hero">
+        <div class="wallet-clean-balance">
+          <p>WALLET</p>
+          <h1>${App.money(availableRealBalance())}</h1>
+          <span>Available Balance · ${statusPill(kyc.status)}</span>
         </div>
+        <div class="wallet-clean-stats">
+          <article><span>Pending Deposit</span><b>${App.money(pendingDepositAmount())}</b></article>
+          <article><span>Pending Withdraw</span><b>${App.money(pendingWithdrawalAmount())}</b></article>
+        </div>
+        ${recentStatus ? `<div class="wallet-last-status"><span>Latest</span><b>${recentStatus.kind} · ${App.money(recentStatus.amount)}</b>${statusPill(recentStatus.status)}</div>` : ""}
       </section>
 
-      <section class="wallet-action-grid">
-        <button class="${activePanel === "DEPOSIT" ? "active" : ""}" onclick="AITradeXUser.setWalletMode('DEPOSIT')">
-          <i>＋</i><b>Deposit</b><span>Add funds with UPI or bank</span>
-        </button>
-        <button class="${activePanel === "WITHDRAWAL" ? "active" : ""}" onclick="AITradeXUser.setWalletMode('WITHDRAWAL')">
-          <i>↗</i><b>Withdraw</b><span>Send balance to approved bank</span>
-        </button>
-        <button class="${activePanel === "HISTORY" ? "active" : ""}" onclick="AITradeXUser.setWalletMode('HISTORY')">
-          <i>≡</i><b>Requests</b><span>Requests and ledger</span>
-        </button>
+      <section class="wallet-clean-tabs">
+        <button class="${activePanel === "DEPOSIT" ? "active" : ""}" onclick="AITradeXUser.setWalletMode('DEPOSIT')"><b>Deposit</b><span>Add funds</span></button>
+        <button class="${activePanel === "WITHDRAWAL" ? "active" : ""}" onclick="AITradeXUser.setWalletMode('WITHDRAWAL')"><b>Withdraw</b><span>Bank payout</span></button>
+        <button class="${activePanel === "HISTORY" ? "active" : ""}" onclick="AITradeXUser.setWalletMode('HISTORY')"><b>Records</b><span>Requests / Ledger</span></button>
       </section>
 
       ${activePanel === "DEPOSIT" ? depositPanel : activePanel === "WITHDRAWAL" ? withdrawalPanel : historyPanel}
@@ -3931,6 +3910,15 @@
       localStorage.setItem("AITradeX_WALLET_REQUEST_PAGE", "0");
       render();
     },
+    setWalletRecordsTab(tab) {
+      walletRecordsTab = tab === "LEDGER" ? "LEDGER" : "REQUESTS";
+      walletRequestPage = 0;
+      walletLedgerPage = 0;
+      localStorage.setItem("AITradeX_WALLET_RECORDS_TAB", walletRecordsTab);
+      localStorage.setItem("AITradeX_WALLET_REQUEST_PAGE", "0");
+      localStorage.setItem("AITradeX_WALLET_LEDGER_PAGE", "0");
+      render();
+    },
     walletRequestPage(delta) {
       walletRequestPage = Math.max(0, walletRequestPage + Number(delta || 0));
       localStorage.setItem("AITradeX_WALLET_REQUEST_PAGE", String(walletRequestPage));
@@ -3940,6 +3928,22 @@
       walletLedgerPage = Math.max(0, walletLedgerPage + Number(delta || 0));
       localStorage.setItem("AITradeX_WALLET_LEDGER_PAGE", String(walletLedgerPage));
       render();
+    },
+    async submitCleanDepositRequest() {
+      const amount = Number(document.getElementById("depositAmountInput")?.value || 0);
+      const utr = normalizeUtr(document.getElementById("depositUtrInput")?.value || "");
+      depositDraft.amount = amount;
+      depositDraft.utr = utr;
+      localStorage.setItem("AITradeX_DEPOSIT_DRAFT", JSON.stringify(depositDraft));
+      await this.submitDepositRequest();
+    },
+    async submitCleanWithdrawalRequest() {
+      const approved = approvedPaymentMethods();
+      const method = approved.find(m => m.id === withdrawalDraft.methodId) || approved[0];
+      withdrawalDraft.amount = Number(document.getElementById("withdrawalAmountInput")?.value || 0);
+      withdrawalDraft.methodId = method?.id || "";
+      localStorage.setItem("AITradeX_WITHDRAWAL_DRAFT", JSON.stringify(withdrawalDraft));
+      await this.submitWithdrawalRequest();
     },
     setDepositType(type) {
       const settings = platformSettings();
