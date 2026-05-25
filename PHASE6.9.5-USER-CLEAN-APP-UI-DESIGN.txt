@@ -1,0 +1,28 @@
+AITradeX Phase 6.9.5 - User Clean App UI Design
+
+Base used:
+- AITradeX-Phase6.9.5-WalletCleanPremium.zip
+
+Scope:
+- User app UI only.
+- Admin side not touched.
+- No SQL changes.
+- No AI/cron/referral/wallet/trade database logic changes.
+
+Goal:
+- Make user app feel lighter and closer to the clean mobile mockup style.
+- Reduce heavy gradient/shadow feel.
+- Keep dark premium fintech look with cyan/gold accents.
+
+Files changed:
+- styles.css: user-only clean mobile app design system.
+- index.html: cache version only.
+
+Not changed:
+- admin-app.js
+- db-service.js
+- auth.js
+- core.js
+- admin.html
+- Supabase SQL files
+- AI cron files
